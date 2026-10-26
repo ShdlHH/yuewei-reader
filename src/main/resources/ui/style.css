@@ -1,0 +1,294 @@
+/* 阅微 · 小说阅读器 —— 纸感暖色主题 */
+
+.root {
+    -fx-font-family: "Microsoft YaHei UI", "PingFang SC", "Segoe UI", sans-serif;
+    -fx-font-size: 13px;
+}
+
+.app-root {
+    -fx-background-color: #faf8f3;
+}
+
+.content-area {
+    -fx-background-color: #faf8f3;
+}
+
+/* ---------------- 左侧导航 ---------------- */
+
+.sidebar {
+    -fx-background-color: #f1ebe0;
+    -fx-border-color: transparent #e6dfd1 transparent transparent;
+    -fx-border-width: 0 1 0 0;
+}
+
+.brand {
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #3b3a36;
+}
+
+.brand-sub {
+    -fx-font-size: 11.5px;
+    -fx-text-fill: #9b9486;
+}
+
+.nav-button {
+    -fx-background-color: transparent;
+    -fx-background-radius: 6;
+    -fx-alignment: center-left;
+    -fx-padding: 9 12 9 12;
+    -fx-text-fill: #4a4740;
+    -fx-font-size: 14px;
+    -fx-cursor: hand;
+}
+
+.nav-button:hover {
+    -fx-background-color: #e7dfd0;
+}
+
+.nav-button:selected {
+    -fx-background-color: #3f5c48;
+    -fx-text-fill: #ffffff;
+}
+
+/* ---------------- 工具栏与按钮 ---------------- */
+
+.toolbar {
+    -fx-background-color: #fffdf9;
+    -fx-border-color: transparent transparent #ece5d8 transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.primary-button {
+    -fx-background-color: #3f5c48;
+    -fx-text-fill: #ffffff;
+    -fx-background-radius: 6;
+    -fx-padding: 7 14 7 14;
+    -fx-cursor: hand;
+}
+
+.primary-button:hover {
+    -fx-background-color: #4d7058;
+}
+
+.ghost-button {
+    -fx-background-color: transparent;
+    -fx-border-color: #d8d0c0;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-text-fill: #4a4740;
+    -fx-padding: 6 12 6 12;
+    -fx-cursor: hand;
+}
+
+.ghost-button:hover {
+    -fx-background-color: #f1ebe0;
+}
+
+/* ---------------- 书架 ---------------- */
+
+.shelf-scroll {
+    -fx-background-color: transparent;
+}
+
+.shelf-scroll > .viewport {
+    -fx-background-color: transparent;
+}
+
+.book-card {
+    -fx-background-color: #fffdf9;
+    -fx-background-radius: 8;
+    -fx-border-color: #ece5d8;
+    -fx-border-radius: 8;
+    -fx-padding: 10;
+    -fx-cursor: hand;
+}
+
+.book-card:hover {
+    -fx-border-color: #c9c0ad;
+    -fx-effect: dropshadow(gaussian, rgba(60, 48, 28, 0.12), 10, 0, 0, 3);
+}
+
+.book-cover {
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 26px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 6;
+}
+
+.book-title {
+    -fx-font-size: 13.5px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #33312c;
+}
+
+.book-meta {
+    -fx-font-size: 11.5px;
+    -fx-text-fill: #8b8578;
+}
+
+.badge-offline {
+    -fx-background-color: #e2efe0;
+    -fx-text-fill: #3f6b45;
+    -fx-background-radius: 4;
+    -fx-padding: 1 6 1 6;
+    -fx-font-size: 10.5px;
+}
+
+.badge-warn {
+    -fx-background-color: #f6e2d7;
+    -fx-text-fill: #a0522d;
+    -fx-background-radius: 4;
+    -fx-padding: 1 6 1 6;
+    -fx-font-size: 10.5px;
+}
+
+.empty-title {
+    -fx-font-size: 18px;
+    -fx-text-fill: #6a655a;
+}
+
+/* ---------------- 通用文字 ---------------- */
+
+.muted {
+    -fx-text-fill: #8b8578;
+    -fx-font-size: 12px;
+}
+
+.ok {
+    -fx-text-fill: #3f7a4f;
+    -fx-font-size: 12px;
+}
+
+.warn {
+    -fx-text-fill: #b4582f;
+    -fx-font-size: 12px;
+}
+
+.panel-title {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #4a4740;
+}
+
+.section-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #3b3a36;
+}
+
+/* ---------------- 阅读器 ---------------- */
+
+.reader-toolbar {
+    -fx-background-color: #ece4d4;
+    -fx-border-color: transparent transparent #ddd3c0 transparent;
+}
+
+.reader-book {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #3b3a36;
+}
+
+.reader-chapter {
+    -fx-font-size: 12.5px;
+    -fx-text-fill: #7d776a;
+}
+
+.reader-percent {
+    -fx-font-size: 12px;
+    -fx-text-fill: #7d776a;
+}
+
+.reader-flow {
+    -fx-background-color: #f6f1e7;
+}
+
+.toc-box {
+    -fx-background-color: #ece4d4;
+    -fx-border-color: transparent #ddd3c0 transparent transparent;
+}
+
+.toc-title {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #4a4740;
+}
+
+.toc-cached {
+    -fx-text-fill: #3f6b45;
+}
+
+/* ---------------- 表格与列表 ---------------- */
+
+.table-view {
+    -fx-background-color: #fffdf9;
+    -fx-border-color: #ece5d8;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+}
+
+.table-view .column-header-background {
+    -fx-background-color: #f4efe4;
+}
+
+.table-view .column-header,
+.table-view .filler {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent #ece5d8 transparent transparent;
+}
+
+.table-view .table-row-cell:selected {
+    -fx-background-color: #dfe8dd;
+}
+
+.table-view .table-row-cell:selected .text {
+    -fx-fill: #2f3a2e;
+}
+
+.list-view {
+    -fx-background-color: #fffdf9;
+    -fx-border-color: #ece5d8;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+}
+
+.list-cell:selected {
+    -fx-background-color: #dfe8dd;
+}
+
+.split-pane {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.split-pane > .split-pane-divider {
+    -fx-background-color: #ece5d8;
+    -fx-padding: 0 0 0 1;
+}
+
+.scroll-pane {
+    -fx-background-color: transparent;
+}
+
+.scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}
+
+/* ---------------- 状态栏 ---------------- */
+
+.status-bar {
+    -fx-background-color: #f1ebe0;
+    -fx-border-color: #e6dfd1 transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+
+.status-text {
+    -fx-text-fill: #5a564c;
+    -fx-font-size: 12px;
+}
+
+.status-muted {
+    -fx-text-fill: #9b9486;
+    -fx-font-size: 11px;
+}

@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PRD · 阅微 小说阅读器（桌面端）</title>
+<style>
+  :root{
+    --paper:#f6f2ea;
+    --paper-2:#fffdf8;
+    --ink:#1d1a16;
+    --ink-2:#3f3a33;
+    --muted:#7a7166;
+    --line:#e2d9cb;
+    --line-strong:#cfc3b1;
+    --accent:#8d4a2c;
+    --accent-soft:#f0e2d6;
+    --green:#2f5b4e;
+    --green-soft:#e3ece7;
+    --amber:#9a6b12;
+    --amber-soft:#f7ecd5;
+    --red:#9b3b34;
+    --red-soft:#f6e3e0;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(29,26,22,.05),0 8px 24px -18px rgba(29,26,22,.35);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Microsoft YaHei","PingFang SC","Hiragino Sans GB",system-ui,sans-serif;
+    font-size:15px;line-height:1.85;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(141,74,44,.3)}
+  a:hover{border-bottom-color:var(--accent)}
+  .layout{display:flex;gap:48px;max-width:1440px;margin:0 auto;padding:0 32px}
+
+  /* ============ 侧栏 ============ */
+  .sidebar{
+    position:sticky;top:0;align-self:flex-start;
+    width:232px;flex:none;height:100vh;padding:34px 0 40px;
+    display:flex;flex-direction:column;gap:22px;
+  }
+  .brand{display:flex;align-items:center;gap:11px;padding:0 10px}
+  .brand-mark{
+    width:34px;height:34px;border-radius:8px;flex:none;
+    background:linear-gradient(145deg,var(--accent),#5e2f1b);
+    color:#fff;display:grid;place-items:center;
+    font-family:Georgia,"Songti SC",serif;font-size:18px;
+  }
+  .brand-text{line-height:1.35}
+  .brand-text b{display:block;font-size:15px;letter-spacing:.02em}
+  .brand-text span{font-size:11.5px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+  .toc{overflow-y:auto;padding:0 4px 20px;scrollbar-width:thin}
+  .toc h4{
+    margin:14px 12px 6px;font-size:11px;letter-spacing:.14em;
+    color:var(--muted);font-weight:600;text-transform:uppercase;
+  }
+  .toc a{
+    display:block;padding:6px 12px;border-radius:6px;border:none;
+    color:var(--ink-2);font-size:13px;line-height:1.5;
+  }
+  .toc a:hover{background:#ece5d9;color:var(--ink)}
+  .toc a.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .toc .sub{padding-left:24px;font-size:12.5px;color:var(--muted)}
+  .side-note{
+    margin-top:auto;font-size:11.5px;color:var(--muted);
+    padding:14px 12px 0;border-top:1px solid var(--line);line-height:1.7;
+  }
+
+  /* ============ 正文 ============ */
+  main{flex:1;min-width:0;max-width:1020px;padding:38px 0 120px}
+  .hero{
+    background:var(--paper-2);border:1px solid var(--line);border-radius:14px;
+    padding:38px 40px 32px;box-shadow:var(--shadow);position:relative;overflow:hidden;
+  }
+  .hero::after{
+    content:"";position:absolute;right:-40px;top:-60px;width:240px;height:240px;border-radius:50%;
+    background:radial-gradient(circle at 30% 30%,rgba(141,74,44,.10),transparent 70%);
+    pointer-events:none;
+  }
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:8px;
+    font-size:11.5px;letter-spacing:.16em;color:var(--accent);
+    font-weight:600;text-transform:uppercase;
+  }
+  .eyebrow::before{content:"";width:22px;height:1px;background:var(--accent)}
+  h1{
+    font-family:Georgia,"Songti SC","SimSun",serif;
+    font-size:38px;line-height:1.25;margin:16px 0 10px;letter-spacing:-.01em;font-weight:600;
+  }
+  .lede{font-size:16px;color:var(--ink-2);max-width:660px;margin:0}
+  .meta-grid{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:18px 24px;margin-top:30px;padding-top:24px;border-top:1px solid var(--line);
+  }
+  .meta-grid dt{font-size:11px;letter-spacing:.1em;color:var(--muted);margin-bottom:3px}
+  .meta-grid dd{margin:0;font-size:13.5px;font-weight:500}
+  .pill{
+    display:inline-block;padding:1px 9px;border-radius:20px;font-size:11.5px;font-weight:600;
+    background:var(--amber-soft);color:var(--amber);border:1px solid rgba(154,107,18,.2);
+  }
+
+  .decision-bar{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1px;
+    background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;
+    margin-top:26px;
+  }
+  .decision{background:var(--paper-2);padding:16px 18px}
+  .decision span{display:block;font-size:11px;letter-spacing:.1em;color:var(--muted);margin-bottom:4px}
+  .decision b{font-size:13.5px;font-weight:600}
+
+  section{margin-top:58px;scroll-margin-top:24px}
+  h2{
+    font-family:Georgia,"Songti SC","SimSun",serif;
+    font-size:27px;margin:0 0 6px;font-weight:600;letter-spacing:-.01em;
+  }
+  h2 .num{
+    font-family:Georgia,serif;font-size:13px;color:var(--accent);
+    display:inline-block;margin-right:10px;vertical-align:3px;letter-spacing:.08em;
+  }
+  .h2-rule{height:1px;background:linear-gradient(90deg,var(--line-strong),transparent);margin:14px 0 26px}
+  h3{font-size:17.5px;margin:34px 0 10px;font-weight:600}
+  h4{font-size:14px;margin:22px 0 8px;color:var(--ink-2);font-weight:600;letter-spacing:.02em}
+  p{margin:0 0 14px}
+  ul,ol{margin:0 0 16px;padding-left:22px}
+  li{margin:4px 0}
+  code{
+    font-family:"Cascadia Code",Consolas,"Courier New",monospace;
+    background:#ece6da;border-radius:4px;padding:1px 5px;font-size:12.5px;
+  }
+  .muted{color:var(--muted)}
+  .small{font-size:12.5px}
+
+  .card{
+    background:var(--paper-2);border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px 24px;box-shadow:var(--shadow);margin:18px 0;
+  }
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+
+  table{width:100%;border-collapse:collapse;margin:16px 0 22px;font-size:13px}
+  th{
+    text-align:left;font-weight:600;font-size:11.5px;letter-spacing:.06em;color:var(--muted);
+    text-transform:uppercase;padding:9px 12px;border-bottom:1px solid var(--line-strong);
+    background:#f1ebdf;
+  }
+  td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.65}
+  tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:#faf6ef}
+  td:first-child{white-space:nowrap}
+
+  .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:4px;font-weight:600;white-space:nowrap}
+  .tag.p0{background:var(--accent-soft);color:var(--accent)}
+  .tag.p1{background:var(--green-soft);color:var(--green)}
+  .tag.no{background:#ece7de;color:#6c6459}
+
+  /* 功能需求卡 */
+  .fr{
+    background:var(--paper-2);border:1px solid var(--line);border-radius:var(--radius);
+    margin:22px 0;box-shadow:var(--shadow);overflow:hidden;
+  }
+  .fr-head{
+    display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
+    padding:16px 24px;border-bottom:1px solid var(--line);background:#fbf7f0;
+  }
+  .fr-id{
+    font-family:"Cascadia Code",Consolas,monospace;font-size:11.5px;font-weight:700;
+    color:var(--accent);background:var(--accent-soft);padding:2px 8px;border-radius:4px;letter-spacing:.04em;
+  }
+  .fr-head h3{margin:0;font-size:16.5px;font-weight:600}
+  .fr-head .stage{margin-left:auto;font-size:11.5px;color:var(--muted)}
+  .fr-body{padding:20px 24px 22px}
+  .fr-body > :last-child{margin-bottom:0}
+  .kv{display:grid;grid-template-columns:88px 1fr;gap:6px 14px;font-size:13.5px;margin:0 0 14px}
+  .kv dt{color:var(--muted);font-size:12.5px;padding-top:1px}
+  .kv dd{margin:0}
+
+  .callout{
+    border-left:3px solid var(--accent);background:var(--accent-soft);
+    padding:12px 16px;border-radius:0 6px 6px 0;margin:16px 0;font-size:13.5px;
+  }
+  .callout.warn{border-left-color:var(--amber);background:var(--amber-soft)}
+  .callout.stop{border-left-color:var(--red);background:var(--red-soft)}
+  .callout b{color:var(--ink)}
+
+  /* 流程链 */
+  .flow{display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;margin:18px 0}
+  .flow-step{
+    flex:1 1 150px;min-width:132px;background:var(--paper-2);border:1px solid var(--line);
+    border-radius:8px;padding:12px 14px;position:relative;
+  }
+  .flow-step b{display:block;font-size:13.5px;margin-bottom:2px}
+  .flow-step span{font-size:11.5px;color:var(--muted);line-height:1.5;display:block}
+  .flow-step em{
+    font-style:normal;font-family:Georgia,serif;font-size:11px;color:var(--accent);
+    display:block;margin-bottom:4px;letter-spacing:.08em;
+  }
+  .flow-step:not(:last-child)::after{
+    content:"→";position:absolute;right:-11px;top:50%;transform:translateY(-50%);
+    color:var(--line-strong);font-size:13px;z-index:1;
+  }
+
+  /* 线框 */
+  .wire{
+    border:1px solid var(--line-strong);border-radius:8px;overflow:hidden;
+    background:#fff;box-shadow:var(--shadow);margin:18px 0 8px;
+  }
+  .wire-bar{
+    display:flex;align-items:center;gap:6px;padding:7px 10px;background:#efe9dd;
+    border-bottom:1px solid var(--line);
+  }
+  .dot{width:8px;height:8px;border-radius:50%;background:#d3c8b6}
+  .wire-title{margin-left:8px;font-size:11px;color:var(--muted);letter-spacing:.06em}
+  .wire-body{display:flex;min-height:270px;font-size:11.5px}
+  .wire-nav{width:132px;background:#f7f2e8;border-right:1px solid var(--line);padding:12px 10px;display:flex;flex-direction:column;gap:6px}
+  .wire-nav .item{padding:5px 8px;border-radius:4px;color:var(--muted)}
+  .wire-nav .item.act{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  .wire-main{flex:1;padding:14px}
+  .wire-caption{font-size:12px;color:var(--muted);margin:0 0 26px;text-align:center}
+  .shelf{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .book{background:#faf6ee;border:1px solid var(--line);border-radius:6px;padding:8px;text-align:center}
+  .cover{
+    height:62px;border-radius:3px;margin-bottom:6px;
+    background:linear-gradient(160deg,#d9c2a8,#a97a55);
+    display:grid;place-items:center;color:#fff;font-family:Georgia,serif;font-size:16px;
+  }
+  .cover.g2{background:linear-gradient(160deg,#9fb3a8,#4c6b5d)}
+  .cover.g3{background:linear-gradient(160deg,#b9aec9,#6c5a86)}
+  .cover.g4{background:linear-gradient(160deg,#d3b6b0,#96605a)}
+  .book b{display:block;font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .book span{font-size:10px;color:var(--muted)}
+  .reader{display:flex;min-height:250px}
+  .reader-toc{width:126px;border-right:1px solid var(--line);padding:10px;background:#fbf7f0;font-size:11px;color:var(--muted)}
+  .reader-toc div{padding:4px 6px;border-radius:3px}
+  .reader-toc .act{background:var(--accent-soft);color:var(--accent)}
+  .page{flex:1;padding:18px 30px;font-family:Georgia,"Songti SC",serif;font-size:12.5px;line-height:2;color:#332d26}
+  .page h5{margin:0 0 10px;font-size:14px}
+  .page .line{height:7px;background:#eee7db;border-radius:3px;margin:8px 0}
+  .page .line.s{width:62%}
+  .page .line.m{width:84%}
+  .dbg{display:grid;grid-template-columns:1fr 1fr;gap:0;min-height:230px}
+  .dbg-left{border-right:1px solid var(--line);padding:12px}
+  .dbg-right{padding:12px;background:#fcf8f1}
+  .row{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px dashed var(--line);font-size:11px}
+  .row span{color:var(--muted)}
+  .ok{color:var(--green);font-weight:600}
+  .bad{color:var(--red);font-weight:600}
+  .wa{color:var(--amber);font-weight:600}
+
+  .state-rail{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 18px}
+  .state{
+    border:1px solid var(--line-strong);border-radius:20px;padding:4px 14px;font-size:12.5px;
+    background:var(--paper-2);font-weight:500;
+  }
+  .state.act{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+  .state.bad{border-color:var(--red);color:var(--red);background:var(--red-soft)}
+  .state.good{border-color:var(--green);color:var(--green);background:var(--green-soft)}
+  .arrow{color:var(--line-strong);font-size:13px}
+
+  .q-list{counter-reset:q;list-style:none;padding:0}
+  .q-list li{
+    counter-increment:q;position:relative;padding:13px 16px 13px 48px;
+    background:var(--paper-2);border:1px solid var(--line);border-radius:8px;margin-bottom:10px;
+  }
+  .q-list li::before{
+    content:"Q" counter(q);position:absolute;left:14px;top:13px;
+    font-family:"Cascadia Code",Consolas,monospace;font-size:11px;font-weight:700;color:var(--accent);
+  }
+
+  @media (max-width:1080px){
+    .layout{display:block;padding:0 20px}
+    .sidebar{position:static;width:auto;height:auto;padding:20px 0 0;border-bottom:1px solid var(--line)}
+    .toc{display:flex;flex-wrap:wrap;gap:2px;padding-bottom:8px}
+    .toc h4{width:100%;margin:6px 0 2px}
+    .toc a{padding:4px 10px}
+    .toc .sub{display:none}
+    .side-note{display:none}
+    main{padding-top:26px}
+    .grid-2,.grid-3,.dbg{grid-template-columns:1fr}
+    .hero{padding:28px 22px}
+    h1{font-size:30px}
+  }
+  @media print{
+    .sidebar,.hero::after{display:none}
+    body{background:#fff;font-size:11.5pt}
+    .layout{display:block;max-width:none;padding:0}
+    main{max-width:none}
+    .fr,.card,.wire{box-shadow:none;break-inside:avoid}
+    a{color:inherit;border:none}
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ================= 侧边目录 ================= -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">阅</div>
+      <div class="brand-text">
+        <b>阅微 · 阅读器</b>
+        <span>PRD v0.1</span>
+      </div>
+    </div>
+    <nav class="toc" id="toc">
+      <h4>文档</h4>
+      <a href="#background">1 背景与目标</a>
+      <a href="#scope">2 范围与优先级</a>
+      <a href="#model">3 产品模型与主流程</a>
+      <a href="#fr">4 功能需求</a>
+      <a href="#fr-01" class="sub">FR-01 TXT 导入与分章</a>
+      <a href="#fr-02" class="sub">FR-02 书架</a>
+      <a href="#fr-03" class="sub">FR-03 阅读器</a>
+      <a href="#fr-04" class="sub">FR-04 书源导入</a>
+      <a href="#fr-05" class="sub">FR-05 在线搜索</a>
+      <a href="#fr-06" class="sub">FR-06 书籍详情</a>
+      <a href="#fr-07" class="sub">FR-07 书源管理</a>
+      <a href="#fr-08" class="sub">FR-08 下载与离线</a>
+      <a href="#fr-09" class="sub">FR-09 设置与数据</a>
+      <a href="#rules">5 共享规则与异常</a>
+      <a href="#open">6 待确认问题</a>
+    </nav>
+    <div class="side-note">
+      评审稿 · 2026-10-26<br>
+      产品决策已收敛，未决项见第 6 节。
+    </div>
+  </aside>
+
+  <main>
+
+    <!-- ================= 封面 ================= -->
+    <header class="hero">
+      <div class="eyebrow">Product Requirements Document</div>
+      <h1>阅微 · 小说阅读器</h1>
+      <p class="lede">一个把「网络书源」和「本地 TXT」放进同一个书架的 Windows 桌面客户端：导入书源即可在线找书，导入 TXT 即可离线阅读，下载过的章节断网也能继续看。</p>
+
+      <dl class="meta-grid">
+        <div><dt>版本</dt><dd>v0.1（评审稿）</dd></div>
+        <div><dt>日期</dt><dd>2026-10-26</dd></div>
+        <div><dt>形态</dt><dd>JavaFX 桌面客户端</dd></div>
+        <div><dt>书源格式</dt><dd>兼容 Legado 3.0</dd></div>
+        <div><dt>状态</dt><dd><span class="pill">待评审</span></dd></div>
+      </dl>
+
+      <div class="decision-bar">
+        <div class="decision"><span>客户端形态</span><b>JavaFX 桌面端（Win / macOS / Linux）</b></div>
+        <div class="decision"><span>书源规则</span><b>直接兼容 Legado 3.0 书源 JSON</b></div>
+        <div class="decision"><span>P0 能力</span><b>本地阅读 · 在线阅读 · 离线缓存 · 书源管理</b></div>
+      </div>
+    </header>
+
+    <!-- ================= 1 背景 ================= -->
+    <section id="background">
+      <h2><span class="num">01</span>背景与目标</h2>
+      <div class="h2-rule"></div>
+
+      <p>追更的人同时面对两种割裂的阅读方式：网页端广告多、排版乱、进度记不住；本地 TXT 没有目录、换设备要重新找位置；而现成的阅读工具往往只解决其中一半——要么只能读本地文件，要么只做在线书源。</p>
+
+      <p>产品要做的判断是：<b>本地书和网络书在同一个书架里，用同一个阅读器读完。</b>因此书籍、章节、阅读进度必须是一套统一模型，来源只是书籍的一个属性，而不是两套系统。</p>
+
+      <h3>目标（以可观察的结果表述）</h3>
+      <ul>
+        <li>导入一份本地 TXT 后，用户能直接看到可跳转的章节目录，并从任意章节开始阅读。</li>
+        <li>导入一份 Legado 书源 JSON 后，用户能在同一界面完成「搜索 → 查看详情 → 加入书架 → 阅读正文」。</li>
+        <li>对任意一本在线书发起下载后，已缓存章节在断网状态下仍能打开。</li>
+        <li>书源失效时，用户能定位到失败环节（搜索 / 详情 / 目录 / 正文）并自行修正规则，而不是只看到“加载失败”。</li>
+      </ul>
+
+      <div class="callout">
+        <b>产品边界前置声明：</b>本软件不内置、不分发任何书源与书籍内容，仅提供规则解析与本地文件阅读能力；所有书源由用户自行导入，所有阅读数据只保存在本机。
+      </div>
+    </section>
+
+    <!-- ================= 2 范围 ================= -->
+    <section id="scope">
+      <h2><span class="num">02</span>范围与优先级</h2>
+      <div class="h2-rule"></div>
+
+      <p>首版以「一位用户在自己电脑上，从导入到读完一章」为最小闭环。下列 P0 项全部参与这个闭环；P1 项在闭环稳定后追加。</p>
+
+      <table>
+        <thead>
+          <tr><th style="width:88px">优先级</th><th>能力</th><th>为什么在这个优先级</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="tag p0">P0</span></td><td>本地 TXT 导入与自动分章</td><td>无需网络即可验证「书架 → 目录 → 阅读 → 记进度」整条链路</td></tr>
+          <tr><td><span class="tag p0">P0</span></td><td>书架与阅读器</td><td>产品主体，所有来源的内容都在这里被消费</td></tr>
+          <tr><td><span class="tag p0">P0</span></td><td>Legado 3.0 书源导入</td><td>决定在线阅读能覆盖多少站点，是核心差异点</td></tr>
+          <tr><td><span class="tag p0">P0</span></td><td>在线搜索、详情、目录与正文</td><td>书源价值必须在完整解析链路上体现</td></tr>
+          <tr><td><span class="tag p0">P0</span></td><td>书源管理（增删改、启停、校验、调试）</td><td>书源会失效，没有调试能力用户无法自救</td></tr>
+          <tr><td><span class="tag p0">P0</span></td><td>批量下载与离线缓存</td><td>“断网可读”是在线阅读的兜底，也是 P0 明确要求</td></tr>
+          <tr><td><span class="tag p1">P1</span></td><td>换源（同一本书切换书源继续读）</td><td>提升追更成功率，但不阻塞首版闭环</td></tr>
+          <tr><td><span class="tag p1">P1</span></td><td>书架分组、排序自定义、封面自定义</td><td>书多之后的整理需求</td></tr>
+          <tr><td><span class="tag p1">P1</span></td><td>EPUB 导入、听书（TTS）</td><td>格式与场景扩展</td></tr>
+          <tr><td><span class="tag p1">P1</span></td><td>数据备份 / 恢复、WebDAV 同步</td><td>换机与多设备场景</td></tr>
+          <tr><td><span class="tag no">不做</span></td><td>内置书源市场、内置书籍内容、账号体系、云同步、移动端</td><td>涉及内容分发的合规风险，或与桌面单机定位不符</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout warn">
+        <b>Legado 兼容性的明确边界（P0 只做到这里）：</b>支持 <code>ruleSearch</code> / <code>ruleBookInfo</code> / <code>ruleToc</code> / <code>ruleContent</code> 四段网页规则，以及 <code>class</code> / <code>tag</code> / <code>id</code> / <code>text</code> / <code>href</code> / <code>src</code> 等常用规则动作、<code>{{key}}</code> / <code>{{page}}</code> 变量与正则替换；<b>不支持</b>规则内嵌 JavaScript、需要登录态的站点、音频/图片类书源（<code>bookSourceType ≠ 0</code>）。这类书源允许导入，但会被标记为「部分支持」并说明原因。
+      </div>
+    </section>
+
+    <!-- ================= 3 模型 ================= -->
+    <section id="model">
+      <h2><span class="num">03</span>产品模型与主流程</h2>
+      <div class="h2-rule"></div>
+
+      <h3>核心对象</h3>
+      <table>
+        <thead>
+          <tr><th>对象</th><th>定义</th><th>关键属性</th><th>来源差异</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>书源</td>
+            <td>一份描述“如何从某个站点取数”的规则集合</td>
+            <td>名称、站点地址、分组、启用状态、健康状态、最近校验时间、原始规则 JSON</td>
+            <td>仅在线书使用；同一份 JSON 可含多个书源</td>
+          </tr>
+          <tr>
+            <td>书籍</td>
+            <td>书架上的一个条目，是阅读进度的归属对象</td>
+            <td>书名、作者、封面、简介、来源类型（本地 TXT / 书源）、所属书源、书籍地址、章节数、最近阅读时间</td>
+            <td>本地书无书源与书籍地址；在线书必须有所属书源</td>
+          </tr>
+          <tr>
+            <td>章节</td>
+            <td>书籍内可独立定位、独立加载的阅读单元</td>
+            <td>序号、标题、正文状态（未缓存 / 缓存中 / 已缓存 / 失败）、字数</td>
+            <td>本地章节来自 TXT 解析；在线章节来自目录规则 + 正文规则</td>
+          </tr>
+          <tr>
+            <td>阅读进度</td>
+            <td>用户在某本书中的停留位置</td>
+            <td>章节序号、章节内字符偏移、最后阅读时间</td>
+            <td>两类书籍共用同一套进度结构</td>
+          </tr>
+          <tr>
+            <td>下载任务</td>
+            <td>一次批量缓存章节的执行记录</td>
+            <td>范围（全部 / 未缓存 / 指定区间）、状态、成功数与失败数、失败章节清单</td>
+            <td>仅在线书产生</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>主流程 A · 本地 TXT 阅读</h3>
+      <div class="flow">
+        <div class="flow-step"><em>STEP 1</em><b>选择或拖入文件</b><span>书架入口或窗口拖拽</span></div>
+        <div class="flow-step"><em>STEP 2</em><b>识别编码与分章</b><span>自动识别 + 可选规则</span></div>
+        <div class="flow-step"><em>STEP 3</em><b>确认书名与目录</b><span>预览前几章，可改名</span></div>
+        <div class="flow-step"><em>STEP 4</em><b>入架并阅读</b><span>从第一章或上次位置进入</span></div>
+      </div>
+
+      <h3>主流程 B · 书源在线阅读</h3>
+      <div class="flow">
+        <div class="flow-step"><em>STEP 1</em><b>导入书源</b><span>JSON 文件 / 粘贴内容</span></div>
+        <div class="flow-step"><em>STEP 2</em><b>校验书源</b><span>跑通四段解析链路</span></div>
+        <div class="flow-step"><em>STEP 3</em><b>关键词搜索</b><span>按书名聚合多源结果</span></div>
+        <div class="flow-step"><em>STEP 4</em><b>详情与目录</b><span>补全信息、拉取章节</span></div>
+        <div class="flow-step"><em>STEP 5</em><b>加入书架</b><span>写入统一书籍模型</span></div>
+      </div>
+
+      <h3>主流程 C · 下载后离线阅读</h3>
+      <div class="flow">
+        <div class="flow-step"><em>STEP 1</em><b>发起下载</b><span>全部 / 未缓存 / 区间</span></div>
+        <div class="flow-step"><em>STEP 2</em><b>排队执行</b><span>可暂停、继续、取消</span></div>
+        <div class="flow-step"><em>STEP 3</em><b>完成并标记</b><span>书架显示已离线</span></div>
+        <div class="flow-step"><em>STEP 4</em><b>断网阅读</b><span>缓存命中直接打开</span></div>
+      </div>
+
+      <div class="callout">
+        <b>统一规则：</b>无论来源如何，一本“已加入书架”的书都必须具备书名、至少一个章节、可保存的阅读进度。缺少任一项的内容不算入架成功，不允许只把搜索结果直接塞进书架。
+      </div>
+    </section>
+
+    <!-- ================= 4 功能需求 ================= -->
+    <section id="fr">
+      <h2><span class="num">04</span>功能需求</h2>
+      <div class="h2-rule"></div>
+      <p>每个模块按「目的 → 入口 → 处理规则 → 结果与状态 → 异常」组织。跨模块复用的规则统一写在第 5 节，模块内只引用、不重复定义。</p>
+
+      <!-- FR-01 -->
+      <article class="fr" id="fr-01">
+        <div class="fr-head">
+          <span class="fr-id">FR-01</span>
+          <h3>本地 TXT 导入与自动分章</h3>
+          <span class="stage">P0 · 入口模块</span>
+        </div>
+        <div class="fr-body">
+          <p><b>目的：</b>让没有书源的用户也能在导入后立刻得到可跳转的目录，而不是拿到一个几百页的纯文本块。</p>
+
+          <dl class="kv">
+            <dt>入口</dt><dd>书架空状态按钮「导入本地 TXT」、书架工具栏、窗口拖拽文件</dd>
+            <dt>触发条件</dt><dd>用户选择一个或多个 <code>.txt</code> 文件</dd>
+          </dl>
+
+          <h4>处理规则</h4>
+          <ul>
+            <li><b>编码识别：</b>依次尝试 UTF-8（含 BOM）→ UTF-16（含 BOM）→ GB18030；仍失败则不自动入架，弹出编码手动选择（UTF-8 / GBK / GB18030 / UTF-16），重新解码后继续。</li>
+            <li><b>分章：</b>使用内置章节目录规则识别标题行，至少覆盖「第 X 章 / 第 X 节 / 第 X 卷 / 序章 / 楔子 / 番外 / Chapter N」等常见写法；识别结果需满足“标题行数量 ≥ 2 且按顺序递增”，否则视为分章失败。</li>
+            <li><b>分章失败的处理：</b>提供三个可选项——按固定字数切分、整本作为单章、手动切换/输入章节规则。用户选定后重新解析，不改动原始文件。</li>
+            <li><b>书名：</b>默认取文件名（去扩展名），允许在确认页修改；作者默认「未知」，允许修改。</li>
+            <li><b>重复导入：</b>以文件内容指纹判断。已存在同一文件时提示「已在书架」，不建立第二条记录，用户可主动选择“仍然导入为新书”。</li>
+            <li><b>大文件：</b>超过 <code>[TBD]</code> 的 TXT 改为后台解析，并在书架显示解析进度；解析期间该书不可阅读。</li>
+          </ul>
+
+          <h4>结果与状态</h4>
+          <ul>
+            <li>生成 1 本本地书籍 + N 条章节记录，原文保存到本地书库目录；书籍状态由「解析中」变为「可阅读」。</li>
+            <li>导入完成后停留在书架，新书置于列表首位并高亮；用户也可直接进入阅读。</li>
+          </ul>
+
+          <h4>异常</h4>
+          <table>
+            <thead><tr><th style="width:150px">场景</th><th>处理</th></tr></thead>
+            <tbody>
+              <tr><td>空文件 / 非文本二进制</td><td>拒绝导入，提示“文件内容为空或不是文本”，不做任何写入</td></tr>
+              <tr><td>编码无法识别</td><td>保留弹窗，允许手动选择编码或取消导入</td></tr>
+              <tr><td>分章结果为 0 或仅 1 章</td><td>进入分章失败处理，不静默按整本入架</td></tr>
+              <tr><td>解析中用户关闭窗口</td><td>中断解析，不产生半成品书籍记录</td></tr>
+              <tr><td>文件被外部删除或移动</td><td>库内已有正文副本，阅读不受影响；仅在用户执行“重新解析”时提示源文件不存在</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <!-- FR-02 -->
+      <article class="fr" id="fr-02">
+        <div class="fr-head">
+          <span class="fr-id">FR-02</span>
+          <h3>书架</h3>
+          <span class="stage">P0 · 主界面</span>
+        </div>
+        <div class="fr-body">
+          <p><b>目的：</b>作为所有书籍的唯一入口，让用户一眼看出“哪些能离线读、哪些来自书源、上次读到哪”。</p>
+
+          <h4>布局</h4>
+          <div class="wire">
+            <div class="wire-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="wire-title">阅微 · 书架</span></div>
+            <div class="wire-body">
+              <div class="wire-nav">
+                <div class="item act">书架</div>
+                <div class="item">搜索</div>
+                <div class="item">书源</div>
+                <div class="item">下载</div>
+                <div class="item">设置</div>
+              </div>
+              <div class="wire-main">
+                <div style="display:flex;gap:8px;margin-bottom:12px">
+                  <div style="flex:1;border:1px solid var(--line);border-radius:4px;padding:4px 8px;color:var(--muted)">搜索书架内书籍…</div>
+                  <div style="border:1px solid var(--line);border-radius:4px;padding:4px 10px;color:var(--muted)">全部 ▾</div>
+                  <div style="border:1px solid var(--line);border-radius:4px;padding:4px 10px;color:var(--muted)">最近阅读 ▾</div>
+                </div>
+                <div class="shelf">
+                  <div class="book"><div class="cover">斗</div><b>斗破苍穹</b><span>在线 · 已离线</span></div>
+                  <div class="book"><div class="cover g2">活</div><b>活着</b><span>本地 · TXT</span></div>
+                  <div class="book"><div class="cover g3">三</div><b>三体</b><span>在线 · 12/30</span></div>
+                  <div class="book"><div class="cover g4">边</div><b>边城</b><span>本地 · TXT</span></div>
+                </div>
+                <div style="margin-top:12px;font-size:10.5px;color:var(--muted)">双击书籍进入阅读 · 右键查看详情、下载、移除</div>
+              </div>
+            </div>
+          </div>
+          <p class="wire-caption">书架线框：左侧全局导航，顶部搜索/筛选/排序，主区为封面网格</p>
+
+          <h4>处理规则</h4>
+          <ul>
+            <li><b>展示：</b>封面（缺失时用书名首字生成占位）、书名、来源标签（本地 / 在线）、阅读状态（未读 / 已读至第 N 章 / 已离线）。</li>
+            <li><b>排序：</b>最近阅读、加入时间、书名；默认最近阅读优先，未读新书排在已读书之后。</li>
+            <li><b>筛选：</b>全部 / 本地 / 在线；与书架内搜索框叠加生效，搜索范围仅限书名与作者。</li>
+            <li><b>打开：</b>单击选中，双击或回车进入阅读；有阅读进度则回到上次位置，否则从第一章开始。</li>
+            <li><b>右键菜单：</b>书籍详情、继续阅读、更新目录（仅在线）、下载（仅在线）、移除。</li>
+            <li><b>移除：</b>弹出确认，并让用户勾选“同时删除已下载章节 / 本地正文副本”；默认不勾选。移除只影响本地数据，不改动用户原始 TXT 文件。</li>
+          </ul>
+
+          <h4>异常</h4>
+          <ul>
+            <li>书架为空：展示引导，两个入口分别是「导入本地 TXT」与「先在书源页导入书源」。</li>
+            <li>在线书所属书源被删除：该书保留在书架，标记「书源已移除」，只能阅读已缓存章节。</li>
+            <li>封面加载失败：回退到占位图，不显示破图。</li>
+          </ul>
+        </div>
+      </article>
+
+      <!-- FR-03 -->
+      <article class="fr" id="fr-03">
+        <div class="fr-head">
+          <span class="fr-id">FR-03</span>
+          <h3>阅读器</h3>
+          <span class="stage">P0 · 核心体验</span>
+        </div>
+        <div class="fr-body">
+          <p><b>目的：</b>用同一套阅读界面承载本地与在线内容，并稳定记住读到哪里。</p>
+
+          <h4>布局</h4>
+          <div class="wire">
+            <div class="wire-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="wire-title">活着 · 第 3 章</span></div>
+            <div class="wire-body" style="padding:0">
+              <div class="reader">
+                <div class="reader-toc">
+                  <div class="act">第 1 章 家</div>
+                  <div>第 2 章 失去</div>
+                  <div class="act">第 3 章 归途</div>
+                  <div>第 4 章 老牛</div>
+                  <div>第 5 章 余晖</div>
+                </div>
+                <div class="page">
+                  <h5>第 3 章 归途</h5>
+                  <div class="line"></div>
+                  <div class="line m"></div>
+                  <div class="line"></div>
+                  <div class="line s"></div>
+                  <div class="line m"></div>
+                  <div class="line"></div>
+                  <div class="line s"></div>
+                  <div style="margin-top:14px;display:flex;justify-content:space-between;font-size:10px;color:var(--muted)">
+                    <span>42%</span><span>空格 / ← → 翻页</span><span>18:24</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="wire-caption">阅读器线框：可收起的目录侧栏 + 正文区 + 底部进度与快捷键提示</p>
+
+          <h4>处理规则</h4>
+          <ul>
+            <li><b>目录：</b>显示全部章节，当前章高亮；支持按章节名搜索；目录可收起，收起状态跨会话记忆。</li>
+            <li><b>正文显示：</b>在线章节先做标签剥离与空白规整，段落首行缩进；正文中的广告行按共享规则过滤；不渲染远程图片（P0 只读文字）。</li>
+            <li><b>翻页：</b>空格 / PageDown 下一页，PageUp 上一页，方向键按行滚动；到章节边界自动进入下一章或上一章；滚动模式下到底部后再继续滚动触发下一章。</li>
+            <li><b>阅读设置：</b>字号、行距、字体、页宽、主题（纸白 / 米黄 / 夜间），即时生效并全局保存。</li>
+            <li><b>进度保存：</b>记录章节序号与章节内字符偏移；在切换章节、关闭阅读器、窗口失焦、应用退出时保存。</li>
+            <li><b>在线章节加载：</b>打开章节时优先用已缓存内容；未缓存则请求书源正文规则，成功后写入缓存并更新章节状态；同时预取下一章。</li>
+            <li><b>更新目录：</b>打开在线书时对比目录，新增章节以角标提示「有 N 章更新」，用户确认后合并，不打断当前阅读位置。</li>
+          </ul>
+
+          <h4>异常</h4>
+          <table>
+            <thead><tr><th style="width:170px">场景</th><th>处理</th></tr></thead>
+            <tbody>
+              <tr><td>正文请求失败（网络 / 规则）</td><td>正文区显示失败原因与「重试」；连续失败 3 次后提示“可尝试切换书源或检查规则”，不自动跳章</td></tr>
+              <tr><td>解析出的正文为空</td><td>视为失败并提示“该书源正文规则可能已失效”，不写入空缓存</td></tr>
+              <tr><td>正文异常超长</td><td>超过 <code>[TBD]</code> 字符时截断展示并提示，防止单章撑爆内存</td></tr>
+              <tr><td>离线且章节未缓存</td><td>提示“本章尚未下载”，提供“连接网络后重试”；目录中该章标记未缓存</td></tr>
+              <tr><td>进度位置失效</td><td>章节数变少或偏移越界时，回退到最近的合法章节开头，并提示一次</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <!-- FR-04 -->
+      <article class="fr" id="fr-04">
+        <div class="fr-head">
+          <span class="fr-id">FR-04</span>
+          <h3>书源导入</h3>
+          <span class="stage">P0 · 在线能力入口</span>
+        </div>
+        <div class="fr-body">
+          <p><b>目的：</b>让用户能把社区已有的 Legado 书源直接搬进来用，而不是被迫手写规则。</p>
+
+          <dl class="kv">
+            <dt>入口</dt><dd>书源管理页「导入书源」、拖拽 <code>.json</code> 文件、粘贴 JSON 文本</dd>
+            <dt>支持格式</dt><dd>单个书源对象；书源数组；一次选择多个文件</dd>
+          </dl>
+
+          <h4>处理规则</h4>
+          <ul>
+            <li><b>字段映射：</b>读取 <code>bookSourceName</code>、<code>bookSourceUrl</code>、<code>bookSourceGroup</code>、<code>bookSourceType</code>、<code>bookSourceComment</code>、<code>enabled</code>、<code>searchUrl</code> 及四段规则对象。</li>
+            <li><b>必填校验：</b><code>bookSourceName</code> 与 <code>bookSourceUrl</code> 缺失的对象跳过，计入失败并给出原因。</li>
+            <li><b>类型处理：</b><code>bookSourceType ≠ 0</code>（音频 / 图片等）允许入库，但状态直接标为「不支持」，默认不启用，不参与搜索。</li>
+            <li><b>兼容性检查：</b>规则值中出现 JavaScript 规则标记或依赖登录的配置时，标记「部分支持」，并在详情中列出不支持的字段。</li>
+            <li><b>去重：</b>以 <code>bookSourceUrl</code> 判定重复。默认跳过已存在项；导入结果页提供“覆盖同名地址书源”选项，选择后保留用户原有的启用状态与分组。</li>
+            <li><b>分组：</b><code>bookSourceGroup</code> 中以分号分隔的多分组拆分为多个标签。</li>
+            <li><b>导入后：</b>默认不立即校验，由用户手动触发；导入结果页提供「全部校验」按钮。</li>
+          </ul>
+
+          <h4>结果与状态</h4>
+          <p>导入结束后展示汇总：成功 N 个、跳过 M 个、失败 K 个；失败与跳过项逐条列出名称、地址与原因。新书源状态为「未校验」。</p>
+
+          <h4>异常</h4>
+          <ul>
+            <li>JSON 语法错误：整体导入失败，提示首个错误所在行，不写入任何数据。</li>
+            <li>顶层不是对象也不是数组：提示“不是有效的书源文件”。</li>
+            <li>数组内部分对象非法：合法项照常导入，非法项计入失败，不做整体回滚。</li>
+            <li>文件编码非 UTF-8：按 FR-01 的编码识别顺序处理。</li>
+          </ul>
+        </div>
+      </article>
+
+      <!-- FR-05 -->
+      <article class="fr" id="fr-05">
+        <div class="fr-head">
+          <span class="fr-id">FR-05</span>
+          <h3>在线搜索</h3>
+          <span class="stage">P0 · 找书</span>
+        </div>
+        <div class="fr-body">
+          <p><b>目的：</b>一次关键词输入，就能看到多个书源里能读到的候选书，并知道每本来自哪个源。</p>
+
+          <dl class="kv">
+            <dt>入口</dt><dd>左侧导航「搜索」、书架顶部搜索框（切换为全网搜索时）</dd>
+            <dt>前置条件</dt><dd>至少有一个「已启用且校验正常」的书源</dd>
+          </dl>
+
+          <h4>处理规则</h4>
+          <ul>
+            <li><b>搜索范围：</b>默认全部可用书源；用户可切换为按分组或指定单个书源。</li>
+            <li><b>执行方式：</b>各书源并行请求，单源超时 <code>[TBD]</code> 秒；并发上限在设置中可调。</li>
+            <li><b>结果聚合：</b>以「书名 + 作者」归并同一本书，卡片默认展示一个来源，展开后列出全部可用书源及其最新章节。</li>
+            <li><b>排序：</b>书名完全匹配优先，其次按来源可用数量降序，再按结果原始顺序。</li>
+            <li><b>分页：</b>书源 <code>searchUrl</code> 含 <code>{{page}}</code> 时支持「加载更多」；不支持分页的源只展示首屏。</li>
+            <li><b>加入书架：</b>必须先拉取书籍详情并成功获取目录，才允许入架；入架后按钮变为「已在书架」，点击跳转该书详情。</li>
+          </ul>
+
+          <h4>结果与状态</h4>
+          <p>搜索过程按书源展示进度（搜索中 / 已完成 N 条 / 失败）。全部结束后，顶部汇总“N 个书源返回结果，M 个失败”，失败源可展开查看原因。</p>
+
+          <h4>异常</h4>
+          <table>
+            <thead><tr><th style="width:170px">场景</th><th>处理</th></tr></thead>
+            <tbody>
+              <tr><td>关键词为空或仅空白</td><td>不发起请求，提示输入书名或作者</td></tr>
+              <tr><td>没有可用书源</td><td>展示引导，跳转书源管理页导入</td></tr>
+              <tr><td>单源超时 / 解析为空</td><td>该源标记失败并记录原因，不影响其他源结果</td></tr>
+              <tr><td>全部源失败</td><td>显示“全部书源搜索失败”，按失败环节归类（搜索规则 / 网络 / 站点变更）</td></tr>
+              <tr><td>加入书架时目录为空</td><td>阻止入架，提示“目录为空，可尝试其他书源或检查目录规则”</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <!-- FR-06 -->
+      <article class="fr" id="fr-06">
+        <div class="fr-head">
+          <span class="fr-id">FR-06</span>
+          <h3>书籍详情</h3>
+          <span class="stage">P0 · 决策与入架</span>
+        </div>
+        <div class="fr-body">
+          <p><b>目的：</b>在入架前让用户确认这本书是不是要找的，并能看到来源与更新情况。</p>
+
+          <h4>展示内容</h4>
+          <p>封面、书名、作者、分类标签、简介、最新章节、来源书源名称、目录章节数。未加入书架时底部按钮为「加入书架」；已加入时为「开始阅读」。</p>
+
+          <h4>处理规则</h4>
+          <ul>
+            <li>详情信息按「搜索结果已有字段 → 详情页规则补全」顺序合并，详情页解析到的同名字段覆盖搜索结果。</li>
+            <li>简介过长时折叠，点击展开；保留换行。</li>
+            <li><b>刷新信息</b>（仅在线书）：重新执行详情与目录规则，更新简介、最新章节与章节列表；不改变阅读进度。</li>
+            <li><b>本地书</b>同样有详情页，展示书名、作者、章节数、文件来源与缓存占用，不显示书源相关操作。</li>
+          </ul>
+
+          <h4>异常</h4>
+          <ul>
+            <li>详情页请求失败：展示搜索结果中已有的信息，简介区显示获取失败与「重试」。</li>
+            <li>目录获取失败：禁止入架，提示可切换其他来源或稍后重试。</li>
+            <li>封面地址无效：使用占位图。</li>
+          </ul>
+        </div>
+      </article>
+
+      <!-- FR-07 -->
+      <article class="fr" id="fr-07">
+        <div class="fr-head">
+          <span class="fr-id">FR-07</span>
+          <h3>书源管理：列表、校验与调试</h3>
+          <span class="stage">P0 · 可维护性</span>
+        </div>
+        <div class="fr-body">
+          <p><b>目的：</b>书源会随站点改版失效。用户必须能自己判断“哪个源坏了、坏在哪一步、怎么改”。</p>
+
+          <h4>列表</h4>
+          <table>
+            <thead><tr><th>列</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>名称 / 地址</td><td>名称可点击进入详情；地址作为副标题截断展示</td></tr>
+              <tr><td>分组</td><td>多标签展示，可据此筛选</td></tr>
+              <tr><td>状态</td><td>未校验 / 校验中 / 正常 / 异常 / 部分支持 / 不支持</td></tr>
+              <tr><td>最近校验</td><td>时间 + 失败环节（搜索 / 详情 / 目录 / 正文）</td></tr>
+              <tr><td>启用</td><td>开关，关闭后不参与搜索</td></tr>
+            </tbody>
+          </table>
+
+          <h4>操作</h4>
+          <ul>
+            <li>新建（空白模板）、编辑规则 JSON、删除、导入、导出（单个或全部为 Legado 兼容 JSON）、批量启用/停用、按分组筛选与名称搜索。</li>
+            <li><b>删除：</b>二次确认，提示受影响书架书籍数量；删除后这些书只保留已缓存章节。</li>
+            <li><b>编辑：</b>内置 JSON 编辑器提供语法高亮与格式校验；保存前检查必填字段与 URL 合法性；保存后状态回到「未校验」。</li>
+            <li><b>校验：</b>使用用户指定的测试关键词（默认取上一次搜索词）依次执行 搜索 → 详情 → 目录 → 正文，逐段记录耗时与结果；任一段失败即判为异常，并保留其余段的执行结果。</li>
+          </ul>
+
+          <h4>调试面板</h4>
+          <div class="wire">
+            <div class="wire-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="wire-title">书源调试 · 示例书源</span></div>
+            <div class="wire-body" style="padding:0">
+              <div class="dbg">
+                <div class="dbg-left">
+                  <div class="row"><span>关键词</span><b>活着</b></div>
+                  <div class="row"><span>搜索 URL</span><b>https://ex.com/s?q=…</b></div>
+                  <div class="row"><span>HTTP 状态</span><b class="ok">200 · 318ms</b></div>
+                  <div class="row"><span>搜索规则</span><b class="ok">通过 · 12 条</b></div>
+                  <div class="row"><span>详情规则</span><b class="ok">通过</b></div>
+                  <div class="row"><span>目录规则</span><b class="bad">失败 · 0 章</b></div>
+                  <div class="row"><span>正文规则</span><b class="wa">未执行</b></div>
+                </div>
+                <div class="dbg-right">
+                  <div style="font-size:10.5px;color:var(--muted);margin-bottom:6px">响应片段 / 字段解析结果</div>
+                  <div class="line" style="height:8px;background:#eae2d4;border-radius:3px;margin:7px 0"></div>
+                  <div class="line" style="height:8px;width:78%;background:#eae2d4;border-radius:3px;margin:7px 0"></div>
+                  <div class="line" style="height:8px;background:#eae2d4;border-radius:3px;margin:7px 0"></div>
+                  <div class="line" style="height:8px;width:56%;background:#eae2d4;border-radius:3px;margin:7px 0"></div>
+                  <div style="margin-top:10px;padding:8px;background:var(--red-soft);border-radius:4px;color:var(--red);font-size:10.5px;line-height:1.6">
+                    目录规则 <code>class.list.0@tag.a</code> 匹配到 0 个元素，页面结构可能已变化
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="wire-caption">调试面板线框：左侧四段链路结果与耗时，右侧原始响应片段与字段解析输出</p>
+
+          <p>调试结果必须包含：实际请求 URL、HTTP 状态码与耗时、响应体截断片段、每个规则字段解析到的值或空值、失败环节与原因描述。调试面板不写入书源数据，仅用于查看。</p>
+
+          <h4>异常</h4>
+          <ul>
+            <li>校验中：该书源不可编辑、不可删除，可取消校验。</li>
+            <li>规则 JSON 非法：保存被阻止，定位到错误位置。</li>
+            <li>站点返回 403 / 需要登录：判为失败，提示“站点可能限制访问或需要登录，当前版本不支持登录态”。</li>
+            <li>删除书源后：受影响书籍标记「书源已移除」。</li>
+          </ul>
+        </div>
+      </article>
+
+      <!-- FR-08 -->
+      <article class="fr" id="fr-08">
+        <div class="fr-head">
+          <span class="fr-id">FR-08</span>
+          <h3>下载与离线缓存</h3>
+          <span class="stage">P0 · 离线兜底</span>
+        </div>
+        <div class="fr-body">
+          <p><b>目的：</b>把在线内容变成本地可读内容，让追更和断网场景都不依赖实时请求。</p>
+
+          <dl class="kv">
+            <dt>入口</dt><dd>书籍详情页「下载」、书架右键「下载」、下载管理页</dd>
+            <dt>范围选项</dt><dd>全部章节 / 仅未缓存章节 / 指定区间（起始章 - 结束章）</dd>
+          </dl>
+
+          <h4>处理规则</h4>
+          <ul>
+            <li><b>队列：</b>同一本书同一时间只允许一个活动任务；多本书的任务按创建顺序排队。</li>
+            <li><b>并发与间隔：</b>并发数默认 2，可在设置中调整；每次请求之间保留可配置间隔，避免给站点造成压力。</li>
+            <li><b>增量：</b>“仅未缓存”只抓取状态为未缓存或失败的章节；已缓存章节跳过。</li>
+            <li><b>暂停 / 继续 / 取消：</b>暂停后已完成的章节保留，继续时从断点续传；取消保留已完成内容，任务标记已取消。</li>
+            <li><b>失败重试：</b>单章失败自动重试，仍失败则记入失败清单；任务结束后可「重试失败章节」。</li>
+            <li><b>完成：</b>全部成功时标记该书「已离线」，书架展示离线标识，并发送应用内完成提示。</li>
+          </ul>
+
+          <h4>状态机</h4>
+          <div class="state-rail">
+            <span class="state">排队中</span><span class="arrow">→</span>
+            <span class="state act">下载中</span><span class="arrow">⇄</span>
+            <span class="state">已暂停</span><span class="arrow">→</span>
+            <span class="state good">已完成</span>
+            <span class="arrow">/</span><span class="state bad">部分失败</span>
+            <span class="arrow">/</span><span class="state">已取消</span>
+          </div>
+          <table>
+            <thead><tr><th style="width:130px">当前状态</th><th>允许操作</th><th>迁移条件</th></tr></thead>
+            <tbody>
+              <tr><td>排队中</td><td>取消</td><td>轮到执行→下载中；用户取消→已取消</td></tr>
+              <tr><td>下载中</td><td>暂停 / 取消</td><td>全部成功→已完成；存在失败→部分失败</td></tr>
+              <tr><td>已暂停</td><td>继续 / 取消</td><td>继续→下载中</td></tr>
+              <tr><td>部分失败</td><td>重试失败章节 / 取消</td><td>重试成功→已完成</td></tr>
+              <tr><td>已完成 / 已取消</td><td>重新发起新任务</td><td>—</td></tr>
+            </tbody>
+          </table>
+
+          <h4>离线阅读与磁盘</h4>
+          <ul>
+            <li>章节打开优先级：本地缓存 → 在线请求 → 失败提示。</li>
+            <li>设置页与书籍详情展示缓存占用；支持清理单本缓存（清理后未下载章节恢复为未缓存，阅读进度保留）。</li>
+            <li>缓存总占用超过用户设定上限时，提示清理，不自动删除任何书籍内容。</li>
+          </ul>
+
+          <h4>异常</h4>
+          <ul>
+            <li>下载中断网：任务转为已暂停并说明原因，网络恢复后不自动继续，需用户确认。</li>
+            <li>书源在任务执行中被删除或停用：暂停任务并提示，已下载内容保留。</li>
+            <li>磁盘空间不足：暂停任务并提示所需空间。</li>
+          </ul>
+        </div>
+      </article>
+
+      <!-- FR-09 -->
+      <article class="fr" id="fr-09">
+        <div class="fr-head">
+          <span class="fr-id">FR-09</span>
+          <h3>设置与本地数据</h3>
+          <span class="stage">P0 · 支撑</span>
+        </div>
+        <div class="fr-body">
+          <p><b>目的：</b>把会影响阅读与抓取行为的参数集中在一处，并让用户知道自己数据存在哪里。</p>
+
+          <table>
+            <thead><tr><th style="width:140px">分组</th><th>设置项</th><th>默认值 / 规则</th></tr></thead>
+            <tbody>
+              <tr><td>阅读</td><td>字号、行距、字体、页宽、主题、翻页方式</td><td>字号 18px、行距 1.8、纸白主题、滚动翻页；修改即时生效</td></tr>
+              <tr><td>网络</td><td>请求超时、搜索并发、下载并发、请求间隔、User-Agent</td><td>超时与并发见第 5 节；UA 默认使用桌面浏览器标识</td></tr>
+              <tr><td>存储</td><td>书库目录、缓存目录、缓存上限、清理缓存</td><td>默认位于用户目录下应用数据文件夹；可迁移</td></tr>
+              <tr><td>数据</td><td>导出书源、清空缓存、重置阅读设置</td><td>导出为 Legado 兼容 JSON；清空缓存不影响书架与进度</td></tr>
+            </tbody>
+          </table>
+
+          <p class="small muted">数据备份 / 恢复与 WebDAV 同步属于 P1，本版本不提供。</p>
+        </div>
+      </article>
+    </section>
+
+    <!-- ================= 5 共享规则 ================= -->
+    <section id="rules">
+      <h2><span class="num">05</span>共享规则与异常</h2>
+      <div class="h2-rule"></div>
+      <p>以下规则被多个模块引用，只在此处定义一次。</p>
+
+      <h3>5.1 规则解析与失败判定</h3>
+      <table>
+        <thead><tr><th style="width:150px">规则</th><th>内容</th></tr></thead>
+        <tbody>
+          <tr><td>规则执行顺序</td><td>按 <code>@</code> 分段从左到右依次收窄范围；每段在前一段结果集内执行，前一段为空即整体为空。</td></tr>
+          <tr><td>相对地址</td><td>解析出的链接若为相对路径，以当前页面地址为基准转为绝对地址；无当前页面地址时以书源地址为基准。</td></tr>
+          <tr><td>字段失败</td><td>单个字段解析为空不中断整条链路，但「书名」为空视为该书无效；「目录」为 0 章视为目录失败；「正文」为空视为正文失败。</td></tr>
+          <tr><td>校验判定</td><td>搜索有结果 → 详情可取书名 → 目录 ≥ 1 章 → 任取一章正文非空，四段全过才判定为「正常」；否则记录首个失败环节。</td></tr>
+          <tr><td>部分支持</td><td>命中不支持的规则能力（JS 规则、登录态）时状态为「部分支持」，默认不参与搜索，用户可手动启用并承担失败风险。</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5.2 正文清洗</h3>
+      <ul>
+        <li>剥离 HTML 标签与脚本样式，保留段落换行；连续空行压缩为一个。</li>
+        <li>去除整行重复的站点推广语、广告行、字数统计行；过滤规则内置，不在界面暴露。</li>
+        <li>全角空格与不可见字符统一处理；段落首行缩进两个字符由阅读器渲染时添加，不改写缓存原文。</li>
+        <li>清洗后的正文写入缓存，原文不保留；若清洗后为空，则按正文失败处理。</li>
+      </ul>
+
+      <h3>5.3 命名、去重与删除</h3>
+      <table>
+        <thead><tr><th style="width:150px">场景</th><th>规则</th></tr></thead>
+        <tbody>
+          <tr><td>书源去重</td><td>以规范化后的 <code>bookSourceUrl</code>（去尾斜杠、统一小写主机名）为唯一判定依据。</td></tr>
+          <tr><td>书籍去重</td><td>本地书用文件内容指纹；在线书用「书源 + 书籍地址」。不同书源的同名书视为不同书籍，可在书架同时存在。</td></tr>
+          <tr><td>删除书源</td><td>不级联删除书籍与缓存；受影响书籍标记「书源已移除」。</td></tr>
+          <tr><td>删除书籍</td><td>删除书架记录、阅读进度与章节记录；缓存文件按用户勾选决定是否删除。</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5.4 网络、重试与并发</h3>
+      <table>
+        <thead><tr><th style="width:150px">规则</th><th>内容</th></tr></thead>
+        <tbody>
+          <tr><td>超时</td><td>搜索单源超时 15 秒；详情 / 目录 / 正文单次请求超时 20 秒。<span class="muted">（具体数值可在设置中调整）</span></td></tr>
+          <tr><td>自动重试</td><td>网络类失败自动重试 2 次，退避 1 秒、3 秒；解析为空、403、404 不自动重试。</td></tr>
+          <tr><td>并发上限</td><td>搜索并发默认 5，下载并发默认 2；同一站点（同主机）同时请求不超过 2 个。</td></tr>
+          <tr><td>失败隔离</td><td>任一请求失败只影响当前书源或当前章节，不阻塞其他任务。</td></tr>
+          <tr><td>离线检测</td><td>发起请求前检测网络；离线时在线类操作直接给出离线提示，不进入超时等待。</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5.5 本地数据与隐私</h3>
+      <ul>
+        <li>所有书源、书籍、章节缓存、阅读进度保存在本机；不设账号，不上传任何数据。</li>
+        <li>应用不内置、不推荐、不自动下载任何书源；书源来源与合法性由用户自行负责。</li>
+        <li>请求头、Cookie 等敏感信息只用于当前请求，不写入日志；调试面板展示响应时截断并对用户自定义请求头做隐藏。</li>
+        <li>日志仅记录错误类型与环节，不记录完整正文内容。</li>
+      </ul>
+
+      <h3>5.6 文案与反馈原则</h3>
+      <p>错误提示必须说明“发生了什么 + 可能原因 + 可执行动作”三要素。例如不使用“加载失败”，而使用“目录解析为空，可能该书源目录规则已失效；可切换书源或到书源管理检查规则”。</p>
+    </section>
+
+    <!-- ================= 6 待确认 ================= -->
+    <section id="open">
+      <h2><span class="num">06</span>待确认问题</h2>
+      <div class="h2-rule"></div>
+      <p>以下问题不阻塞 PRD 评审，但会影响实现范围或体验，需在开发前给出结论。</p>
+      <ol class="q-list">
+        <li><b>TXT 单文件大小上限</b>：是否需要支持 100MB 以上的超大合集？影响解析方式（内存解析 / 流式解析）与进度提示设计。</li>
+        <li><b>单章正文长度上限</b>：用于防御异常规则抓到整页内容，暂以 <code>[TBD]</code> 占位。</li>
+        <li><b>是否需要在 P0 支持 JS 规则书源</b>：Legado 生态中部分书源依赖 JS。若必须支持，规则引擎复杂度与安全风险（脚本执行）都会显著上升，需要单独评估。</li>
+        <li><b>Windows 之外的打包目标</b>：当前按 Win / macOS / Linux 设计，但首版是否只交付 Windows 安装包待定。</li>
+        <li><b>书源推荐关键词</b>：校验书源时使用的默认测试词是固定值还是由用户配置，待定。</li>
+        <li><b>数据备份是否提前到 P0</b>：涉及用户书源与进度的迁移成本，若首版就要给他人使用，建议提前。</li>
+      </ol>
+
+      <div class="callout">
+        <b>评审通过后的下一步：</b>进入技术方案与架构设计（模块划分、规则引擎设计、数据表结构、打包方式），再进入迭代开发。PRD 本身不包含技术实现细节。
+      </div>
+    </section>
+
+    <footer style="margin-top:70px;padding-top:22px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)">
+      阅微 · 小说阅读器 PRD v0.1 · 2026-10-26 · 评审稿
+    </footer>
+
+  </main>
+</div>
+
+<script>
+  // 目录高亮：滚动时同步当前章节
+  (function(){
+    const links = Array.from(document.querySelectorAll('#toc a'));
+    const targets = links.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+    function update(){
+      let idx = 0;
+      const y = window.scrollY + 90;
+      targets.forEach((t,i)=>{ if(t.offsetTop <= y) idx = i; });
+      links.forEach(a=>a.classList.remove('on'));
+      if(links[idx]) links[idx].classList.add('on');
+    }
+    window.addEventListener('scroll', update, {passive:true});
+    update();
+  })();
+</script>
+</body>
+</html>
