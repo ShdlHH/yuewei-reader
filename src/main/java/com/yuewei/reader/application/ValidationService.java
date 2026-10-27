@@ -95,9 +95,26 @@ public class ValidationService {
                 Document doc = RuleEngine.parseHtml(resp.body, resp.finalUrl);
                 RuleEngine.Stats stats = new RuleEngine.Stats();
                 detail = RuleEngine.parseDetail(doc, resp.finalUrl, rules, stats);
+                // 真实书源常省略书名/作者规则，按运行时逻辑回退到搜索结果
+                if (detail == null) {
+                    detail = new BookDetail();
+                }
+                if (detail.title == null || detail.title.isBlank()) {
+                    detail.title = picked.title;
+                }
+                if (detail.author == null || detail.author.isBlank()) {
+                    detail.author = picked.author;
+                }
+                if (detail.coverUrl == null || detail.coverUrl.isBlank()) {
+                    detail.coverUrl = picked.coverUrl;
+                }
+                if (detail.intro == null || detail.intro.isBlank()) {
+                    detail.intro = picked.intro;
+                }
+                detail.bookUrl = picked.bookUrl;
                 detailStage.sample = sample(doc);
                 detailStage.fields.putAll(stats.fields);
-                if (detail == null || detail.title == null || detail.title.isBlank()) {
+                if (detail.title == null || detail.title.isBlank()) {
                     detailStage.message = "失败：详情页未解析到书名";
                     failed = true;
                 } else {

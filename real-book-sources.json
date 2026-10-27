@@ -1,0 +1,90 @@
+[ {
+  "bookSourceComment" : "",
+  "bookSourceGroup" : "精品书源",
+  "bookSourceName" : "✈ 笔趣中文",
+  "bookSourceType" : 0,
+  "bookSourceUrl" : "http://www.xbiquzw.net",
+  "bookUrlPattern" : "",
+  "concurrentRate" : "",
+  "customOrder" : 3,
+  "enabled" : true,
+  "enabledCookieJar" : true,
+  "enabledExplore" : false,
+  "exploreUrl" : "",
+  "header" : "",
+  "lastUpdateTime" : 1763043266799,
+  "loginCheckJs" : "",
+  "loginUi" : "",
+  "loginUrl" : "",
+  "respondTime" : 1524,
+  "ruleBookInfo" : {
+    "coverUrl" : "id.fmimg@tag.img@src",
+    "init" : "",
+    "intro" : "id.intro@text##本站提示.*推荐哦！"
+  },
+  "ruleContent" : {
+    "content" : "id.content@html",
+    "imageStyle" : "0"
+  },
+  "ruleExplore" : {
+    "bookList" : ""
+  },
+  "ruleSearch" : {
+    "author" : "tag.td.2@text",
+    "bookList" : "class.grid@tag.tr!0",
+    "bookUrl" : "tag.a.0@href",
+    "lastChapter" : "tag.td.1@text",
+    "name" : "tag.a.0@text"
+  },
+  "ruleToc" : {
+    "chapterList" : "id.list@tag.dd",
+    "chapterName" : "tag.a@text",
+    "chapterUrl" : "tag.a@href"
+  },
+  "searchUrl" : "http://www.xbiquzw.net/modules/article/search.php?searchkey={{key}}",
+  "weight" : 0
+}, {
+  "bookSourceComment" : "",
+  "bookSourceGroup" : "精品书源",
+  "bookSourceName" : "✈ 梦书中文",
+  "bookSourceType" : 0,
+  "bookSourceUrl" : "http://www.mcxs.info",
+  "bookUrlPattern" : "",
+  "concurrentRate" : "",
+  "customOrder" : 15,
+  "enabled" : true,
+  "enabledCookieJar" : true,
+  "enabledExplore" : false,
+  "exploreUrl" : "",
+  "header" : "",
+  "lastUpdateTime" : 1753263210284,
+  "loginCheckJs" : "",
+  "loginUi" : "",
+  "loginUrl" : "",
+  "respondTime" : 3340,
+  "ruleBookInfo" : {
+    "coverUrl" : "id.fmimg@tag.img.0@src",
+    "init" : "",
+    "intro" : "id.intro"
+  },
+  "ruleContent" : {
+    "content" : "id.content@html##(章节错误.*请耐心等待。|天才一秒记住本站地址.*无广告！)"
+  },
+  "ruleExplore" : {
+    "bookList" : ""
+  },
+  "ruleSearch" : {
+    "author" : "tag.span.2@tag.a@text",
+    "bookList" : "class.novelslist2@tag.ul@tag.li!0",
+    "bookUrl" : "tag.span.1@tag.a@href",
+    "lastChapter" : "tag.span.3@tag.a@text",
+    "name" : "tag.span.1@tag.a@text"
+  },
+  "ruleToc" : {
+    "chapterList" : "id.list@dd!0:1:2:3:4:5:6:7:8:9:10:11",
+    "chapterName" : "tag.a@text",
+    "chapterUrl" : "tag.a@href"
+  },
+  "searchUrl" : "http://www.mcxs.info/search.html?name={{key}}",
+  "weight" : 0
+} ]

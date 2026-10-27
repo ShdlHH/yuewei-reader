@@ -65,6 +65,48 @@ class RuleEngineTest {
     }
 
     @Test
+    void supportsLegadoExcludeIndexAndBareTags() throws Exception {
+        String html = """
+                <html><body>
+                <table class="grid">
+                  <tr><th>文章名称</th><th>最新章节</th></tr>
+                  <tr><td><a href="/10_1/">斗罗大陆</a></td><td>大结局</td></tr>
+                  <tr><td><a href="/10_2/">剑来</a></td><td>第一章</td></tr>
+                </table>
+                <div id="list">
+                  <dd><a href="c0.html">最新章节</a></dd>
+                  <dd><a href="c1.html">第一章 开始</a></dd>
+                </div>
+                </body></html>
+                """;
+        JsonNode searchRules = rules("""
+                {"ruleSearch": {
+                  "bookList": "class.grid@tag.tr!0",
+                  "name": "tag.td.0@tag.a@text",
+                  "bookUrl": "tag.td.0@tag.a@href"
+                }}
+                """);
+        List<SearchResult> results = RuleEngine.parseSearch(
+                RuleEngine.parseHtml(html, BASE + "/search"), BASE + "/search", searchRules, null);
+        assertEquals(2, results.size());
+        assertEquals("斗罗大陆", results.get(0).title);
+        assertEquals(BASE + "/10_1/", results.get(0).bookUrl);
+
+        JsonNode tocRules = rules("""
+                {"ruleToc": {
+                  "chapterList": "id.list@dd!0",
+                  "chapterName": "tag.a@text",
+                  "chapterUrl": "tag.a@href"
+                }}
+                """);
+        List<TocChapter> chapters = RuleEngine.parseToc(
+                RuleEngine.parseHtml(html, BASE + "/toc"), BASE + "/toc", tocRules, null);
+        assertEquals(1, chapters.size());
+        assertEquals("第一章 开始", chapters.get(0).title);
+        assertEquals(BASE + "/c1.html", chapters.get(0).url);
+    }
+
+    @Test
     void appliesRegexReplacementInRules() throws Exception {
         String html = "<div class=\"name\">斗破苍穹（精校版）</div>";
         JsonNode rules = rules("""

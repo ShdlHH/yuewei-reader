@@ -7,6 +7,7 @@ import com.yuewei.reader.domain.BookDetail;
 import com.yuewei.reader.domain.BookSource;
 import com.yuewei.reader.domain.SearchResult;
 import javafx.application.Platform;
+import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -20,7 +21,6 @@ import javafx.scene.control.SplitPane;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
-import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -76,20 +76,16 @@ public class SearchView implements AppView {
         toolbar.setAlignment(Pos.CENTER_LEFT);
         toolbar.setPadding(new Insets(12, 16, 12, 16));
 
-        TableColumn<AggregatedResult, String> titleCol = new TableColumn<>("书名");
-        titleCol.setCellValueFactory(new PropertyValueFactory<>("title"));
-        titleCol.setPrefWidth(230);
-        TableColumn<AggregatedResult, String> authorCol = new TableColumn<>("作者");
-        authorCol.setCellValueFactory(new PropertyValueFactory<>("author"));
-        authorCol.setPrefWidth(120);
-        TableColumn<AggregatedResult, String> lastCol = new TableColumn<>("最新章节");
-        lastCol.setCellValueFactory(new PropertyValueFactory<>("lastChapter"));
-        lastCol.setPrefWidth(220);
-        TableColumn<AggregatedResult, String> sourceCol = new TableColumn<>("来源");
-        sourceCol.setCellValueFactory(cell -> new javafx.beans.property.ReadOnlyStringWrapper(
-                cell.getValue().sourceSummary()));
-        sourceCol.setPrefWidth(200);
+        TableColumn<AggregatedResult, String> titleCol = resultColumn("书名", 230,
+                result -> result.title);
+        TableColumn<AggregatedResult, String> authorCol = resultColumn("作者", 120,
+                result -> result.author);
+        TableColumn<AggregatedResult, String> lastCol = resultColumn("最新章节", 220,
+                result -> result.lastChapter);
+        TableColumn<AggregatedResult, String> sourceCol = resultColumn("来源", 200,
+                AggregatedResult::sourceSummary);
         results.getColumns().addAll(titleCol, authorCol, lastCol, sourceCol);
+        results.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         results.setPlaceholder(Ui.label("搜索结果会显示在这里", "muted"));
         results.getSelectionModel().selectedItemProperty().addListener(
                 (observable, oldValue, newValue) -> showSources(newValue));
@@ -135,6 +131,17 @@ public class SearchView implements AppView {
         BorderPane.setMargin(main, new Insets(0, 16, 16, 16));
 
         addButton.setOnAction(e -> addToShelf());
+    }
+
+    private TableColumn<AggregatedResult, String> resultColumn(
+            String title, double width, java.util.function.Function<AggregatedResult, String> getter) {
+        TableColumn<AggregatedResult, String> column = new TableColumn<>(title);
+        column.setPrefWidth(width);
+        column.setCellValueFactory(cell -> {
+            String value = getter.apply(cell.getValue());
+            return new ReadOnlyStringWrapper(value == null ? "" : value);
+        });
+        return column;
     }
 
     public void focusKeyword() {
