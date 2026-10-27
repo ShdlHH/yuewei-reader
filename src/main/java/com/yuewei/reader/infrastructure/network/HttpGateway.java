@@ -1,6 +1,8 @@
 package com.yuewei.reader.infrastructure.network;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -8,6 +10,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.zip.GZIPInputStream;
 
 /**
  * 统一 HTTP 入口：UA、超时、重试、URL 规整。
@@ -87,7 +90,7 @@ public class HttpGateway {
         HttpResponse<byte[]> resp = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
         Response r = new Response();
         r.status = resp.statusCode();
-        r.body = resp.body();
+        r.body = decompress(resp.body());
         r.finalUrl = resp.uri().toString();
         r.contentType = resp.headers().firstValue("content-type").orElse("");
         r.millis = System.currentTimeMillis() - start;
@@ -95,6 +98,21 @@ public class HttpGateway {
             throw new HttpStatusException(r.status, url);
         }
         return r;
+    }
+
+    /** 部分站点无视 Accept-Encoding 直接返回 gzip，需要手动解压。 */
+    private static byte[] decompress(byte[] body) {
+        if (body == null || body.length < 2) {
+            return body;
+        }
+        if ((body[0] & 0xff) == 0x1f && (body[1] & 0xff) == 0x8b) {
+            try (InputStream in = new GZIPInputStream(new ByteArrayInputStream(body))) {
+                return in.readAllBytes();
+            } catch (IOException e) {
+                return body;
+            }
+        }
+        return body;
     }
 
     /** 去掉 Legado URL 后的 ,{...} 选项，并对空格做最小转义。 */

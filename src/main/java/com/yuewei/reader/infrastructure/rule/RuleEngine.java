@@ -282,6 +282,15 @@ public class RuleEngine {
                 }
             }
         }
+        if (!step.excludes.isEmpty()) {
+            List<Element> kept = new ArrayList<>();
+            for (int i = 0; i < out.size(); i++) {
+                if (!step.excludes.contains(i)) {
+                    kept.add(out.get(i));
+                }
+            }
+            out = kept;
+        }
         if (step.index >= 0) {
             return out.size() > step.index ? List.of(out.get(step.index)) : List.of();
         }
@@ -331,6 +340,8 @@ public class RuleEngine {
         public Kind kind;
         public String name = "";
         public int index = -1;
+        /** Legado 的 !0 / !1:2 排除索引。 */
+        public final List<Integer> excludes = new ArrayList<>();
         public boolean extractor;
 
         boolean urlLike() {
@@ -373,7 +384,18 @@ public class RuleEngine {
     }
 
     private static Step parseStep(String raw) {
+        Step step = new Step();
         String s = raw;
+        int bang = s.indexOf('!');
+        if (bang > 0 && bang < s.length() - 1) {
+            String exclude = s.substring(bang + 1);
+            if (exclude.matches("\\d+(:\\d+)*")) {
+                for (String part : exclude.split(":")) {
+                    step.excludes.add(Integer.parseInt(part));
+                }
+                s = s.substring(0, bang);
+            }
+        }
         int index = -1;
         int dot = s.lastIndexOf('.');
         if (dot > 0 && dot < s.length() - 1) {
@@ -384,7 +406,6 @@ public class RuleEngine {
             }
         }
         String lower = s.toLowerCase();
-        Step step = new Step();
         step.index = index;
         switch (lower) {
             case "text" -> {
@@ -423,6 +444,12 @@ public class RuleEngine {
         }
         int dot2 = s.indexOf('.');
         if (dot2 <= 0 || dot2 == s.length() - 1) {
+            // 无前缀的裸标签，如 dd / h3 / a.0
+            if (!s.isEmpty() && org.jsoup.parser.Tag.isKnownTag(s)) {
+                step.kind = Kind.TAG;
+                step.name = s;
+                return step;
+            }
             return null;
         }
         String type = s.substring(0, dot2);
