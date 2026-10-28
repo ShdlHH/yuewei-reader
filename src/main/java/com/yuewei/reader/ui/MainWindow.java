@@ -1,10 +1,15 @@
 package com.yuewei.reader.ui;
 
+import com.yuewei.reader.ReaderApp;
 import com.yuewei.reader.application.AppContext;
 import com.yuewei.reader.domain.Book;
 import com.yuewei.reader.domain.ReadingProgress;
 import javafx.geometry.Insets;
 import javafx.scene.Parent;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
 import javafx.scene.control.ToggleButton;
@@ -14,6 +19,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
@@ -147,7 +153,52 @@ public class MainWindow {
         addNav(sidebar, group, "sources", "书源");
         addNav(sidebar, group, "downloads", "下载");
         addNav(sidebar, group, "settings", "设置");
+
+        Region spacer = new Region();
+        VBox.setVgrow(spacer, Priority.ALWAYS);
+        Button about = Ui.button("关于", "ghost-button");
+        about.setMaxWidth(Double.MAX_VALUE);
+        about.setOnAction(e -> showAbout());
+        sidebar.getChildren().addAll(spacer, new Separator(), about);
         return sidebar;
+    }
+
+    /** 关于：版本、开源地址与免责声明。 */
+    private void showAbout() {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.initOwner(stage);
+        dialog.setTitle("关于阅微");
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        if (root.getScene() != null) {
+            dialog.getDialogPane().getStylesheets().addAll(root.getScene().getStylesheets());
+        }
+
+        Label name = Ui.label("阅微 · 小说阅读器", "about-name");
+        Label version = Ui.label("版本 " + ReaderApp.VERSION + " · JavaFX 17 · SQLite", "muted");
+        Label intro = Ui.label("支持本地 TXT 与 Legado 书源的桌面小说阅读器，书籍、进度与设置只保存在本机。",
+                "about-text");
+        intro.setWrapText(true);
+
+        Hyperlink repo = new Hyperlink("https://github.com/ShdlHH/yuewei-reader");
+        repo.setOnAction(e -> openUrl(repo.getText()));
+        Label license = Ui.label("开源协议：MIT License", "muted");
+        Label disclaimer = Ui.label("本软件不内置任何书源与书籍内容。书源由使用者自行导入，"
+                + "抓取内容的版权归原作者与站点所有，请遵守目标站点的使用条款。", "muted");
+        disclaimer.setWrapText(true);
+
+        VBox content = new VBox(8, name, version, intro, repo, license, new Separator(), disclaimer);
+        content.setPadding(new Insets(18, 22, 8, 22));
+        content.setPrefWidth(440);
+        dialog.getDialogPane().setContent(content);
+        dialog.showAndWait();
+    }
+
+    private void openUrl(String url) {
+        try {
+            java.awt.Desktop.getDesktop().browse(java.net.URI.create(url));
+        } catch (Exception e) {
+            Ui.error("无法打开浏览器", url);
+        }
     }
 
     private void addNav(VBox sidebar, ToggleGroup group, String key, String text) {

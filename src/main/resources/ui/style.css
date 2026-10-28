@@ -292,3 +292,21 @@
     -fx-text-fill: #9b9486;
     -fx-font-size: 11px;
 }
+
+/* ---------------- 关于 ---------------- */
+
+.about-name {
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #33493c;
+}
+
+.about-text {
+    -fx-font-size: 13px;
+    -fx-text-fill: #4a4740;
+}
+
+.dialog-pane .hyperlink {
+    -fx-text-fill: #3f5c48;
+    -fx-border-color: transparent;
+}
