@@ -88,6 +88,11 @@ public class MainWindow {
         shelfView.refresh();
     }
 
+    /** 设置页保存阅读样式后，立即刷新已打开的阅读界面。 */
+    public void applyReaderStyle() {
+        readerView.refreshStyle();
+    }
+
     public void show(String key) {
         AppView view = views.get(key);
         if (view == null) {

@@ -6,7 +6,7 @@
 
   <groupId>com.yuewei</groupId>
   <artifactId>yuewei-reader</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
   <packaging>jar</packaging>
   <name>阅微 · 小说阅读器</name>
 
