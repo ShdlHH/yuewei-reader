@@ -1,6 +1,7 @@
 package com.yuewei.reader.ui;
 
 import com.yuewei.reader.application.AppContext;
+import com.yuewei.reader.application.SettingsService;
 import com.yuewei.reader.domain.Book;
 import com.yuewei.reader.domain.Chapter;
 import com.yuewei.reader.domain.ContentState;
@@ -10,15 +11,21 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Spinner;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
 import javafx.util.Duration;
@@ -97,6 +104,8 @@ public class ReaderView implements AppView {
         smaller.setOnAction(e -> changeFontSize(-1));
         Button larger = Ui.button("A＋", "ghost-button");
         larger.setOnAction(e -> changeFontSize(1));
+        Button typesetting = Ui.button("排版", "ghost-button");
+        typesetting.setOnAction(e -> openTypesetting());
         Button theme = Ui.button("主题", "ghost-button");
         theme.setOnAction(e -> cycleTheme());
 
@@ -109,7 +118,7 @@ public class ReaderView implements AppView {
         toolbar.setAlignment(Pos.CENTER_LEFT);
         toolbar.setPadding(new Insets(8, 14, 8, 14));
         toolbar.getChildren().addAll(back, bookLabel, chapterLabel, spacer, prev, next,
-                tocToggle, smaller, larger, theme, percentLabel);
+                tocToggle, smaller, larger, typesetting, theme, percentLabel);
 
         Label tocTitle = Ui.label("目录", "toc-title");
         toc.getStyleClass().add("toc-list");
@@ -230,8 +239,72 @@ public class ReaderView implements AppView {
 
     private void changeFontSize(int delta) {
         int size = Math.max(12, Math.min(32, ctx.settings.fontSize() + delta));
-        ctx.settings.put(com.yuewei.reader.application.SettingsService.FONT_SIZE, String.valueOf(size));
+        ctx.settings.put(SettingsService.FONT_SIZE, String.valueOf(size));
         applyStyle();
+    }
+
+    /** 阅读中排版面板：字体取系统已安装字体，调整即时生效并持久化。 */
+    private void openTypesetting() {
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.initOwner(window.stage());
+        dialog.setTitle("排版设置");
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        if (root.getScene() != null) {
+            dialog.getDialogPane().getStylesheets().addAll(root.getScene().getStylesheets());
+        }
+
+        ComboBox<String> families = new ComboBox<>();
+        families.getItems().setAll(Ui.fontFamilies());
+        families.setValue(ctx.settings.fontFamily());
+        families.setPrefWidth(260);
+
+        Spinner<Integer> size = new Spinner<>(12, 32, ctx.settings.fontSize());
+        Spinner<Double> spacing = new Spinner<>(1.2, 3.0, ctx.settings.lineSpacing(), 0.1);
+        size.setEditable(true);
+        spacing.setEditable(true);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(12);
+        grid.setVgap(10);
+        grid.add(new Label("字体"), 0, 0);
+        grid.add(families, 1, 0);
+        grid.add(new Label("字号"), 0, 1);
+        grid.add(size, 1, 1);
+        grid.add(new Label("行距（倍）"), 0, 2);
+        grid.add(spacing, 1, 2);
+
+        Button reset = Ui.button("恢复默认", "ghost-button");
+        reset.setOnAction(e -> {
+            families.setValue("系统默认");
+            size.getValueFactory().setValue(18);
+            spacing.getValueFactory().setValue(1.8);
+        });
+
+        families.valueProperty().addListener((observable, oldValue, newValue) -> {
+            if (newValue != null) {
+                ctx.settings.put(SettingsService.FONT_FAMILY, newValue);
+                applyStyle();
+            }
+        });
+        size.valueProperty().addListener((observable, oldValue, newValue) -> {
+            if (newValue != null) {
+                ctx.settings.put(SettingsService.FONT_SIZE, String.valueOf(newValue));
+                applyStyle();
+            }
+        });
+        spacing.valueProperty().addListener((observable, oldValue, newValue) -> {
+            if (newValue != null) {
+                ctx.settings.put(SettingsService.LINE_SPACING, String.valueOf(newValue));
+                applyStyle();
+            }
+        });
+
+        VBox content = new VBox(12, grid, reset,
+                Ui.label("调整会立即应用到正文并自动保存；关闭窗口即可。", "muted"));
+        content.setPadding(new Insets(16, 20, 8, 20));
+        content.setPrefWidth(380);
+        dialog.getDialogPane().setContent(content);
+        dialog.showAndWait();
     }
 
     private void cycleTheme() {
@@ -241,7 +314,7 @@ public class ReaderView implements AppView {
             case "green" -> "paper";
             default -> "night";
         };
-        ctx.settings.put(com.yuewei.reader.application.SettingsService.THEME, next);
+        ctx.settings.put(SettingsService.THEME, next);
         applyStyle();
     }
 
@@ -251,19 +324,20 @@ public class ReaderView implements AppView {
         String family = ctx.settings.fontFamily();
         Theme theme = THEMES.getOrDefault(ctx.settings.theme(), THEMES.get("paper"));
 
-        StringBuilder style = new StringBuilder()
-                .append("-fx-font-size:").append(size).append("px;")
-                .append("-fx-fill:").append(theme.foreground).append(";");
-        if (family != null && !family.isBlank() && !"系统默认".equals(family)) {
-            style.append("-fx-font-family:'").append(family).append("';");
-        }
-        text.setStyle(style.toString());
+        boolean defaultFamily = family == null || family.isBlank() || "系统默认".equals(family);
+        text.setFont(defaultFamily ? Font.font(size) : Font.font(family, size));
+        text.setStyle("-fx-fill:" + theme.foreground + ";");
         flow.setLineSpacing(Math.max(0, (spacing - 1) * size));
         flow.setStyle("-fx-background-color:" + theme.background + ";");
         scroll.setStyle("-fx-background:" + theme.background + "; -fx-background-color:" + theme.background + ";");
         toolbar.setStyle("-fx-background-color:" + theme.bar + ";");
         tocBox.setStyle("-fx-background-color:" + theme.bar + ";");
         root.setStyle("-fx-background-color:" + theme.background + ";");
+    }
+
+    /** 设置页保存后调用，让已打开的阅读界面立即套用新样式。 */
+    public void refreshStyle() {
+        applyStyle();
     }
 
     @Override

@@ -6,10 +6,13 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextInputControl;
+import javafx.scene.text.Font;
 import javafx.stage.Window;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
@@ -109,6 +112,18 @@ public final class Ui {
         }
         String message = error.getMessage();
         return message == null || message.isBlank() ? error.getClass().getSimpleName() : message;
+    }
+
+    /** 系统已安装字体：首项“系统默认”，其余按名称排序，供排版选择与预览。 */
+    public static List<String> fontFamilies() {
+        List<String> families = new ArrayList<>();
+        families.add("系统默认");
+        Font.getFamilies().stream()
+                .filter(name -> name != null && !name.isBlank() && !name.startsWith("@"))
+                .distinct()
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .forEach(families::add);
+        return families;
     }
 
     public static void setMonospace(TextInputControl control) {
