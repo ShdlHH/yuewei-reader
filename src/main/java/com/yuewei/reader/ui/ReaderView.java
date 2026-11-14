@@ -5,7 +5,11 @@ import com.yuewei.reader.application.SettingsService;
 import com.yuewei.reader.domain.Book;
 import com.yuewei.reader.domain.Chapter;
 import com.yuewei.reader.domain.ContentState;
+import javafx.animation.Interpolator;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
 import javafx.animation.PauseTransition;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -20,6 +24,7 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Spinner;
+import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -79,6 +84,9 @@ public class ReaderView implements AppView {
     private double pendingFraction = -1;
     private String content = "";
     private Font readerFont = Font.font(18);
+    private Timeline scrollAnimation;
+    private boolean animatingScroll;
+    private double scrollTarget = -1;
 
     public ReaderView(AppContext ctx, MainWindow window) {
         this.ctx = ctx;
@@ -158,9 +166,19 @@ public class ReaderView implements AppView {
         scroll.setFitToWidth(true);
         scroll.setContent(flow);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scroll.addEventFilter(ScrollEvent.SCROLL, event -> {
+            if (event.getDeltaY() == 0 || event.isShortcutDown()) {
+                return;
+            }
+            smoothScroll(event.getDeltaY());
+            event.consume();
+        });
 
         saveTimer.setOnFinished(e -> saveProgress());
         scroll.vvalueProperty().addListener((observable, oldValue, newValue) -> {
+            if (!animatingScroll) {
+                scrollTarget = -1;
+            }
             updatePercent();
             if (!loading && book != null) {
                 saveTimer.playFromStart();
@@ -233,10 +251,39 @@ public class ReaderView implements AppView {
     }
 
     private void renderContent() {
+        if (scrollAnimation != null) {
+            scrollAnimation.stop();
+            scrollAnimation = null;
+        }
+        animatingScroll = false;
+        scrollTarget = -1;
         Theme theme = theme();
         ReaderStyles.fill(flow, content, readerFont, ctx.settings.punctEnabled(),
                 ReaderStyles.rules(ctx.settings), ReaderStyles.colors(ctx.settings, ctx.settings.theme()),
                 Color.web(theme.foreground));
+    }
+
+    /** 滚轮按像素缓动，连续滚动时累积目标位置，避免整块跳动。 */
+    private void smoothScroll(double deltaY) {
+        double viewport = scroll.getViewportBounds().getHeight();
+        double contentHeight = flow.getBoundsInLocal().getHeight();
+        double max = Math.max(0, contentHeight - viewport);
+        if (max <= 0) {
+            return;
+        }
+        double current = scroll.getVvalue() * max;
+        if (scrollTarget < 0 || Math.abs(scrollTarget - current) > viewport) {
+            scrollTarget = current;
+        }
+        scrollTarget = Math.max(0, Math.min(max, scrollTarget - deltaY * 2.2));
+        if (scrollAnimation != null) {
+            scrollAnimation.stop();
+        }
+        animatingScroll = true;
+        scrollAnimation = new Timeline(new KeyFrame(Duration.millis(220),
+                new KeyValue(scroll.vvalueProperty(), scrollTarget / max, Interpolator.EASE_OUT)));
+        scrollAnimation.setOnFinished(e -> animatingScroll = false);
+        scrollAnimation.play();
     }
 
     private Theme theme() {

@@ -38,10 +38,37 @@ public final class Fonts {
     }
 
     public static boolean available(String family) {
+        return actualFamily(family) != null;
+    }
+
+    /**
+     * 按规范化名称匹配实际字体家族。字体内部的家族名常带后缀或繁体写法
+     * （如「京華老宋体_KingHwa_OldSong」），统一去空格、去符号并归一繁体字后再比较。
+     *
+     * @return 字体文件中真实的家族名，未加载时返回 null
+     */
+    public static String actualFamily(String family) {
         if (family == null || family.isBlank()) {
-            return false;
+            return null;
         }
-        return Font.getFamilies().stream().anyMatch(name -> name.equalsIgnoreCase(family));
+        String key = normalize(family);
+        if (key.isEmpty()) {
+            return null;
+        }
+        String prefixMatch = null;
+        for (String name : Font.getFamilies()) {
+            String candidate = normalize(name);
+            if (candidate.isEmpty()) {
+                continue;
+            }
+            if (candidate.equals(key)) {
+                return name;
+            }
+            if (prefixMatch == null && candidate.startsWith(key)) {
+                prefixMatch = name;
+            }
+        }
+        return prefixMatch;
     }
 
     /** 首选字体不可用时回退宋体；返回 null 表示交给 JavaFX 默认字体。 */
@@ -49,12 +76,14 @@ public final class Fonts {
         if (family == null || family.isBlank() || "系统默认".equals(family)) {
             return null;
         }
-        if (available(family)) {
-            return family;
+        String actual = actualFamily(family);
+        if (actual != null) {
+            return actual;
         }
         for (String fallback : FALLBACKS) {
-            if (available(fallback)) {
-                return fallback;
+            String resolved = actualFamily(fallback);
+            if (resolved != null) {
+                return resolved;
             }
         }
         return null;
@@ -77,6 +106,19 @@ public final class Fonts {
     private static boolean isFontFile(Path path) {
         String name = path.getFileName().toString().toLowerCase(Locale.ROOT);
         return name.endsWith(".ttf") || name.endsWith(".otf") || name.endsWith(".ttc");
+    }
+
+    /** 小写、繁体归一、只保留字母和数字，用于宽松比对字体家族名。 */
+    private static String normalize(String name) {
+        String lower = name.toLowerCase(Locale.ROOT).replace('華', '华').replace('體', '体');
+        StringBuilder sb = new StringBuilder(lower.length());
+        for (int i = 0; i < lower.length(); i++) {
+            char c = lower.charAt(i);
+            if (Character.isLetterOrDigit(c)) {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 
     private static String loadFile(Path path) {

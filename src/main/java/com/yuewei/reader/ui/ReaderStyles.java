@@ -13,9 +13,14 @@ import javafx.scene.text.TextFlow;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /** 阅读器正文着色：把标点分段结果渲染成 TextFlow 中的彩色 Text 节点。 */
 final class ReaderStyles {
+
+    /** 章节标题不参与首行缩进，例如「第一章 雨夜」「第12回　风起」。 */
+    private static final Pattern CHAPTER_TITLE =
+            Pattern.compile("^第[0-9零一二三四五六七八九十百千万两]+[章回节卷部篇集][\\s　:：、.．]?");
 
     private ReaderStyles() {
     }
@@ -26,15 +31,36 @@ final class ReaderStyles {
         if (content == null || content.isEmpty()) {
             return;
         }
+        String text = indent(content);
         List<Run> runs = enabled
-                ? PunctuationHighlighter.highlight(content, rules)
-                : List.of(new Run(content, Role.INK));
+                ? PunctuationHighlighter.highlight(text, rules)
+                : List.of(new Run(text, Role.INK));
         for (Run run : runs) {
             Text node = new Text(run.text());
             node.setFont(font);
             node.setFill(run.role() == Role.INK ? ink : colors.getOrDefault(run.role(), ink));
             flow.getChildren().add(node);
         }
+    }
+
+    /** 每个自然段首行缩进两个字，空行保持不变。 */
+    static String indent(String content) {
+        String[] lines = content.split("\n", -1);
+        StringBuilder sb = new StringBuilder(content.length() + lines.length * 2);
+        for (int i = 0; i < lines.length; i++) {
+            if (i > 0) {
+                sb.append('\n');
+            }
+            String line = lines[i];
+            if (!line.isBlank()) {
+                String trimmed = line.stripLeading();
+                if (!CHAPTER_TITLE.matcher(trimmed).find()) {
+                    sb.append("　　");
+                }
+                sb.append(trimmed);
+            }
+        }
+        return sb.toString();
     }
 
     static Rules rules(SettingsService settings) {
