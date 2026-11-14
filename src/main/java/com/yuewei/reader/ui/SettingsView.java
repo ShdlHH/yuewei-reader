@@ -2,10 +2,14 @@ package com.yuewei.reader.ui;
 
 import com.yuewei.reader.application.AppContext;
 import com.yuewei.reader.application.SettingsService;
+import com.yuewei.reader.infrastructure.txt.PunctuationHighlighter.Role;
+import com.yuewei.reader.infrastructure.txt.PunctuationHighlighter.Rules;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ColorPicker;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
@@ -18,9 +22,17 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
-import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
+import javafx.stage.FileChooser;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 
 /** 设置：阅读样式与网络参数。 */
 public class SettingsView implements AppView {
@@ -41,7 +53,32 @@ public class SettingsView implements AppView {
     private final Spinner<Integer> cacheLimit = new Spinner<>(100, 10240, 1024, 100);
     private final Label cacheUsage = Ui.label("", "muted");
     private final TextFlow previewFlow = new TextFlow();
-    private final Text previewText = new Text();
+    private final CheckBox punctEnabled = new CheckBox("开启标点着色");
+    private final List<PunctRule> punctRules = new ArrayList<>();
+    private final Label fontHint = Ui.label("", "muted");
+
+    /** 一条着色规则：开关 + 颜色 + 彩色示例。 */
+    private static final class PunctRule {
+        final Role role;
+        final String colorKey;
+        final String defaultColor;
+        final CheckBox box;
+        final ColorPicker picker;
+        final Label sample;
+
+        PunctRule(Role role, String colorKey, String defaultColor,
+                  CheckBox box, ColorPicker picker, Label sample) {
+            this.role = role;
+            this.colorKey = colorKey;
+            this.defaultColor = defaultColor;
+            this.box = box;
+            this.picker = picker;
+            this.sample = sample;
+        }
+    }
+
+    private static final String PREVIEW_TEXT = "“你终于来了。”他放下书，抬头问道：“外面下雨了吗？”\n"
+            + "她笑了一下——没有回答（也许是不必回答）。";
 
     public SettingsView(AppContext ctx, MainWindow window) {
         this.ctx = ctx;
@@ -76,20 +113,62 @@ public class SettingsView implements AppView {
         readerGrid.add(fontSize, 1, row++);
         readerGrid.add(new Label("行距（倍）"), 0, row);
         readerGrid.add(lineSpacing, 1, row++);
-        readerGrid.add(new Label("字体（系统已安装）"), 0, row);
-        readerGrid.add(fontFamily, 1, row++);
+        readerGrid.add(new Label("字体"), 0, row);
+        Button importFont = Ui.button("导入字体文件", "ghost-button");
+        importFont.setOnAction(e -> importFont());
+        HBox fontRow = new HBox(10, fontFamily, importFont);
+        fontRow.setAlignment(Pos.CENTER_LEFT);
+        readerGrid.add(fontRow, 1, row++);
         readerGrid.add(new Label("主题"), 0, row);
         readerGrid.add(theme, 1, row++);
+        readerGrid.add(fontHint, 1, row++);
+        GridPane.setColumnSpan(fontHint, 1);
+        fontHint.setWrapText(true);
+        fontHint.setMaxWidth(560);
 
-        previewText.setText("春江潮水连海平，海上明月共潮生。\n"
-                + "字体、字号与行距会在此实时预览，保存后立即应用到阅读界面。");
-        previewFlow.setPadding(new Insets(14, 16, 14, 16));
+        previewFlow.setPadding(new Insets(16, 18, 16, 18));
         previewFlow.setPrefWidth(560);
-        previewFlow.getChildren().add(previewText);
+
+        VBox punctBox = new VBox(8);
+        punctEnabled.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            for (PunctRule rule : punctRules) {
+                rule.box.setDisable(!newValue);
+                rule.picker.setDisable(!newValue);
+            }
+            updatePreview();
+        });
+        punctEnabled.setSelected(true);
+        punctBox.getChildren().add(punctEnabled);
+
+        GridPane punctGrid = grid();
+        punctGrid.setVgap(8);
+        int punctRow = 0;
+        addRule(punctGrid, punctRow++, "对话（引号内）", Role.DIALOGUE,
+                SettingsService.PUNCT_DIALOGUE_COLOR, SettingsService.DEFAULT_PUNCT_DIALOGUE_COLOR,
+                true, "“你来了。”");
+        addRule(punctGrid, punctRow++, "句号", Role.STOP,
+                SettingsService.PUNCT_STOP_COLOR, SettingsService.DEFAULT_PUNCT_STOP_COLOR,
+                true, "他合上书。");
+        addRule(punctGrid, punctRow++, "问号", Role.ASK,
+                SettingsService.PUNCT_ASK_COLOR, SettingsService.DEFAULT_PUNCT_ASK_COLOR,
+                true, "外面下雨了吗？");
+        addRule(punctGrid, punctRow++, "感叹号", Role.EXCL,
+                SettingsService.PUNCT_EXCL_COLOR, SettingsService.DEFAULT_PUNCT_EXCL_COLOR,
+                true, "别回头！");
+        addRule(punctGrid, punctRow++, "省略号 / 破折号", Role.ELLIPSIS,
+                SettingsService.PUNCT_ELLIPSIS_COLOR, SettingsService.DEFAULT_PUNCT_ELLIPSIS_COLOR,
+                false, "她笑了一下——没有回答……");
+        addRule(punctGrid, punctRow, "括号（含内容）", Role.PAREN,
+                SettingsService.PUNCT_PAREN_COLOR, SettingsService.DEFAULT_PUNCT_PAREN_COLOR,
+                false, "（也许是不必回答）");
+        punctBox.getChildren().add(punctGrid);
 
         fontSize.valueProperty().addListener((observable, oldValue, newValue) -> updatePreview());
         lineSpacing.valueProperty().addListener((observable, oldValue, newValue) -> updatePreview());
-        fontFamily.valueProperty().addListener((observable, oldValue, newValue) -> updatePreview());
+        fontFamily.valueProperty().addListener((observable, oldValue, newValue) -> {
+            refreshFontHint();
+            updatePreview();
+        });
         theme.valueProperty().addListener((observable, oldValue, newValue) -> updatePreview());
 
         GridPane networkGrid = grid();
@@ -130,6 +209,8 @@ public class SettingsView implements AppView {
 
         VBox content = new VBox(12,
                 Ui.label("阅读", "section-title"), readerGrid,
+                Ui.label("标点着色", "section-title"), punctBox,
+                Ui.label("关闭总开关或取消某条规则，对应文字恢复墨色；夜间与护眼主题会自动调整明度。", "muted"),
                 Ui.label("预览", "section-title"), previewFlow,
                 new Separator(),
                 Ui.label("网络", "section-title"), networkGrid,
@@ -154,6 +235,26 @@ public class SettingsView implements AppView {
         return grid;
     }
 
+    private void addRule(GridPane grid, int row, String label, Role role, String colorKey,
+                         String defaultColor, boolean on, String sampleText) {
+        CheckBox box = new CheckBox(label);
+        box.setSelected(on);
+        box.setPrefWidth(160);
+        ColorPicker picker = new ColorPicker(Color.web(defaultColor));
+        picker.setPrefWidth(120);
+        Label sample = new Label(sampleText);
+        sample.setFont(Font.font(14));
+
+        PunctRule rule = new PunctRule(role, colorKey, defaultColor, box, picker, sample);
+        punctRules.add(rule);
+        box.selectedProperty().addListener((observable, oldValue, newValue) -> updatePreview());
+        picker.valueProperty().addListener((observable, oldValue, newValue) -> updatePreview());
+
+        grid.add(box, 0, row);
+        grid.add(picker, 1, row);
+        grid.add(sample, 2, row);
+    }
+
     private void load() {
         SettingsService settings = ctx.settings;
         fontSize.getValueFactory().setValue(settings.fontSize());
@@ -169,6 +270,28 @@ public class SettingsView implements AppView {
             case "green" -> "护眼";
             default -> "纸白";
         });
+
+        punctEnabled.setSelected(settings.punctEnabled());
+        boolean[] switches = {settings.punctDialogue(), settings.punctStop(), settings.punctAsk(),
+                settings.punctExcl(), settings.punctEllipsis(), settings.punctParen()};
+        String[] colors = {
+                settings.punctColor(SettingsService.PUNCT_DIALOGUE_COLOR,
+                        SettingsService.DEFAULT_PUNCT_DIALOGUE_COLOR),
+                settings.punctColor(SettingsService.PUNCT_STOP_COLOR,
+                        SettingsService.DEFAULT_PUNCT_STOP_COLOR),
+                settings.punctColor(SettingsService.PUNCT_ASK_COLOR,
+                        SettingsService.DEFAULT_PUNCT_ASK_COLOR),
+                settings.punctColor(SettingsService.PUNCT_EXCL_COLOR,
+                        SettingsService.DEFAULT_PUNCT_EXCL_COLOR),
+                settings.punctColor(SettingsService.PUNCT_ELLIPSIS_COLOR,
+                        SettingsService.DEFAULT_PUNCT_ELLIPSIS_COLOR),
+                settings.punctColor(SettingsService.PUNCT_PAREN_COLOR,
+                        SettingsService.DEFAULT_PUNCT_PAREN_COLOR)};
+        for (int i = 0; i < punctRules.size() && i < switches.length; i++) {
+            punctRules.get(i).box.setSelected(switches[i]);
+            punctRules.get(i).picker.setValue(Color.web(colors[i]));
+        }
+
         timeout.getValueFactory().setValue(settings.timeout());
         searchConcurrency.getValueFactory().setValue(settings.searchConcurrency());
         downloadConcurrency.getValueFactory().setValue(settings.downloadConcurrency());
@@ -176,18 +299,18 @@ public class SettingsView implements AppView {
         userAgent.setText(settings.userAgent());
         cacheLimit.getValueFactory().setValue(settings.cacheLimitMb());
         refreshCacheUsage();
+        refreshFontHint();
         updatePreview();
     }
 
-    /** 实时预览：字体、字号、行距与主题与阅读界面保持同一套取值。 */
+    /** 实时预览：字体、字号、行距、主题与着色规则都和阅读界面共用同一套渲染。 */
     private void updatePreview() {
-        String family = fontFamily.getValue();
+        String family = Fonts.resolve(fontFamily.getValue());
         Integer sizeValue = fontSize.getValue();
         Double spacingValue = lineSpacing.getValue();
         int size = sizeValue == null ? 18 : sizeValue;
         double spacing = spacingValue == null ? 1.8 : spacingValue;
-        boolean defaultFamily = family == null || family.isBlank() || "系统默认".equals(family);
-        previewText.setFont(defaultFamily ? Font.font(size) : Font.font(family, size));
+        Font previewFont = family == null ? Font.font(size) : Font.font(family, size);
         previewFlow.setLineSpacing(Math.max(0, (spacing - 1) * size));
 
         String background;
@@ -207,7 +330,99 @@ public class SettingsView implements AppView {
             }
         }
         previewFlow.setStyle("-fx-background-color:" + background + "; -fx-background-radius:8;");
-        previewText.setStyle("-fx-fill:" + foreground + ";");
+
+        Map<Role, Color> colors = previewColors(themeKey());
+        Color ink = Color.web(foreground);
+        ReaderStyles.fill(previewFlow, PREVIEW_TEXT, previewFont, punctEnabled.isSelected(),
+                previewRules(), colors, ink);
+        for (PunctRule rule : punctRules) {
+            rule.sample.setFont(Font.font(family == null ? Font.getDefault().getFamily() : family, 14));
+            rule.sample.setStyle("-fx-text-fill:" + toHex(colors.getOrDefault(rule.role, ink)) + ";");
+        }
+    }
+
+    private Rules previewRules() {
+        return new Rules(on(Role.DIALOGUE), on(Role.STOP), on(Role.ASK),
+                on(Role.EXCL), on(Role.ELLIPSIS), on(Role.PAREN));
+    }
+
+    private boolean on(Role role) {
+        if (!punctEnabled.isSelected()) {
+            return false;
+        }
+        for (PunctRule rule : punctRules) {
+            if (rule.role == role) {
+                return rule.box.isSelected();
+            }
+        }
+        return false;
+    }
+
+    private Map<Role, Color> previewColors(String themeKey) {
+        Map<Role, Color> colors = new EnumMap<>(Role.class);
+        for (PunctRule rule : punctRules) {
+            Color value = rule.picker.getValue() == null
+                    ? Color.web(rule.defaultColor)
+                    : rule.picker.getValue();
+            colors.put(rule.role, ReaderStyles.adjust(value, themeKey));
+        }
+        return colors;
+    }
+
+    private String colorOf(Role role) {
+        for (PunctRule rule : punctRules) {
+            if (rule.role == role) {
+                return toHex(rule.picker.getValue() == null
+                        ? Color.web(rule.defaultColor)
+                        : rule.picker.getValue());
+            }
+        }
+        return "";
+    }
+
+    private static String toHex(Color color) {
+        return String.format("#%02x%02x%02x",
+                (int) Math.round(color.getRed() * 255),
+                (int) Math.round(color.getGreen() * 255),
+                (int) Math.round(color.getBlue() * 255));
+    }
+
+    /** 字体提示：默认字体缺失时明确告知回退方案与导入入口。 */
+    private void refreshFontHint() {
+        String family = fontFamily.getValue();
+        if (family == null || family.isBlank() || "系统默认".equals(family)) {
+            fontHint.setText("将使用系统默认字体。");
+        } else if (Fonts.available(family)) {
+            fontHint.setText("已加载「" + family + "」。");
+        } else {
+            fontHint.setText("未检测到「" + family + "」，正文暂用宋体回退。"
+                    + "可点击“导入字体文件”，或把字体文件放进数据目录的 fonts 文件夹后重启。");
+        }
+    }
+
+    private void importFont() {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("导入字体文件");
+        chooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("字体文件", "*.ttf", "*.otf", "*.ttc"));
+        File file = chooser.showOpenDialog(window.stage());
+        if (file == null) {
+            return;
+        }
+        try {
+            String family = Fonts.install(file);
+            if (family == null) {
+                Ui.info("无法识别这个字体文件，请换一个 ttf / otf / ttc 文件。");
+                return;
+            }
+            if (!fontFamily.getItems().contains(family)) {
+                fontFamily.getItems().add(family);
+            }
+            fontFamily.setValue(family);
+            window.status("已导入字体：" + family + "，保存设置后应用到阅读界面");
+        } catch (IOException e) {
+            Ui.info("导入字体失败：" + e.getMessage());
+        }
     }
 
     private String themeKey() {
@@ -241,9 +456,13 @@ public class SettingsView implements AppView {
 
     private void save() {
         String family = fontFamily.getValue() == null || fontFamily.getValue().isBlank()
-                ? "系统默认"
+                ? SettingsService.DEFAULT_FONT_FAMILY
                 : fontFamily.getValue().trim();
         ctx.settings.saveReader(fontSize.getValue(), lineSpacing.getValue(), family, themeKey());
+        ctx.settings.savePunct(punctEnabled.isSelected(), on(Role.DIALOGUE), on(Role.STOP),
+                on(Role.ASK), on(Role.EXCL), on(Role.ELLIPSIS), on(Role.PAREN));
+        ctx.settings.savePunctColors(colorOf(Role.DIALOGUE), colorOf(Role.STOP), colorOf(Role.ASK),
+                colorOf(Role.EXCL), colorOf(Role.ELLIPSIS), colorOf(Role.PAREN));
         String ua = userAgent.getText();
         if (ua == null || ua.isBlank()) {
             ua = ctx.settings.userAgent();

@@ -12,6 +12,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
@@ -25,8 +26,8 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
-import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
 import javafx.util.Duration;
 
@@ -67,7 +68,7 @@ public class ReaderView implements AppView {
     private final ListView<Chapter> toc = new ListView<>();
     private final ScrollPane scroll = new ScrollPane();
     private final TextFlow flow = new TextFlow();
-    private final Text text = new Text();
+    private final Button highlightToggle = Ui.button("着色 开", "ghost-button");
     private final PauseTransition saveTimer = new PauseTransition(Duration.millis(700));
 
     private Book book;
@@ -76,6 +77,8 @@ public class ReaderView implements AppView {
     private boolean loading;
     private boolean selecting;
     private double pendingFraction = -1;
+    private String content = "";
+    private Font readerFont = Font.font(18);
 
     public ReaderView(AppContext ctx, MainWindow window) {
         this.ctx = ctx;
@@ -108,6 +111,7 @@ public class ReaderView implements AppView {
         typesetting.setOnAction(e -> openTypesetting());
         Button theme = Ui.button("主题", "ghost-button");
         theme.setOnAction(e -> cycleTheme());
+        highlightToggle.setOnAction(e -> toggleHighlight());
 
         Button prev = Ui.button("上一章", "ghost-button");
         prev.setOnAction(e -> previousChapter());
@@ -118,7 +122,7 @@ public class ReaderView implements AppView {
         toolbar.setAlignment(Pos.CENTER_LEFT);
         toolbar.setPadding(new Insets(8, 14, 8, 14));
         toolbar.getChildren().addAll(back, bookLabel, chapterLabel, spacer, prev, next,
-                tocToggle, smaller, larger, typesetting, theme, percentLabel);
+                tocToggle, smaller, larger, typesetting, highlightToggle, theme, percentLabel);
 
         Label tocTitle = Ui.label("目录", "toc-title");
         toc.getStyleClass().add("toc-list");
@@ -151,7 +155,6 @@ public class ReaderView implements AppView {
 
         flow.getStyleClass().add("reader-flow");
         flow.setPadding(new Insets(18, 36, 60, 36));
-        flow.getChildren().add(text);
         scroll.setFitToWidth(true);
         scroll.setContent(flow);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
@@ -188,7 +191,7 @@ public class ReaderView implements AppView {
         }
         if (chapters.isEmpty()) {
             chapterLabel.setText("");
-            text.setText("这本书还没有章节。");
+            setContent("这本书还没有章节。");
             return;
         }
         int next = Math.max(0, Math.min(chapters.size() - 1, target));
@@ -203,12 +206,12 @@ public class ReaderView implements AppView {
             pendingFraction = fraction;
         }
         loading = true;
-        text.setText("正在加载章节…");
+        setContent("正在加载章节…");
         Ui.async("read-chapter",
                 () -> ctx.onlineBookService.loadContent(book, chapter),
-                content -> {
+                loaded -> {
                     loading = false;
-                    text.setText(content);
+                    setContent(loaded);
                     double target2 = pendingFraction < 0 ? 0 : pendingFraction;
                     pendingFraction = -1;
                     Platform.runLater(() -> {
@@ -219,9 +222,31 @@ public class ReaderView implements AppView {
                 error -> {
                     loading = false;
                     String message = Ui.message(error);
-                    text.setText("本章加载失败：" + message + "\n\n可以在书源页校验规则，或先下载本书离线阅读。");
+                    setContent("本章加载失败：" + message + "\n\n可以在书源页校验规则，或先下载本书离线阅读。");
                     window.status("章节加载失败：" + message);
                 });
+    }
+
+    private void setContent(String value) {
+        content = value == null ? "" : value;
+        renderContent();
+    }
+
+    private void renderContent() {
+        Theme theme = theme();
+        ReaderStyles.fill(flow, content, readerFont, ctx.settings.punctEnabled(),
+                ReaderStyles.rules(ctx.settings), ReaderStyles.colors(ctx.settings, ctx.settings.theme()),
+                Color.web(theme.foreground));
+    }
+
+    private Theme theme() {
+        return THEMES.getOrDefault(ctx.settings.theme(), THEMES.get("paper"));
+    }
+
+    private void toggleHighlight() {
+        boolean enabled = !ctx.settings.punctEnabled();
+        ctx.settings.put(SettingsService.PUNCT_ENABLED, String.valueOf(enabled));
+        applyStyle();
     }
 
     private void updatePercent() {
@@ -263,6 +288,13 @@ public class ReaderView implements AppView {
         size.setEditable(true);
         spacing.setEditable(true);
 
+        CheckBox highlight = new CheckBox("标点着色");
+        highlight.setSelected(ctx.settings.punctEnabled());
+        highlight.selectedProperty().addListener((observable, oldValue, newValue) -> {
+            ctx.settings.put(SettingsService.PUNCT_ENABLED, String.valueOf(newValue));
+            applyStyle();
+        });
+
         GridPane grid = new GridPane();
         grid.setHgap(12);
         grid.setVgap(10);
@@ -272,10 +304,12 @@ public class ReaderView implements AppView {
         grid.add(size, 1, 1);
         grid.add(new Label("行距（倍）"), 0, 2);
         grid.add(spacing, 1, 2);
+        grid.add(new Label("标点着色"), 0, 3);
+        grid.add(highlight, 1, 3);
 
         Button reset = Ui.button("恢复默认", "ghost-button");
         reset.setOnAction(e -> {
-            families.setValue("系统默认");
+            families.setValue(SettingsService.DEFAULT_FONT_FAMILY);
             size.getValueFactory().setValue(18);
             spacing.getValueFactory().setValue(1.8);
         });
@@ -321,18 +355,18 @@ public class ReaderView implements AppView {
     private void applyStyle() {
         int size = ctx.settings.fontSize();
         double spacing = ctx.settings.lineSpacing();
-        String family = ctx.settings.fontFamily();
-        Theme theme = THEMES.getOrDefault(ctx.settings.theme(), THEMES.get("paper"));
+        String family = Fonts.resolve(ctx.settings.fontFamily());
+        Theme theme = theme();
 
-        boolean defaultFamily = family == null || family.isBlank() || "系统默认".equals(family);
-        text.setFont(defaultFamily ? Font.font(size) : Font.font(family, size));
-        text.setStyle("-fx-fill:" + theme.foreground + ";");
+        readerFont = family == null ? Font.font(size) : Font.font(family, size);
+        highlightToggle.setText(ctx.settings.punctEnabled() ? "着色 开" : "着色 关");
         flow.setLineSpacing(Math.max(0, (spacing - 1) * size));
         flow.setStyle("-fx-background-color:" + theme.background + ";");
         scroll.setStyle("-fx-background:" + theme.background + "; -fx-background-color:" + theme.background + ";");
         toolbar.setStyle("-fx-background-color:" + theme.bar + ";");
         tocBox.setStyle("-fx-background-color:" + theme.bar + ";");
         root.setStyle("-fx-background-color:" + theme.background + ";");
+        renderContent();
     }
 
     /** 设置页保存后调用，让已打开的阅读界面立即套用新样式。 */

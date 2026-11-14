@@ -12,7 +12,8 @@
 - 书架与阅读器：目录侧栏、上一章/下一章、阅读进度按章节与章内位置保存
 - 在线书源：导入 Legado 3.0 书源，搜索、详情、目录、正文四段解析，支持规则校验与调试
 - 下载与离线：整本下载、暂停/继续/取消、失败重试，已缓存章节断网可读
-- 阅读排版：系统字体选择、12–32 号字、1.2–3.0 倍行距、纸白/夜间/护眼三套主题，调整即时生效
+- 阅读排版：默认京华老宋体（缺失时回退宋体并提示），支持导入 ttf/otf/ttc 字体、12–32 号字、1.2–3.0 倍行距、纸白/夜间/护眼三套主题，调整即时生效
+- 标点着色：引号内对话朱红，句号、问号、感叹号、省略号/破折号、括号分别配色；六条规则可逐条开关与调色，阅读器工具栏可一键关闭
 - 数据本地：SQLite 保存书籍与进度，正文缓存落文件，可设置缓存上限并一键清理
 
 ## 技术栈
@@ -56,19 +57,19 @@ New-Item -ItemType Directory -Force target\package-input
 Copy-Item target\yuewei-reader.jar target\package-input\
 
 # 免安装目录
-jpackage --type app-image --name 阅微阅读器 --app-version 0.2.0 --vendor 阅微 `
+jpackage --type app-image --name 阅微阅读器 --app-version 0.3.0 --vendor 阅微 `
   --input target\package-input --main-jar yuewei-reader.jar `
   --main-class com.yuewei.reader.Launcher --icon packaging\app.ico --dest dist
 
 # exe 安装包
-jpackage --type exe --name 阅微阅读器 --app-version 0.2.0 --vendor 阅微 `
+jpackage --type exe --name 阅微阅读器 --app-version 0.3.0 --vendor 阅微 `
   --input target\package-input --main-jar yuewei-reader.jar `
   --main-class com.yuewei.reader.Launcher --icon packaging\app.ico --dest dist `
   --java-options "-Dfile.encoding=UTF-8" `
   --win-shortcut --win-menu --win-menu-group 阅微 --win-dir-chooser --win-per-user-install
 ```
 
-产物为 `dist\阅微阅读器\`（免安装）与 `dist\阅微阅读器-0.2.0.exe`（安装包）。详细发布流程见 [docs/开发流程.md](docs/开发流程.md)。
+产物为 `dist\阅微阅读器\`（免安装）与 `dist\阅微阅读器-0.3.0.exe`（安装包）。详细发布流程见 [docs/开发流程.md](docs/开发流程.md)。
 
 ## 书源
 
@@ -84,6 +85,11 @@ jpackage --type exe --name 阅微阅读器 --app-version 0.2.0 --vendor 阅微 `
 |---|---|
 | `reader.db` | 书籍、章节、书源、下载任务、阅读进度与设置 |
 | `cache\<bookId>\` | 章节正文缓存，本地导入与在线书都按章节落盘 |
+| `fonts\` | 自定义字体，启动时自动加载；也可在设置页点「导入字体文件」 |
+
+### 字体
+
+正文默认使用「京华老宋体」，字体文件由使用者自行提供，本项目不分发字体。把 ttf / otf / ttc 文件放进 `fonts\`（或在设置页导入）后重启即可生效；未检测到该字体时正文回退宋体，设置页会给出提示。
 
 删除整个目录即可清空所有数据。安装版与免安装版共用同一数据目录。
 

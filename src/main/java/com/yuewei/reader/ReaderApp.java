@@ -1,6 +1,7 @@
 package com.yuewei.reader;
 
 import com.yuewei.reader.application.AppContext;
+import com.yuewei.reader.ui.Fonts;
 import com.yuewei.reader.ui.MainWindow;
 import javafx.application.Application;
 import javafx.scene.Scene;
@@ -12,13 +13,14 @@ import java.net.URL;
 /** JavaFX 应用：初始化数据目录，装配主窗口。 */
 public class ReaderApp extends Application {
 
-    public static final String VERSION = "0.2.0";
+    public static final String VERSION = "0.3.0";
 
     private AppContext context;
 
     @Override
     public void init() {
         context = new AppContext(AppContext.defaultDataDir());
+        Fonts.load(context.dataDir);
     }
 
     @Override
