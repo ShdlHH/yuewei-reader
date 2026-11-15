@@ -13,7 +13,8 @@
 - 目录：章节搜索、在读标记、缓存圆点与底部进度信息，纸白/夜间/护眼三套主题自动适配；宽度可拖拽调整并记忆
 - 在线书源：导入 Legado 3.0 书源，搜索、详情、目录、正文四段解析，支持规则校验与调试
 - 下载与离线：整本下载、暂停/继续/取消、失败重试，已缓存章节断网可读
-- 阅读排版：默认京华老宋体（缺失时回退宋体并提示），支持导入 ttf/otf/ttc 字体、12–32 号字、1.2–3.0 倍行距、段落首行缩进、按章节预分页（滚轮整页翻页，页内不留滚动残影）、纸白/夜间/护眼三套主题，调整即时生效
+- 键盘翻页：空格/PageDown/→/↓ 下一页，PageUp/←/↑/退格 上一页；翻到章末或章首会继续跨章
+- 阅读排版：默认京华老宋体（缺失时回退宋体并提示），支持导入 ttf/otf/ttc 字体、12–32 号字、1.2–3.0 倍行距（段内换行与段间距同步）、段落首行缩进、按章节预分页（滚轮整页翻页，页内不留滚动残影）、纸白/夜间/护眼三套主题，调整即时生效
 - 标点着色：引号内对话朱红，句号、问号、感叹号、省略号/破折号、括号分别配色；六条规则可逐条开关与调色，阅读器工具栏可一键关闭
 - 数据本地：SQLite 保存书籍与进度，正文缓存落文件，可设置缓存上限并一键清理
 
@@ -58,14 +59,14 @@ New-Item -ItemType Directory -Force target\package-input
 Copy-Item target\yuewei-reader.jar target\package-input\
 
 # 免安装目录
-jpackage --type app-image --name 阅微阅读器 --app-version 0.4.4 --vendor 阅微 `
+jpackage --type app-image --name 阅微阅读器 --app-version 0.4.6 --vendor 阅微 `
   --input target\package-input --main-jar yuewei-reader.jar `
-  --main-class com.yuewei.reader.Launcher --icon packaging\app.ico --dest dist\0.4.4
+  --main-class com.yuewei.reader.Launcher --icon packaging\app.ico --dest dist\0.4.6
 
 # exe 安装包
-jpackage --type exe --name 阅微阅读器 --app-version 0.4.4 --vendor 阅微 `
+jpackage --type exe --name 阅微阅读器 --app-version 0.4.6 --vendor 阅微 `
   --input target\package-input --main-jar yuewei-reader.jar `
-  --main-class com.yuewei.reader.Launcher --icon packaging\app.ico --dest dist\0.4.4 `
+  --main-class com.yuewei.reader.Launcher --icon packaging\app.ico --dest dist\0.4.6 `
   --java-options "-Dfile.encoding=UTF-8" `
   --win-shortcut --win-menu --win-menu-group 阅微 --win-dir-chooser --win-per-user-install
 
@@ -73,7 +74,7 @@ jpackage --type exe --name 阅微阅读器 --app-version 0.4.4 --vendor 阅微 `
 powershell -ExecutionPolicy Bypass -File packaging\make-shortcut.ps1
 ```
 
-产物为 `dist\0.4.4\阅微阅读器\`（免安装）与 `dist\0.4.4\阅微阅读器-0.4.4.exe`（安装包）。桌面快捷方式指向 `dist\latest`（目录联接），每次出新版本后执行一次 `packaging\make-shortcut.ps1` 即可自动切换到最新版本。详细发布流程见 [docs/开发流程.md](docs/开发流程.md)。
+产物为 `dist\0.4.6\阅微阅读器\`（免安装）与 `dist\0.4.6\阅微阅读器-0.4.6.exe`（安装包）。桌面快捷方式指向 `dist\latest`（目录联接），每次出新版本后执行一次 `packaging\make-shortcut.ps1` 即可自动切换到最新版本。详细发布流程见 [docs/开发流程.md](docs/开发流程.md)。
 
 ## 书源
 

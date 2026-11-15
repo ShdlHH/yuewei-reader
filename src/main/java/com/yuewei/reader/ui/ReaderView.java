@@ -19,6 +19,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.ComboBoxBase;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
@@ -26,6 +27,8 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputControl;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
@@ -268,6 +271,8 @@ public class ReaderView implements AppView {
 
         HBox main = new HBox(tocBox, resizeHandle);
         main.setFillHeight(true);
+        root.setFocusTraversable(true);
+        root.addEventFilter(KeyEvent.KEY_PRESSED, this::handleKey);
         root.setTop(toolbar);
         root.setLeft(main);
         root.setCenter(scroll);
@@ -356,7 +361,7 @@ public class ReaderView implements AppView {
     }
 
     private Region blankSpacer() {
-        double height = readerFont.getSize() * 1.2 + lineGap();
+        double height = readerFont.getSize() * 1.2;
         Region spacer = new Region();
         spacer.setMinHeight(height);
         spacer.setPrefHeight(height);
@@ -390,6 +395,35 @@ public class ReaderView implements AppView {
             return;
         }
         lastPageTurn = now;
+        turnPage(forward);
+    }
+
+    /** 键盘翻页：空格/PageDown/→/↓ 下一页，PageUp/←/↑/退格 上一页。 */
+    private void handleKey(KeyEvent event) {
+        if (event.isControlDown() || event.isAltDown() || event.isMetaDown()) {
+            return;
+        }
+        if (root.getScene() == null || root.getParent() == null) {
+            return;
+        }
+        Node owner = root.getScene().getFocusOwner();
+        if (owner instanceof TextInputControl || owner instanceof ComboBoxBase) {
+            return;
+        }
+        boolean forward;
+        switch (event.getCode()) {
+            case SPACE, PAGE_DOWN, RIGHT, DOWN -> forward = true;
+            case PAGE_UP, LEFT, UP, BACK_SPACE -> forward = false;
+            default -> {
+                return;
+            }
+        }
+        long now = System.currentTimeMillis();
+        if (now - lastPageTurn < 150) {
+            return;
+        }
+        lastPageTurn = now;
+        event.consume();
         turnPage(forward);
     }
 
@@ -454,18 +488,21 @@ public class ReaderView implements AppView {
             return;
         }
         double contentWidth = Math.max(80, width - padding.getLeft() - padding.getRight());
+        double gap = lineGap();
+        double blankLine = readerFont.getSize() * 1.2;
         List<Node> page = new ArrayList<>();
         double used = 0;
         for (String block : blocks) {
             if (block.isEmpty()) {
-                double height = readerFont.getSize() * 1.2 + lineGap();
-                if (!page.isEmpty() && used + height > usable) {
+                double total = (page.isEmpty() ? 0 : gap) + blankLine;
+                if (!page.isEmpty() && used + total > usable) {
                     pages.add(page);
                     page = new ArrayList<>();
                     used = 0;
+                    total = blankLine;
                 }
                 page.add(blankSpacer());
-                used += height;
+                used += total;
                 continue;
             }
             String text = ReaderStyles.indent(block);
@@ -474,9 +511,10 @@ public class ReaderView implements AppView {
                 String rest = text.substring(offset);
                 TextFlow node = paragraphNode(rest);
                 double height = node.prefHeight(contentWidth);
-                if (used + height <= usable) {
+                double total = (page.isEmpty() ? 0 : gap) + height;
+                if (used + total <= usable) {
                     page.add(node);
-                    used += height;
+                    used += total;
                     offset = text.length();
                     continue;
                 }
@@ -776,11 +814,12 @@ public class ReaderView implements AppView {
 
     private void applyStyle() {
         int size = ctx.settings.fontSize();
-        double spacing = ctx.settings.lineSpacing();
         String family = Fonts.resolve(ctx.settings.fontFamily());
         Theme theme = theme();
 
         readerFont = family == null ? Font.font(size) : Font.font(family, size);
+        // 段落被拆成独立 TextFlow，段间距也要跟随行距设置，否则只在段内换行时生效
+        flow.setSpacing(lineGap());
         highlightToggle.setText(ctx.settings.punctEnabled() ? "着色 开" : "着色 关");
         // 重新排版会重建分页，用当前页比例保住阅读位置
         pendingPage = -1;
@@ -840,6 +879,7 @@ public class ReaderView implements AppView {
     @Override
     public void onShow() {
         applyStyle();
+        root.requestFocus();
     }
 
     public void previousChapter() {
