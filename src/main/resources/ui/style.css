@@ -216,6 +216,15 @@
     -toc-field: rgba(255,253,249,0.65);
 }
 
+.reader-resize {
+    -fx-background-color: transparent;
+    -fx-cursor: h-resize;
+}
+
+.reader-resize:hover {
+    -fx-background-color: rgba(166,61,50,0.16);
+}
+
 .toc-header {
     -fx-padding: 14 14 10 16;
     -fx-alignment: center-left;

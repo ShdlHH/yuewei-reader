@@ -13,6 +13,7 @@ public class SettingsService {
     public static final String LINE_SPACING = "reader.lineSpacing";
     public static final String FONT_FAMILY = "reader.fontFamily";
     public static final String THEME = "reader.theme";
+    public static final String TOC_WIDTH = "reader.tocWidth";
 
     public static final String PUNCT_ENABLED = "reader.punct.enabled";
     public static final String PUNCT_DIALOGUE = "reader.punct.dialogue";

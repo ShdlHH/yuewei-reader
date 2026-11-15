@@ -6,7 +6,7 @@
 
   <groupId>com.yuewei</groupId>
   <artifactId>yuewei-reader</artifactId>
-  <version>0.4.0</version>
+  <version>0.4.1</version>
   <packaging>jar</packaging>
   <name>阅微 · 小说阅读器</name>
   <description>支持本地 TXT 与 Legado 书源的桌面小说阅读器</description>

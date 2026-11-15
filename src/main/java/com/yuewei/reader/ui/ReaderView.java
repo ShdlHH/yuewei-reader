@@ -13,6 +13,7 @@ import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.Cursor;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
@@ -75,6 +76,7 @@ public class ReaderView implements AppView {
     private final TextField tocSearch = new TextField();
     private final Label tocCount = Ui.label("", "toc-count");
     private final Label tocFooter = Ui.label("", "toc-footer");
+    private final Region resizeHandle = new Region();
     private final ScrollPane scroll = new ScrollPane();
     private final TextFlow flow = new TextFlow();
     private final Button highlightToggle = Ui.button("着色 开", "ghost-button");
@@ -90,6 +92,9 @@ public class ReaderView implements AppView {
     private Font readerFont = Font.font(18);
     private Chapter currentChapter;
     private int cachedCount;
+    private double tocWidth = 270;
+    private double dragStartX;
+    private double dragStartWidth;
     private AnimationTimer scrollAnimator;
     private long lastScrollFrame;
     private boolean animatingScroll;
@@ -118,6 +123,8 @@ public class ReaderView implements AppView {
             boolean visible = !tocBox.isVisible();
             tocBox.setVisible(visible);
             tocBox.setManaged(visible);
+            resizeHandle.setVisible(visible);
+            resizeHandle.setManaged(visible);
         });
 
         Button smaller = Ui.button("A－", "ghost-button");
@@ -206,9 +213,30 @@ public class ReaderView implements AppView {
 
         tocBox.getStyleClass().add("toc-box");
         tocBox.setPadding(new Insets(0));
-        tocBox.setPrefWidth(270);
-        tocBox.setMinWidth(270);
+        tocWidth = Math.max(180, Math.min(460, ctx.settings.getInt(SettingsService.TOC_WIDTH, 270)));
+        tocBox.setPrefWidth(tocWidth);
+        tocBox.setMinWidth(180);
+        tocBox.setMaxWidth(460);
+        tocBox.setMaxHeight(Double.MAX_VALUE);
         tocBox.getChildren().addAll(tocHeader, tocSearchWrap, toc, tocFootBox);
+
+        resizeHandle.getStyleClass().add("reader-resize");
+        resizeHandle.setCursor(Cursor.H_RESIZE);
+        resizeHandle.setPrefWidth(6);
+        resizeHandle.setMinWidth(6);
+        resizeHandle.setMaxWidth(6);
+        resizeHandle.setMaxHeight(Double.MAX_VALUE);
+        resizeHandle.setOnMousePressed(e -> {
+            dragStartX = e.getScreenX();
+            dragStartWidth = tocBox.getWidth();
+        });
+        resizeHandle.setOnMouseDragged(e -> {
+            double width = Math.max(180, Math.min(460, dragStartWidth + e.getScreenX() - dragStartX));
+            tocWidth = width;
+            tocBox.setPrefWidth(width);
+        });
+        resizeHandle.setOnMouseReleased(e ->
+                ctx.settings.put(SettingsService.TOC_WIDTH, String.valueOf(Math.round(tocWidth))));
 
         flow.getStyleClass().add("reader-flow");
         flow.setPadding(new Insets(18, 36, 60, 36));
@@ -234,8 +262,10 @@ public class ReaderView implements AppView {
             }
         });
 
+        HBox main = new HBox(tocBox, resizeHandle);
+        main.setFillHeight(true);
         root.setTop(toolbar);
-        root.setLeft(tocBox);
+        root.setLeft(main);
         root.setCenter(scroll);
     }
 
@@ -620,6 +650,8 @@ public class ReaderView implements AppView {
                 + "-toc-selected:" + selected + ";"
                 + "-toc-hover:" + hover + ";"
                 + "-toc-field:" + field + ";");
+        resizeHandle.setStyle("-fx-border-color: transparent transparent transparent " + rgba(ink, 0.18)
+                + "; -fx-border-width: 0 0 0 1;");
     }
 
     /** 设置页保存后调用，让已打开的阅读界面立即套用新样式。 */
