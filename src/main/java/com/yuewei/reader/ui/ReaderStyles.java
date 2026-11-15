@@ -27,11 +27,16 @@ final class ReaderStyles {
 
     static void fill(TextFlow flow, String content, Font font, boolean enabled, Rules rules,
                      Map<Role, Color> colors, Color ink) {
+        fillRaw(flow, indent(content), font, enabled, rules, colors, ink);
+    }
+
+    /** 直接渲染已带缩进的文本，供分页切分后的续段使用，避免重复加首行缩进。 */
+    static void fillRaw(TextFlow flow, String text, Font font, boolean enabled, Rules rules,
+                        Map<Role, Color> colors, Color ink) {
         flow.getChildren().clear();
-        if (content == null || content.isEmpty()) {
+        if (text == null || text.isEmpty()) {
             return;
         }
-        String text = indent(content);
         List<Run> runs = enabled
                 ? PunctuationHighlighter.highlight(text, rules)
                 : List.of(new Run(text, Role.INK));

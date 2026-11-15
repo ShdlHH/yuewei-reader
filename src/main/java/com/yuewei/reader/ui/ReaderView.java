@@ -5,10 +5,11 @@ import com.yuewei.reader.application.SettingsService;
 import com.yuewei.reader.domain.Book;
 import com.yuewei.reader.domain.Chapter;
 import com.yuewei.reader.domain.ContentState;
-import javafx.animation.AnimationTimer;
-import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
 import javafx.animation.PauseTransition;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -78,7 +79,7 @@ public class ReaderView implements AppView {
     private final Label tocFooter = Ui.label("", "toc-footer");
     private final Region resizeHandle = new Region();
     private final ScrollPane scroll = new ScrollPane();
-    private final TextFlow flow = new TextFlow();
+    private final VBox flow = new VBox();
     private final Button highlightToggle = Ui.button("着色 开", "ghost-button");
     private final PauseTransition saveTimer = new PauseTransition(Duration.millis(700));
 
@@ -95,12 +96,17 @@ public class ReaderView implements AppView {
     private double tocWidth = 270;
     private double dragStartX;
     private double dragStartWidth;
-    private AnimationTimer scrollAnimator;
-    private long lastScrollFrame;
-    private boolean animatingScroll;
-    private double scrollTarget = -1;
     private long lastChapterJump;
+    private double pageDelta;
+    private long lastPageTurn;
+    /** 当前章节的正文自然段（空行用空串表示），分页时按视口高度切分。 */
+    private final List<String> blocks = new ArrayList<>();
+    /** 预分页结果：每页只保存本页的段落节点，阅读时整页替换。 */
+    private final List<List<Node>> pages = new ArrayList<>();
+    private int pageIndex;
+    private int pendingPage = -1;
     private boolean fadeNextRender;
+    private Timeline pageAnimation;
 
     public ReaderView(AppContext ctx, MainWindow window) {
         this.ctx = ctx;
@@ -203,7 +209,7 @@ public class ReaderView implements AppView {
             }
             int real = chapters.indexOf(toc.getItems().get(pos));
             if (real >= 0 && real != index) {
-                loadChapter(real, -1);
+                loadChapter(real, 0);
             }
         });
         VBox.setVgrow(toc, Priority.ALWAYS);
@@ -239,10 +245,17 @@ public class ReaderView implements AppView {
                 ctx.settings.put(SettingsService.TOC_WIDTH, String.valueOf(Math.round(tocWidth))));
 
         flow.getStyleClass().add("reader-flow");
-        flow.setPadding(new Insets(18, 36, 60, 36));
+        flow.setFillWidth(true);
+        flow.setPadding(new Insets(18, 36, 20, 36));
         scroll.setFitToWidth(true);
         scroll.setContent(flow);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scroll.viewportBoundsProperty().addListener((observable, oldBounds, newBounds) -> {
+            if (oldBounds.getWidth() != newBounds.getWidth() || oldBounds.getHeight() != newBounds.getHeight()) {
+                Platform.runLater(this::repaginateKeepingPage);
+            }
+        });
         scroll.addEventFilter(ScrollEvent.SCROLL, event -> {
             if (event.getDeltaY() == 0 || event.isShortcutDown()) {
                 return;
@@ -252,15 +265,6 @@ public class ReaderView implements AppView {
         });
 
         saveTimer.setOnFinished(e -> saveProgress());
-        scroll.vvalueProperty().addListener((observable, oldValue, newValue) -> {
-            if (!animatingScroll) {
-                scrollTarget = -1;
-            }
-            updatePercent();
-            if (!loading && book != null) {
-                saveTimer.playFromStart();
-            }
-        });
 
         HBox main = new HBox(tocBox, resizeHandle);
         main.setFillHeight(true);
@@ -276,6 +280,10 @@ public class ReaderView implements AppView {
         this.index = -1;
         this.currentChapter = null;
         this.pendingFraction = Math.max(0, Math.min(1, charOffset / 10000.0));
+        this.pendingPage = -1;
+        blocks.clear();
+        pages.clear();
+        pageIndex = 0;
         bookLabel.setText(book.title);
         tocSearch.clear();
         refreshTocList(false);
@@ -302,6 +310,7 @@ public class ReaderView implements AppView {
         if (fraction >= 0) {
             pendingFraction = fraction;
         }
+        pendingPage = -1;
         loading = true;
         setContent("正在加载章节…");
         Ui.async("read-chapter",
@@ -310,12 +319,6 @@ public class ReaderView implements AppView {
                     loading = false;
                     fadeNextRender = true;
                     setContent(loaded);
-                    double target2 = pendingFraction < 0 ? 0 : pendingFraction;
-                    pendingFraction = -1;
-                    Platform.runLater(() -> Platform.runLater(() -> {
-                        scroll.setVvalue(target2);
-                        updatePercent();
-                    }));
                 },
                 error -> {
                     loading = false;
@@ -328,98 +331,260 @@ public class ReaderView implements AppView {
     private void setContent(String value) {
         content = value == null ? "" : value;
         renderContent();
+        Platform.runLater(() -> Platform.runLater(this::afterContentLayout));
     }
 
+    /** 章节文本先拆成自然段备用；加载提示直接显示，正文等预分页完成后再上屏。 */
     private void renderContent() {
-        stopScrollAnimation();
-        scrollTarget = -1;
-        Theme theme = theme();
-        ReaderStyles.fill(flow, content, readerFont, ctx.settings.punctEnabled(),
-                ReaderStyles.rules(ctx.settings), ReaderStyles.colors(ctx.settings, ctx.settings.theme()),
-                Color.web(theme.foreground));
-        if (fadeNextRender) {
-            fadeNextRender = false;
-            flow.setOpacity(0.2);
-            FadeTransition fade = new FadeTransition(Duration.millis(200), flow);
-            fade.setFromValue(0.2);
-            fade.setToValue(1);
-            fade.setInterpolator(Interpolator.EASE_BOTH);
-            fade.play();
-        } else {
+        blocks.clear();
+        pages.clear();
+        pageIndex = 0;
+        for (String paragraph : content.split("\n", -1)) {
+            blocks.add(paragraph.isBlank() ? "" : paragraph);
+        }
+        flow.getChildren().clear();
+        if (loading) {
+            for (String block : blocks) {
+                flow.getChildren().add(block.isEmpty() ? blankSpacer() : paragraphNode(ReaderStyles.indent(block)));
+            }
             flow.setOpacity(1);
         }
     }
 
-    /** 滚轮按像素缓动；滚到章末继续下滑换下一章，章首继续上滑回上一章。 */
-    private void smoothScroll(double deltaY) {
-        double viewport = scroll.getViewportBounds().getHeight();
-        double contentHeight = flow.getBoundsInLocal().getHeight();
-        double max = Math.max(0, contentHeight - viewport);
-        boolean canJump = !loading && System.currentTimeMillis() - lastChapterJump > 350;
+    private double lineGap() {
+        return Math.max(0, (ctx.settings.lineSpacing() - 1) * readerFont.getSize());
+    }
 
-        if (max <= 0) {
+    private Region blankSpacer() {
+        double height = readerFont.getSize() * 1.2 + lineGap();
+        Region spacer = new Region();
+        spacer.setMinHeight(height);
+        spacer.setPrefHeight(height);
+        spacer.setMaxHeight(height);
+        return spacer;
+    }
+
+    /** 单个自然段 → 着色 TextFlow；text 传入的是已缩进文本，切页续段不会重复缩进。 */
+    private TextFlow paragraphNode(String text) {
+        TextFlow line = new TextFlow();
+        line.getStyleClass().add("reader-paragraph");
+        line.setLineSpacing(lineGap());
+        line.setMaxWidth(Double.MAX_VALUE);
+        ReaderStyles.fillRaw(line, text, readerFont, ctx.settings.punctEnabled(),
+                ReaderStyles.rules(ctx.settings),
+                ReaderStyles.colors(ctx.settings, ctx.settings.theme()),
+                Color.web(theme().foreground));
+        return line;
+    }
+
+    /** 滚轮整页翻页；滚动累计到阈值再翻，避免触控板高频事件连翻多页。 */
+    private void smoothScroll(double deltaY) {
+        pageDelta += deltaY;
+        if (Math.abs(pageDelta) < 20) {
+            return;
+        }
+        boolean forward = pageDelta < 0;
+        pageDelta = 0;
+        long now = System.currentTimeMillis();
+        if (now - lastPageTurn < 220) {
+            return;
+        }
+        lastPageTurn = now;
+        turnPage(forward);
+    }
+
+    /** 按预分页翻页；最后一页继续后翻进下一章，首页前翻回上一章末页。 */
+    private void turnPage(boolean forward) {
+        boolean canJump = !loading && System.currentTimeMillis() - lastChapterJump > 350;
+        if (pages.isEmpty()) {
             if (canJump) {
-                jumpChapter(deltaY < 0);
+                jumpChapter(forward);
             }
             return;
         }
-
-        double current = scroll.getVvalue() * max;
-        if (scrollTarget < 0 || Math.abs(scrollTarget - current) > viewport) {
-            scrollTarget = current;
+        if (forward) {
+            if (pageIndex < pages.size() - 1) {
+                showPage(pageIndex + 1, true);
+            } else if (canJump) {
+                jumpChapter(true);
+            }
+        } else {
+            if (pageIndex > 0) {
+                showPage(pageIndex - 1, true);
+            } else if (canJump) {
+                jumpChapter(false);
+            }
         }
-        double next = scrollTarget - deltaY * 2.2;
+    }
 
-        if (canJump && deltaY < 0 && current >= max - 2 && next >= max) {
-            jumpChapter(true);
+    /** 内容就绪后先完成整章分页，再按页显示。 */
+    private void afterContentLayout() {
+        if (loading || flow.getScene() == null) {
             return;
         }
-        if (canJump && deltaY > 0 && current <= 2 && next <= 0) {
-            jumpChapter(false);
+        paginate();
+        int target = 0;
+        if (pendingPage >= 0) {
+            target = pendingPage;
+        } else if (pendingFraction >= 0 && !pages.isEmpty()) {
+            target = (int) Math.round(pendingFraction * (pages.size() - 1));
+        }
+        pendingPage = -1;
+        pendingFraction = -1;
+        boolean animate = fadeNextRender;
+        fadeNextRender = false;
+        showPage(target, animate);
+    }
+
+    /** 把整章切分成若干页：每页只保存该页的节点，页末不留半截段落，超长段落才按字符续页。 */
+    private void paginate() {
+        pages.clear();
+        pageIndex = 0;
+        if (blocks.isEmpty()) {
+            updatePercent();
             return;
         }
-
-        scrollTarget = Math.max(0, Math.min(max, next));
-        animatingScroll = true;
-        if (scrollAnimator == null) {
-            scrollAnimator = new AnimationTimer() {
-                @Override
-                public void handle(long now) {
-                    animateScroll(now);
+        double width = scroll.getViewportBounds().getWidth();
+        Insets padding = flow.getInsets();
+        double usable = scroll.getViewportBounds().getHeight() - padding.getTop() - padding.getBottom();
+        if (width <= 40 || usable <= 40) {
+            pages.add(new ArrayList<>(List.of()));
+            pages.get(0).addAll(loadingNodes());
+            updatePercent();
+            return;
+        }
+        double contentWidth = Math.max(80, width - padding.getLeft() - padding.getRight());
+        List<Node> page = new ArrayList<>();
+        double used = 0;
+        for (String block : blocks) {
+            if (block.isEmpty()) {
+                double height = readerFont.getSize() * 1.2 + lineGap();
+                if (!page.isEmpty() && used + height > usable) {
+                    pages.add(page);
+                    page = new ArrayList<>();
+                    used = 0;
                 }
-            };
+                page.add(blankSpacer());
+                used += height;
+                continue;
+            }
+            String text = ReaderStyles.indent(block);
+            int offset = 0;
+            while (offset < text.length()) {
+                String rest = text.substring(offset);
+                TextFlow node = paragraphNode(rest);
+                double height = node.prefHeight(contentWidth);
+                if (used + height <= usable) {
+                    page.add(node);
+                    used += height;
+                    offset = text.length();
+                    continue;
+                }
+                if (!page.isEmpty()) {
+                    pages.add(page);
+                    page = new ArrayList<>();
+                    used = 0;
+                    continue;
+                }
+                // 空页也放不下：按能容纳的字数切开，剩余部分留给下一页
+                int take = fittingCount(rest, contentWidth, usable);
+                page.add(paragraphNode(rest.substring(0, take)));
+                pages.add(page);
+                page = new ArrayList<>();
+                used = 0;
+                offset += take;
+            }
         }
-        lastScrollFrame = 0;
-        scrollAnimator.start();
+        if (!page.isEmpty()) {
+            pages.add(page);
+        }
+        if (pages.isEmpty()) {
+            pages.add(new ArrayList<>());
+        }
+        updatePercent();
     }
 
-    /** 逐帧指数逼近目标位置，连续滚轮不会因重启动画而顿挫。 */
-    private void animateScroll(long now) {
-        double viewport = scroll.getViewportBounds().getHeight();
-        double max = Math.max(0, flow.getBoundsInLocal().getHeight() - viewport);
-        if (max <= 0) {
-            stopScrollAnimation();
-            return;
+    /** 二分查找在给定高度内最多能排下的字符数，至少取一个字符避免死循环。 */
+    private int fittingCount(String text, double width, double maxHeight) {
+        int low = 1;
+        int high = text.length();
+        int best = 1;
+        while (low <= high) {
+            int mid = (low + high) >>> 1;
+            if (paragraphNode(text.substring(0, mid)).prefHeight(width) <= maxHeight) {
+                best = mid;
+                low = mid + 1;
+            } else {
+                high = mid - 1;
+            }
         }
-        double current = scroll.getVvalue() * max;
-        double diff = scrollTarget - current;
-        if (Math.abs(diff) < 0.5) {
-            scroll.setVvalue(Math.max(0, Math.min(1, scrollTarget / max)));
-            stopScrollAnimation();
-            return;
-        }
-        double elapsed = lastScrollFrame == 0 ? 0.016 : Math.min(0.05, (now - lastScrollFrame) / 1_000_000_000.0);
-        lastScrollFrame = now;
-        double factor = 1 - Math.exp(-elapsed / 0.09);
-        scroll.setVvalue(Math.max(0, Math.min(1, (current + diff * factor) / max)));
+        return best;
     }
 
-    private void stopScrollAnimation() {
-        if (scrollAnimator != null) {
-            scrollAnimator.stop();
+    private List<Node> loadingNodes() {
+        List<Node> nodes = new ArrayList<>();
+        for (String block : blocks) {
+            nodes.add(block.isEmpty() ? blankSpacer() : paragraphNode(ReaderStyles.indent(block)));
         }
-        lastScrollFrame = 0;
-        animatingScroll = false;
+        return nodes;
+    }
+
+    /** 整页替换：只把本页节点放进容器，因此不会出现上一页末尾残留在本页顶部。 */
+    private void showPage(int index, boolean animate) {
+        if (pages.isEmpty()) {
+            percentLabel.setText("0/0");
+            updateTocFooter();
+            return;
+        }
+        int previous = pageIndex;
+        pageIndex = Math.max(0, Math.min(pages.size() - 1, index));
+        boolean forward = pageIndex >= previous;
+        flow.getChildren().setAll(pages.get(pageIndex));
+        scroll.setVvalue(0);
+        if (animate) {
+            playPageAnimation(forward);
+        } else {
+            stopPageAnimation();
+            flow.setOpacity(1);
+            flow.setTranslateY(0);
+        }
+        updatePercent();
+        if (!loading && book != null) {
+            saveTimer.playFromStart();
+        }
+    }
+
+    /** 翻页动画：新页淡入并沿阅读方向轻移 18px，缓出收住，避免整页滚动带来的跳动感。 */
+    private void playPageAnimation(boolean forward) {
+        stopPageAnimation();
+        double offset = forward ? 18 : -18;
+        flow.setOpacity(0);
+        flow.setTranslateY(offset);
+        pageAnimation = new Timeline(
+                new KeyFrame(Duration.ZERO,
+                        new KeyValue(flow.opacityProperty(), 0),
+                        new KeyValue(flow.translateYProperty(), offset)),
+                new KeyFrame(Duration.millis(200),
+                        new KeyValue(flow.opacityProperty(), 1, Interpolator.EASE_OUT),
+                        new KeyValue(flow.translateYProperty(), 0, Interpolator.EASE_OUT)));
+        pageAnimation.play();
+    }
+
+    private void stopPageAnimation() {
+        if (pageAnimation != null) {
+            pageAnimation.stop();
+            pageAnimation = null;
+        }
+    }
+
+    /** 窗口尺寸或排版变化后重新分页，并按页比例回到原来的阅读位置。 */
+    private void repaginateKeepingPage() {
+        if (loading || blocks.isEmpty()) {
+            return;
+        }
+        double ratio = pages.size() <= 1 ? 0 : (double) pageIndex / (pages.size() - 1);
+        paginate();
+        showPage((int) Math.round(ratio * Math.max(0, pages.size() - 1)), false);
     }
 
     /** 翻章：往后落在新章开头，往前落在上一章结尾。 */
@@ -450,8 +615,11 @@ public class ReaderView implements AppView {
     }
 
     private void updatePercent() {
-        int percent = (int) Math.round(scroll.getVvalue() * 100);
-        percentLabel.setText(percent + "%");
+        if (pages.isEmpty()) {
+            percentLabel.setText("0/0");
+        } else {
+            percentLabel.setText((pageIndex + 1) + "/" + pages.size());
+        }
         updateTocFooter();
     }
 
@@ -495,8 +663,8 @@ public class ReaderView implements AppView {
             return;
         }
         int chapterNo = index < 0 ? 0 : index + 1;
-        int percent = (int) Math.round(scroll.getVvalue() * 100);
-        tocFooter.setText("已缓存 " + cachedCount + " 章 · 第 " + chapterNo + " 章 · " + percent + "%");
+        String page = pages.isEmpty() ? "0/0" : (pageIndex + 1) + "/" + pages.size();
+        tocFooter.setText("已缓存 " + cachedCount + " 章 · 第 " + chapterNo + " 章 · " + page + " 页");
     }
 
     private static String rgba(Color color, double opacity) {
@@ -511,7 +679,8 @@ public class ReaderView implements AppView {
         if (book == null || chapters.isEmpty() || index < 0) {
             return;
         }
-        int percent = (int) Math.round(scroll.getVvalue() * 10000);
+        int percent = pages.size() <= 1 ? 0
+                : (int) Math.round(pageIndex * 10000.0 / (pages.size() - 1));
         ctx.bookService.saveProgress(book.id, index, percent);
     }
 
@@ -613,13 +782,17 @@ public class ReaderView implements AppView {
 
         readerFont = family == null ? Font.font(size) : Font.font(family, size);
         highlightToggle.setText(ctx.settings.punctEnabled() ? "着色 开" : "着色 关");
-        flow.setLineSpacing(Math.max(0, (spacing - 1) * size));
+        // 重新排版会重建分页，用当前页比例保住阅读位置
+        pendingPage = -1;
+        if (!pages.isEmpty()) {
+            pendingFraction = pages.size() <= 1 ? 0 : (double) pageIndex / (pages.size() - 1);
+        }
         flow.setStyle("-fx-background-color:" + theme.background + ";");
         scroll.setStyle("-fx-background:" + theme.background + "; -fx-background-color:" + theme.background + ";");
         toolbar.setStyle("-fx-background-color:" + theme.bar + ";");
         applyTocStyle(theme);
         root.setStyle("-fx-background-color:" + theme.background + ";");
-        renderContent();
+        setContent(content);
     }
 
     /** 目录配色跟随主题：通过 looked-up color 让 CSS 与代码共用一套颜色。 */
