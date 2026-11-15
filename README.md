@@ -9,7 +9,8 @@
 ## 功能
 
 - 本地 TXT：自动识别编码、按章节标题分章、导入前预览，支持大文件导入
-- 书架与阅读器：目录侧栏、上一章/下一章、阅读进度按章节与章内位置保存
+- 书架与阅读器：目录侧栏、上一章/下一章、阅读进度按章节与章内位置保存；章末继续下滑自动进入下一章，章首继续上滑回到上一章结尾
+- 目录：章节搜索、在读标记、缓存圆点与底部进度信息，纸白/夜间/护眼三套主题自动适配
 - 在线书源：导入 Legado 3.0 书源，搜索、详情、目录、正文四段解析，支持规则校验与调试
 - 下载与离线：整本下载、暂停/继续/取消、失败重试，已缓存章节断网可读
 - 阅读排版：默认京华老宋体（缺失时回退宋体并提示），支持导入 ttf/otf/ttc 字体、12–32 号字、1.2–3.0 倍行距、段落首行缩进、滚轮缓动滚动、纸白/夜间/护眼三套主题，调整即时生效
@@ -57,14 +58,14 @@ New-Item -ItemType Directory -Force target\package-input
 Copy-Item target\yuewei-reader.jar target\package-input\
 
 # 免安装目录
-jpackage --type app-image --name 阅微阅读器 --app-version 0.3.2 --vendor 阅微 `
+jpackage --type app-image --name 阅微阅读器 --app-version 0.4.0 --vendor 阅微 `
   --input target\package-input --main-jar yuewei-reader.jar `
-  --main-class com.yuewei.reader.Launcher --icon packaging\app.ico --dest dist\0.3.2
+  --main-class com.yuewei.reader.Launcher --icon packaging\app.ico --dest dist\0.4.0
 
 # exe 安装包
-jpackage --type exe --name 阅微阅读器 --app-version 0.3.2 --vendor 阅微 `
+jpackage --type exe --name 阅微阅读器 --app-version 0.4.0 --vendor 阅微 `
   --input target\package-input --main-jar yuewei-reader.jar `
-  --main-class com.yuewei.reader.Launcher --icon packaging\app.ico --dest dist\0.3.2 `
+  --main-class com.yuewei.reader.Launcher --icon packaging\app.ico --dest dist\0.4.0 `
   --java-options "-Dfile.encoding=UTF-8" `
   --win-shortcut --win-menu --win-menu-group 阅微 --win-dir-chooser --win-per-user-install
 
@@ -72,7 +73,7 @@ jpackage --type exe --name 阅微阅读器 --app-version 0.3.2 --vendor 阅微 `
 powershell -ExecutionPolicy Bypass -File packaging\make-shortcut.ps1
 ```
 
-产物为 `dist\0.3.2\阅微阅读器\`（免安装）与 `dist\0.3.2\阅微阅读器-0.3.2.exe`（安装包）。桌面快捷方式指向 `dist\latest`（目录联接），每次出新版本后执行一次 `packaging\make-shortcut.ps1` 即可自动切换到最新版本。详细发布流程见 [docs/开发流程.md](docs/开发流程.md)。
+产物为 `dist\0.4.0\阅微阅读器\`（免安装）与 `dist\0.4.0\阅微阅读器-0.4.0.exe`（安装包）。桌面快捷方式指向 `dist\latest`（目录联接），每次出新版本后执行一次 `packaging\make-shortcut.ps1` 即可自动切换到最新版本。详细发布流程见 [docs/开发流程.md](docs/开发流程.md)。
 
 ## 书源
 

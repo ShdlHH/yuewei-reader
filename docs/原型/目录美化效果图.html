@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>阅微 · 目录界面美化提案</title>
+<style>
+  :root{
+    --paper:#f6f1e7; --bar:#ece4d4; --line:#ddd3c0; --ink:#2f2a24;
+    --muted:#8a8175; --faint:#b3a996; --cinnabar:#a63d32;
+    --cinnabar-soft:rgba(166,61,50,.09); --green:#3f6b45;
+    --night-bg:#1b1c20; --night-bar:#24262c; --night-ink:#c8c6c0;
+    --night-line:#34363d; --night-muted:#8d8a84;
+    --eye-bg:#e6efe4; --eye-bar:#d8e6d5; --eye-ink:#2d3a2b; --eye-muted:#6d7b68;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:44px 40px 72px; background:#efe9dd; color:var(--ink);
+    font-family:"京华老宋体","JingHuaOldSong","STSong","SimSun",serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .page{max-width:1160px;margin:0 auto}
+  .eyebrow{font-size:12px;letter-spacing:.22em;color:var(--cinnabar);text-transform:uppercase}
+  h1{font-size:34px;line-height:1.3;margin:12px 0 10px;font-weight:600;letter-spacing:.02em}
+  .lead{font-size:14px;line-height:1.9;color:#6b6459;max-width:760px;margin:0}
+  .lead b{color:var(--ink);font-weight:600}
+  .rule{height:1px;background:#ddd3c0;margin:30px 0}
+  h2{font-size:17px;margin:0 0 4px;letter-spacing:.04em}
+  .h2-note{font-size:12px;color:#8a8175;margin:0 0 18px}
+
+  .diagnosis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:22px}
+  .diag{background:#f9f5ec;border:1px solid #e3dac9;border-radius:10px;padding:16px 16px 14px}
+  .diag .no{font-size:11px;letter-spacing:.14em;color:var(--cinnabar)}
+  .diag h3{font-size:14px;margin:8px 0 6px;font-weight:600}
+  .diag p{font-size:12px;line-height:1.75;color:#7b7468;margin:0}
+
+  .compare{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:8px}
+  .shot{background:#f9f5ec;border:1px solid #e3dac9;border-radius:14px;padding:16px 16px 14px}
+  .shot-label{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .shot-label span:first-child{font-size:13px;letter-spacing:.08em}
+  .tag{font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid #ddd3c0;color:#8a8175;background:#fdfaf3}
+  .tag.bad{color:#9a6a5f;border-color:#e7d5cd;background:#fbf1ee}
+  .tag.good{color:#3f6b45;border-color:#cfdccb;background:#f0f5ee}
+
+  .window{border-radius:10px;overflow:hidden;border:1px solid #ddd3c0;background:var(--paper);box-shadow:0 8px 22px rgba(70,58,40,.08)}
+  .win-bar{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bar);border-bottom:1px solid var(--line);font-size:11px;color:#7d776a}
+  .win-bar .dot{width:7px;height:7px;border-radius:50%;background:#c9bda9}
+  .win-bar .grow{flex:1}
+  .win-bar .pill{padding:2px 8px;border-radius:20px;background:#f6f1e7;border:1px solid #ddd3c0;color:#7d776a}
+  .win-body{display:flex;height:470px}
+  .toc{width:270px;flex:0 0 270px;display:flex;flex-direction:column;border-right:1px solid var(--line);background:rgba(236,228,212,.55)}
+  .text-area{flex:1;padding:24px 30px;overflow:hidden}
+  .text-area p{font-size:14px;line-height:2.1;margin:0 0 14px;color:#3f3a32}
+  .text-area .hl{color:var(--cinnabar)}
+  .text-area .dim{color:#b9b0a1}
+
+  /* 旧版目录 */
+  .toc.old{padding:12px 10px}
+  .old .head{font-size:13px;font-weight:600;padding:2px 4px 10px}
+  .old .list{background:#fffdf9;border:1px solid #ece5d8;border-radius:6px;flex:1;overflow:hidden;padding:4px 0}
+  .old .row{height:27px;line-height:27px;padding:0 10px;font-size:12.5px;color:#4a4740;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .old .row.selected{background:#dfe8dd;color:#2f3a2e}
+  .old .row.cached{color:#3f6b45}
+  .old .hint{font-size:11px;color:#9a9285;padding:8px 4px 0}
+
+  /* 新版目录 · 方案 A */
+  .toc.new{padding:0}
+  .new .head{display:flex;align-items:center;gap:8px;padding:16px 16px 12px;border-bottom:1px solid var(--line)}
+  .new .head .title{font-size:14px;font-weight:600;letter-spacing:.12em}
+  .new .head .count{font-size:11px;color:var(--muted);letter-spacing:.04em}
+  .new .head .seal{margin-left:auto;width:22px;height:22px;border-radius:4px;background:var(--cinnabar);color:#fdf6ec;font-size:11px;display:flex;align-items:center;justify-content:center;letter-spacing:.05em;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+  .new .list{flex:1;overflow:hidden;padding:8px 8px 12px}
+  .new .row{display:flex;align-items:center;gap:9px;height:36px;padding:0 10px 0 9px;border-radius:7px;position:relative;color:#4a4740;cursor:pointer}
+  .new .row .idx{width:24px;flex:0 0 24px;font-family:Georgia,"Times New Roman",serif;font-size:10.5px;letter-spacing:.06em;color:#b1a794;text-align:right;font-variant-numeric:tabular-nums}
+  .new .row .name{flex:1;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.02em}
+  .new .row .dot{width:4px;height:4px;border-radius:50%;background:#8aa887;flex:0 0 4px}
+  .new .row:hover{background:rgba(166,61,50,.05)}
+  .new .row.selected{background:var(--cinnabar-soft)}
+  .new .row.selected::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:2px;border-radius:2px;background:var(--cinnabar)}
+  .new .row.selected .idx{color:var(--cinnabar)}
+  .new .row.selected .name{color:var(--ink);font-weight:600}
+  .new .row.selected .read{font-size:10px;color:var(--cinnabar);border:1px solid rgba(166,61,50,.35);border-radius:20px;padding:1px 6px;letter-spacing:.08em;background:rgba(253,246,236,.7)}
+  .new .foot{padding:10px 16px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);display:flex;justify-content:space-between}
+
+  .notes{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+  .note{font-size:11.5px;line-height:1.7;color:#7b7468}
+  .note b{display:block;color:var(--ink);font-size:12.5px;font-weight:600;margin-bottom:3px}
+
+  .variants{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:6px}
+  .variant{background:#f9f5ec;border:1px solid #e3dac9;border-radius:14px;padding:14px}
+  .variant h3{font-size:14px;margin:0 0 2px;font-weight:600}
+  .variant .sub{font-size:11px;color:#8a8175;letter-spacing:.06em;margin-bottom:12px}
+  .mini{border-radius:8px;border:1px solid #ddd3c0;overflow:hidden;background:var(--paper)}
+  .mini .head{display:flex;align-items:center;gap:7px;padding:10px 12px;border-bottom:1px solid var(--line)}
+  .mini .head b{font-size:12px;letter-spacing:.1em}
+  .mini .head small{font-size:10px;color:var(--muted)}
+  .mini .head .seal{margin-left:auto;width:17px;height:17px;border-radius:3px;background:var(--cinnabar);color:#fdf6ec;font-size:9px;display:flex;align-items:center;justify-content:center}
+  .mini .rows{padding:6px 7px 10px;height:214px;overflow:hidden}
+  .mini .r{display:flex;align-items:center;gap:7px;height:30px;padding:0 7px;border-radius:6px;font-size:12px;color:#4a4740;position:relative}
+  .mini .r .idx{width:20px;flex:0 0 20px;font-family:Georgia,serif;font-size:9.5px;color:#b1a794;text-align:right}
+  .mini .r .n{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mini .r.sel{background:var(--cinnabar-soft)}
+  .mini .r.sel::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:2px;border-radius:2px;background:var(--cinnabar)}
+  .mini .r.sel .n{font-weight:600;color:var(--ink)}
+  .mini .r.sel .idx{color:var(--cinnabar)}
+  .mini .r .dot{width:4px;height:4px;border-radius:50%;background:#8aa887;flex:0 0 4px}
+  .variant ul{margin:12px 0 0;padding-left:16px;font-size:11.5px;line-height:1.75;color:#7b7468}
+  .variant ul b{color:var(--ink)}
+  .pick{display:inline-block;margin-top:10px;font-size:10.5px;letter-spacing:.1em;color:var(--cinnabar);border:1px solid rgba(166,61,50,.35);padding:3px 8px;border-radius:20px}
+
+  /* 方案 B 静读 */
+  .mini.b .r{height:34px;border-bottom:1px solid rgba(221,211,192,.6);border-radius:0;padding-left:10px}
+  .mini.b .r:last-child{border-bottom:none}
+  .mini.b .r .idx{display:none}
+  .mini.b .r.sel::before{display:none}
+  .mini.b .r.sel{background:linear-gradient(90deg,rgba(166,61,50,.10),transparent)}
+  .mini.b .r.sel .n{color:var(--cinnabar)}
+
+  /* 方案 C 卷册 */
+  .mini.c .vol{font-size:10px;letter-spacing:.14em;color:#a39a8a;padding:8px 8px 4px}
+  .mini.c .r{height:29px;padding-left:14px}
+  .mini.c .r .idx{display:none}
+  .mini.c .r.sel::before{display:none}
+  .mini.c .r.sel{background:rgba(166,61,50,.07);box-shadow:inset 0 0 0 1px rgba(166,61,50,.15)}
+
+  .themes{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:6px}
+  .theme{border-radius:12px;border:1px solid #ddd3c0;overflow:hidden}
+  .theme .th-head{padding:9px 12px;font-size:11px;letter-spacing:.1em}
+  .theme .th-body{padding:8px 8px 12px;height:250px;overflow:hidden}
+  .theme .r{display:flex;align-items:center;gap:8px;height:34px;padding:0 9px;border-radius:6px;font-size:12.5px;color:#4a4740}
+  .theme .r .idx{width:26px;flex:0 0 26px;font-family:Georgia,"Times New Roman",serif;font-size:10px;letter-spacing:.06em;color:#b1a794;text-align:right;font-variant-numeric:tabular-nums}
+  .theme .r .n{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.02em}
+  .theme .r .dot{width:4px;height:4px;border-radius:50%;background:#8aa887;flex:0 0 4px}
+  .theme .r .read{font-size:9.5px;line-height:1.5;border:1px solid currentColor;border-radius:20px;padding:0 5px;letter-spacing:.06em;flex:0 0 auto}
+  .theme .r.sel{position:relative}
+  .theme .r.sel::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:2px;border-radius:2px;background:var(--cinnabar)}
+  .theme .r.sel .n{font-weight:600}
+  .theme.paper{background:var(--paper)}
+  .theme.paper .th-head{color:#7d776a;background:var(--bar);border-bottom:1px solid var(--line)}
+  .theme.night{background:var(--night-bg);border-color:#34363d}
+  .theme.night .th-head{color:var(--night-muted);background:var(--night-bar);border-bottom:1px solid var(--night-line)}
+  .theme.night .r{color:#c8c6c0}
+  .theme.night .r .idx{color:#73706a}
+  .theme.night .r.sel{background:rgba(166,61,50,.22)}
+  .theme.night .r.sel .n{color:#f0ece2}
+  .theme.night .r.sel .idx,.theme.night .r.sel .read{color:#e08b7d}
+  .theme.eye{background:var(--eye-bg);border-color:#cfdccb}
+  .theme.eye .th-head{color:var(--eye-muted);background:var(--eye-bar);border-bottom:1px solid #c9d9c5}
+  .theme.eye .r{color:var(--eye-ink)}
+  .theme.eye .r .idx{color:#9aa995}
+  .theme.eye .r.sel{background:rgba(166,61,50,.12)}
+  .theme.eye .r.sel .n{color:#243021}
+  .theme.eye .r.sel .idx,.theme.eye .r.sel .read{color:var(--cinnabar)}
+
+  .ask{background:#f9f5ec;border:1px solid #e3dac9;border-radius:14px;padding:20px 22px;margin-top:10px}
+  .ask h2{font-size:15px;margin-bottom:12px}
+  .ask ol{margin:0;padding-left:20px;font-size:12.5px;line-height:2;color:#6b6459}
+  .ask b{color:var(--ink)}
+  .stamp{float:right;margin-top:-6px;width:62px;height:62px;border:2px solid rgba(166,61,50,.55);border-radius:8px;color:var(--cinnabar);display:flex;align-items:center;justify-content:center;font-size:13px;letter-spacing:.18em;transform:rotate(-4deg);opacity:.85}
+  .foot-note{margin-top:28px;font-size:11px;color:#9a9285;letter-spacing:.04em}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="eyebrow">阅微 · 阅读器优化提案 02</div>
+  <h1>目录，不只是章节列表</h1>
+  <p class="lead">当前目录是一个贴着白底的默认列表：没有序号、行距紧、选中色与主题脱节，长书翻找时很难定位。下面给出<b>一套推荐方案</b>与两个备选方向，确认后我再改代码。</p>
+
+  <div class="rule"></div>
+
+  <h2>现状诊断</h2>
+  <p class="h2-note">问题都来自 style.css 的默认 ListView，与阅读器的纸感界面不在一个体系里。</p>
+  <div class="diagnosis">
+    <div class="diag"><div class="no">01</div><h3>白卡片突兀</h3><p>侧栏是纸色，列表却是纯白圆角卡片，边界像贴上去的。</p></div>
+    <div class="diag"><div class="no">02</div><h3>行距太挤</h3><p>27px 行高、无内边距，长目录一眼望不到重点。</p></div>
+    <div class="diag"><div class="no">03</div><h3>选中像表格</h3><p>整行浅绿底，与纸白/夜间/护眼三套主题都不协调。</p></div>
+    <div class="diag"><div class="no">04</div><h3>缺少定位线索</h3><p>没有序号、没有“在读”标识，缓存章只靠绿字区分。</p></div>
+  </div>
+
+  <div class="rule"></div>
+
+  <h2>推荐方案对比</h2>
+  <p class="h2-note">左：当前；右：方案 A「素笺目录」。间距、序号、朱红在读标记与主题色全部收进同一套纸感语言。</p>
+  <div class="compare">
+    <div class="shot">
+      <div class="shot-label"><span>当前目录</span><span class="tag bad">待优化</span></div>
+      <div class="window">
+        <div class="win-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="grow"></span><span class="pill">着色 开</span><span class="pill">主题</span><span>12%</span></div>
+        <div class="win-body">
+          <div class="toc old">
+            <div class="head">目录</div>
+            <div class="list">
+              <div class="row">第一章 雨夜来客</div>
+              <div class="row cached">第二章 旧书与灯</div>
+              <div class="row selected">第三章 渡口无船</div>
+              <div class="row">第四章 山中来信</div>
+              <div class="row cached">第五章 灯下故人</div>
+              <div class="row">第六章 秋水长天</div>
+              <div class="row">第七章 雪落无声</div>
+              <div class="row">第八章 一纸风尘</div>
+              <div class="row">第九章 雁字回时</div>
+              <div class="row">第十章 月满西楼</div>
+              <div class="row">第十一章 长夜将尽</div>
+              <div class="row">第十二章 归途</div>
+            </div>
+            <div class="hint">白色列表与纸色侧栏脱节</div>
+          </div>
+          <div class="text-area">
+            <p>雨落在青石板上，声音细碎而密。</p>
+            <p><span class="hl">“你终于来了。”</span>他把书合上，抬头看向门口。</p>
+            <p>她收起伞，雨水顺着伞骨滴落在地板上<span class="dim">——</span>没有回答。</p>
+            <p><span class="hl">“外面下雨了吗？”</span>他问。</p>
+            <p><span class="hl">“下了。”</span>她说，<span class="hl">“而且很大。”</span></p>
+            <p>灯影在纸页上摇晃，像一段没有说完的话。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="shot">
+      <div class="shot-label"><span>方案 A · 素笺目录</span><span class="tag good">推荐</span></div>
+      <div class="window">
+        <div class="win-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="grow"></span><span class="pill">着色 开</span><span class="pill">主题</span><span>12%</span></div>
+        <div class="win-body">
+          <div class="toc new">
+            <div class="head"><span class="title">目录</span><span class="count">共 338 章</span><span class="seal">读</span></div>
+            <div class="list">
+              <div class="row"><span class="idx">001</span><span class="name">第一章 雨夜来客</span></div>
+              <div class="row"><span class="idx">002</span><span class="name">第二章 旧书与灯</span><span class="dot"></span></div>
+              <div class="row selected"><span class="idx">003</span><span class="name">第三章 渡口无船</span><span class="read">在读</span></div>
+              <div class="row"><span class="idx">004</span><span class="name">第四章 山中来信</span><span class="dot"></span></div>
+              <div class="row"><span class="idx">005</span><span class="name">第五章 灯下故人</span></div>
+              <div class="row"><span class="idx">006</span><span class="name">第六章 秋水长天</span></div>
+              <div class="row"><span class="idx">007</span><span class="name">第七章 雪落无声</span></div>
+              <div class="row"><span class="idx">008</span><span class="name">第八章 一纸风尘</span></div>
+              <div class="row"><span class="idx">009</span><span class="name">第九章 雁字回时</span></div>
+              <div class="row"><span class="idx">010</span><span class="name">第十章 月满西楼</span></div>
+              <div class="row"><span class="idx">011</span><span class="name">第十一章 长夜将尽</span></div>
+            </div>
+            <div class="foot"><span>已缓存 2 章</span><span>第 3 章 · 12%</span></div>
+          </div>
+          <div class="text-area">
+            <p>雨落在青石板上，声音细碎而密。</p>
+            <p><span class="hl">“你终于来了。”</span>他把书合上，抬头看向门口。</p>
+            <p>她收起伞，雨水顺着伞骨滴落在地板上<span class="dim">——</span>没有回答。</p>
+            <p><span class="hl">“外面下雨了吗？”</span>他问。</p>
+            <p><span class="hl">“下了。”</span>她说，<span class="hl">“而且很大。”</span></p>
+            <p>灯影在纸页上摇晃，像一段没有说完的话。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="note"><b>序号即坐标</b>三位数古体数字，弱化但可扫读，长书翻找有落点。</div>
+    <div class="note"><b>朱红只在“在读”</b>左侧 2px 朱线 + 10% 底纹，其余行保持安静。</div>
+    <div class="note"><b>缓存改为圆点</b>不再用绿字区分，减少颜色噪音。</div>
+    <div class="note"><b>头尾说明</b>显示总章数、已缓存数与当前章进度，不用再回正文确认。</div>
+  </div>
+
+  <div class="rule"></div>
+
+  <h2>三个方向，选一个</h2>
+  <p class="h2-note">A 改动可控、最适合现在的纸感主题；B 更安静；C 需要章节标题里带卷名，数据不总是存在。</p>
+  <div class="variants">
+    <div class="variant">
+      <h3>A · 素笺目录</h3>
+      <div class="sub">推荐 · 序号 + 在读朱标</div>
+      <div class="mini">
+        <div class="head"><b>目录</b><small>共 338 章</small><span class="seal">读</span></div>
+        <div class="rows">
+          <div class="r"><span class="idx">001</span><span class="n">第一章 雨夜来客</span></div>
+          <div class="r"><span class="idx">002</span><span class="n">第二章 旧书与灯</span><span class="dot"></span></div>
+          <div class="r sel"><span class="idx">003</span><span class="n">第三章 渡口无船</span></div>
+          <div class="r"><span class="idx">004</span><span class="n">第四章 山中来信</span><span class="dot"></span></div>
+          <div class="r"><span class="idx">005</span><span class="n">第五章 灯下故人</span></div>
+          <div class="r"><span class="idx">006</span><span class="n">第六章 秋水长天</span></div>
+        </div>
+      </div>
+      <ul><li>视觉层次最完整，长目录可扫读</li><li>与标点着色、纸感主题同一语言</li><li><b>改动中等</b>：列表单元格 + 样式</li></ul>
+      <span class="pick">推荐</span>
+    </div>
+
+    <div class="variant">
+      <h3>B · 静读列表</h3>
+      <div class="sub">更安静 · 无序号细线分隔</div>
+      <div class="mini b">
+        <div class="head"><b>目录</b><small>338 章</small></div>
+        <div class="rows">
+          <div class="r"><span class="n">第一章 雨夜来客</span></div>
+          <div class="r"><span class="n">第二章 旧书与灯</span></div>
+          <div class="r sel"><span class="n">第三章 渡口无船</span></div>
+          <div class="r"><span class="n">第四章 山中来信</span></div>
+          <div class="r"><span class="n">第五章 灯下故人</span></div>
+          <div class="r"><span class="n">第六章 秋水长天</span></div>
+        </div>
+      </div>
+      <ul><li>留白更多，阅读时不抢注意力</li><li>缺少序号，长书定位稍弱</li><li><b>改动最少</b>：只改样式</li></ul>
+    </div>
+
+    <div class="variant">
+      <h3>C · 卷册分组</h3>
+      <div class="sub">需章节含卷名 · 分组标题</div>
+      <div class="mini c">
+        <div class="head"><b>目录</b><small>3 卷</small></div>
+        <div class="rows">
+          <div class="vol">卷一 · 春灯</div>
+          <div class="r"><span class="n">第一章 雨夜来客</span></div>
+          <div class="r"><span class="n">第二章 旧书与灯</span></div>
+          <div class="r sel"><span class="n">第三章 渡口无船</span></div>
+          <div class="vol">卷二 · 秋水</div>
+          <div class="r"><span class="n">第四章 山中来信</span></div>
+          <div class="r"><span class="n">第五章 灯下故人</span></div>
+        </div>
+      </div>
+      <ul><li>长篇结构最清晰</li><li>本地 TXT 多无卷名，在线书源也不统一</li><li><b>改动最大</b>：需解析卷标题与分组模型</li></ul>
+    </div>
+  </div>
+
+  <div class="rule"></div>
+
+  <h2>同一套方案，三种主题</h2>
+  <p class="h2-note">颜色不写死：沿用阅读器的纸白、夜间、护眼变量，选中底与文字自动换色。</p>
+  <div class="themes">
+    <div class="theme paper">
+      <div class="th-head">纸白 · PAPER</div>
+      <div class="th-body">
+        <div class="r"><span class="idx">001</span><span class="n">第一章 雨夜来客</span></div>
+        <div class="r"><span class="idx">002</span><span class="n">第二章 旧书与灯</span><span class="dot"></span></div>
+        <div class="r sel"><span class="idx">003</span><span class="n">第三章 渡口无船</span><span class="read">在读</span></div>
+        <div class="r"><span class="idx">004</span><span class="n">第四章 山中来信</span></div>
+        <div class="r"><span class="idx">005</span><span class="n">第五章 灯下故人</span></div>
+        <div class="r"><span class="idx">006</span><span class="n">第六章 秋水长天</span></div>
+      </div>
+    </div>
+    <div class="theme night">
+      <div class="th-head">夜间 · NIGHT</div>
+      <div class="th-body">
+        <div class="r"><span class="idx">001</span><span class="n">第一章 雨夜来客</span></div>
+        <div class="r"><span class="idx">002</span><span class="n">第二章 旧书与灯</span><span class="dot"></span></div>
+        <div class="r sel"><span class="idx">003</span><span class="n">第三章 渡口无船</span><span class="read">在读</span></div>
+        <div class="r"><span class="idx">004</span><span class="n">第四章 山中来信</span></div>
+        <div class="r"><span class="idx">005</span><span class="n">第五章 灯下故人</span></div>
+        <div class="r"><span class="idx">006</span><span class="n">第六章 秋水长天</span></div>
+      </div>
+    </div>
+    <div class="theme eye">
+      <div class="th-head">护眼 · EYE</div>
+      <div class="th-body">
+        <div class="r"><span class="idx">001</span><span class="n">第一章 雨夜来客</span></div>
+        <div class="r"><span class="idx">002</span><span class="n">第二章 旧书与灯</span><span class="dot"></span></div>
+        <div class="r sel"><span class="idx">003</span><span class="n">第三章 渡口无船</span><span class="read">在读</span></div>
+        <div class="r"><span class="idx">004</span><span class="n">第四章 山中来信</span></div>
+        <div class="r"><span class="idx">005</span><span class="n">第五章 灯下故人</span></div>
+        <div class="r"><span class="idx">006</span><span class="n">第六章 秋水长天</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rule"></div>
+
+  <div class="ask">
+    <div class="stamp">待确认</div>
+    <h2>请确认三件事</h2>
+    <ol>
+      <li><b>方向</b>：A 素笺目录（推荐）/ B 静读列表 / C 卷册分组。</li>
+      <li><b>序号</b>：是否保留三位数序号？（A 的核心定位线索，去掉后更接近 B）</li>
+      <li><b>页脚</b>：是否显示「已缓存 N 章 · 当前章进度」？</li>
+    </ol>
+  </div>
+
+  <div class="foot-note">阅微 · 目录界面美化提案 · 2026-11-15 · 所有样式均可在 JavaFX CSS 与 ListCell 中实现，不新增依赖。</div>
+</div>
+</body>
+</html>

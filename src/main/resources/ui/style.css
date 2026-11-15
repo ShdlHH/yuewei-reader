@@ -207,16 +207,127 @@
 .toc-box {
     -fx-background-color: #ece4d4;
     -fx-border-color: transparent #ddd3c0 transparent transparent;
+    -toc-ink: #2f2a24;
+    -toc-muted: #8a8175;
+    -toc-line: #ddd3c0;
+    -toc-accent: #a63d32;
+    -toc-selected: rgba(166,61,50,0.10);
+    -toc-hover: rgba(166,61,50,0.05);
+    -toc-field: rgba(255,253,249,0.65);
+}
+
+.toc-header {
+    -fx-padding: 14 14 10 16;
+    -fx-alignment: center-left;
 }
 
 .toc-title {
-    -fx-font-size: 13px;
+    -fx-font-size: 14px;
     -fx-font-weight: bold;
-    -fx-text-fill: #4a4740;
+    -fx-text-fill: -toc-ink;
 }
 
-.toc-cached {
-    -fx-text-fill: #3f6b45;
+.toc-count {
+    -fx-font-size: 11px;
+    -fx-text-fill: -toc-muted;
+}
+
+.toc-seal {
+    -fx-background-color: #a63d32;
+    -fx-background-radius: 4;
+    -fx-text-fill: #fdf6ec;
+    -fx-font-size: 11px;
+    -fx-padding: 1 5 1 5;
+}
+
+.toc-search-wrap {
+    -fx-padding: 0 12 10 12;
+}
+
+.toc-search {
+    -fx-background-color: -toc-field;
+    -fx-text-fill: -toc-ink;
+    -fx-prompt-text-fill: -toc-muted;
+    -fx-border-color: -toc-line;
+    -fx-border-radius: 7;
+    -fx-background-radius: 7;
+    -fx-padding: 6 10 6 10;
+    -fx-font-size: 12px;
+}
+
+.toc-search:focused {
+    -fx-border-color: -toc-accent;
+}
+
+.toc-box .toc-list {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 2 6 4 6;
+}
+
+.toc-box .toc-list .list-cell {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.toc-box .toc-list .list-cell:filled:hover {
+    -fx-background-color: -toc-hover;
+    -fx-background-insets: 3 0 3 0;
+    -fx-background-radius: 6;
+}
+
+.toc-box .toc-list .list-cell:filled:selected {
+    -fx-background-color: -toc-selected;
+    -fx-background-insets: 3 0 3 0;
+    -fx-background-radius: 6;
+    -fx-border-color: -toc-accent;
+    -fx-border-width: 0 0 0 2;
+    -fx-border-insets: 3 0 3 0;
+}
+
+.toc-row {
+    -fx-padding: 0 10 0 12;
+}
+
+.toc-name {
+    -fx-text-fill: -toc-ink;
+    -fx-font-size: 13px;
+}
+
+.toc-box .toc-list .list-cell:filled:selected .toc-name {
+    -fx-font-weight: bold;
+}
+
+.toc-dot {
+    -fx-background-color: #8aa887;
+    -fx-background-radius: 2;
+    -fx-min-width: 4;
+    -fx-min-height: 4;
+    -fx-pref-width: 4;
+    -fx-pref-height: 4;
+    -fx-max-width: 4;
+    -fx-max-height: 4;
+}
+
+.toc-reading {
+    -fx-text-fill: -toc-accent;
+    -fx-border-color: -toc-accent;
+    -fx-border-width: 1;
+    -fx-border-radius: 20;
+    -fx-background-radius: 20;
+    -fx-padding: 0 6 1 6;
+    -fx-font-size: 10px;
+}
+
+.toc-footer-wrap {
+    -fx-padding: 9 16 11 16;
+    -fx-border-color: -toc-line transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+
+.toc-footer {
+    -fx-text-fill: -toc-muted;
+    -fx-font-size: 11px;
 }
 
 /* ---------------- 表格与列表 ---------------- */
@@ -310,3 +421,4 @@
     -fx-text-fill: #3f5c48;
     -fx-border-color: transparent;
 }
+

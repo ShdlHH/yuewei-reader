@@ -5,11 +5,10 @@ import com.yuewei.reader.application.SettingsService;
 import com.yuewei.reader.domain.Book;
 import com.yuewei.reader.domain.Chapter;
 import com.yuewei.reader.domain.ContentState;
+import javafx.animation.AnimationTimer;
+import javafx.animation.FadeTransition;
 import javafx.animation.Interpolator;
-import javafx.animation.KeyFrame;
-import javafx.animation.KeyValue;
 import javafx.animation.PauseTransition;
-import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -24,6 +23,7 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Spinner;
+import javafx.scene.control.TextField;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
@@ -36,6 +36,7 @@ import javafx.scene.text.Font;
 import javafx.scene.text.TextFlow;
 import javafx.util.Duration;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -71,6 +72,9 @@ public class ReaderView implements AppView {
     private final Label percentLabel = Ui.label("", "reader-percent");
     private final VBox tocBox = new VBox(6);
     private final ListView<Chapter> toc = new ListView<>();
+    private final TextField tocSearch = new TextField();
+    private final Label tocCount = Ui.label("", "toc-count");
+    private final Label tocFooter = Ui.label("", "toc-footer");
     private final ScrollPane scroll = new ScrollPane();
     private final TextFlow flow = new TextFlow();
     private final Button highlightToggle = Ui.button("着色 开", "ghost-button");
@@ -84,9 +88,14 @@ public class ReaderView implements AppView {
     private double pendingFraction = -1;
     private String content = "";
     private Font readerFont = Font.font(18);
-    private Timeline scrollAnimation;
+    private Chapter currentChapter;
+    private int cachedCount;
+    private AnimationTimer scrollAnimator;
+    private long lastScrollFrame;
     private boolean animatingScroll;
     private double scrollTarget = -1;
+    private long lastChapterJump;
+    private boolean fadeNextRender;
 
     public ReaderView(AppContext ctx, MainWindow window) {
         this.ctx = ctx;
@@ -133,33 +142,73 @@ public class ReaderView implements AppView {
                 tocToggle, smaller, larger, typesetting, highlightToggle, theme, percentLabel);
 
         Label tocTitle = Ui.label("目录", "toc-title");
+        Region tocSpacer = new Region();
+        HBox.setHgrow(tocSpacer, Priority.ALWAYS);
+        HBox tocHeader = new HBox(8, tocTitle, tocCount, tocSpacer, Ui.label("读", "toc-seal"));
+        tocHeader.setAlignment(Pos.CENTER_LEFT);
+        tocHeader.getStyleClass().add("toc-header");
+
+        tocSearch.setPromptText("搜索章节");
+        tocSearch.getStyleClass().add("toc-search");
+        tocSearch.textProperty().addListener((observable, oldValue, newValue) -> refreshTocList(false));
+        HBox tocSearchWrap = new HBox(tocSearch);
+        HBox.setHgrow(tocSearch, Priority.ALWAYS);
+        tocSearchWrap.getStyleClass().add("toc-search-wrap");
+
         toc.getStyleClass().add("toc-list");
+        toc.setFixedCellSize(36);
         toc.setCellFactory(list -> new ListCell<>() {
             @Override
             protected void updateItem(Chapter item, boolean empty) {
                 super.updateItem(item, empty);
-                getStyleClass().remove("toc-cached");
+                setText(null);
                 if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(item.title);
-                    if (item.state == ContentState.CACHED) {
-                        getStyleClass().add("toc-cached");
-                    }
+                    setGraphic(null);
+                    return;
                 }
+                Label name = new Label(item.title);
+                name.getStyleClass().add("toc-name");
+                name.setMaxWidth(Double.MAX_VALUE);
+                HBox.setHgrow(name, Priority.ALWAYS);
+                HBox row = new HBox(8, name);
+                row.setAlignment(Pos.CENTER_LEFT);
+                row.getStyleClass().add("toc-row");
+                if (item.state == ContentState.CACHED) {
+                    Region dot = new Region();
+                    dot.getStyleClass().add("toc-dot");
+                    row.getChildren().add(dot);
+                }
+                if (item == currentChapter) {
+                    Label reading = new Label("在读");
+                    reading.getStyleClass().add("toc-reading");
+                    row.getChildren().add(reading);
+                }
+                setGraphic(row);
             }
         });
         toc.getSelectionModel().selectedIndexProperty().addListener((observable, oldValue, newValue) -> {
-            if (!selecting && newValue != null && newValue.intValue() >= 0 && newValue.intValue() != index) {
-                loadChapter(newValue.intValue(), -1);
+            if (selecting || newValue == null) {
+                return;
+            }
+            int pos = newValue.intValue();
+            if (pos < 0 || pos >= toc.getItems().size()) {
+                return;
+            }
+            int real = chapters.indexOf(toc.getItems().get(pos));
+            if (real >= 0 && real != index) {
+                loadChapter(real, -1);
             }
         });
         VBox.setVgrow(toc, Priority.ALWAYS);
+
+        HBox tocFootBox = new HBox(tocFooter);
+        tocFootBox.getStyleClass().add("toc-footer-wrap");
+
         tocBox.getStyleClass().add("toc-box");
-        tocBox.setPadding(new Insets(10));
-        tocBox.setPrefWidth(250);
-        tocBox.setMinWidth(250);
-        tocBox.getChildren().addAll(tocTitle, toc);
+        tocBox.setPadding(new Insets(0));
+        tocBox.setPrefWidth(270);
+        tocBox.setMinWidth(270);
+        tocBox.getChildren().addAll(tocHeader, tocSearchWrap, toc, tocFootBox);
 
         flow.getStyleClass().add("reader-flow");
         flow.setPadding(new Insets(18, 36, 60, 36));
@@ -195,9 +244,11 @@ public class ReaderView implements AppView {
         this.book = book;
         this.chapters = ctx.bookService.chapters(book.id);
         this.index = -1;
+        this.currentChapter = null;
         this.pendingFraction = Math.max(0, Math.min(1, charOffset / 10000.0));
         bookLabel.setText(book.title);
-        toc.getItems().setAll(chapters);
+        tocSearch.clear();
+        refreshTocList(false);
         applyStyle();
         loadChapter(chapterIndex, -1);
         window.status("《" + book.title + "》 共 " + chapters.size() + " 章");
@@ -215,11 +266,9 @@ public class ReaderView implements AppView {
         int next = Math.max(0, Math.min(chapters.size() - 1, target));
         index = next;
         Chapter chapter = chapters.get(next);
-        selecting = true;
-        toc.getSelectionModel().select(next);
-        toc.scrollTo(Math.max(0, next - 3));
-        selecting = false;
+        currentChapter = chapter;
         chapterLabel.setText(chapter.title);
+        refreshTocList(true);
         if (fraction >= 0) {
             pendingFraction = fraction;
         }
@@ -229,13 +278,14 @@ public class ReaderView implements AppView {
                 () -> ctx.onlineBookService.loadContent(book, chapter),
                 loaded -> {
                     loading = false;
+                    fadeNextRender = true;
                     setContent(loaded);
                     double target2 = pendingFraction < 0 ? 0 : pendingFraction;
                     pendingFraction = -1;
-                    Platform.runLater(() -> {
+                    Platform.runLater(() -> Platform.runLater(() -> {
                         scroll.setVvalue(target2);
                         updatePercent();
-                    });
+                    }));
                 },
                 error -> {
                     loading = false;
@@ -251,39 +301,112 @@ public class ReaderView implements AppView {
     }
 
     private void renderContent() {
-        if (scrollAnimation != null) {
-            scrollAnimation.stop();
-            scrollAnimation = null;
-        }
-        animatingScroll = false;
+        stopScrollAnimation();
         scrollTarget = -1;
         Theme theme = theme();
         ReaderStyles.fill(flow, content, readerFont, ctx.settings.punctEnabled(),
                 ReaderStyles.rules(ctx.settings), ReaderStyles.colors(ctx.settings, ctx.settings.theme()),
                 Color.web(theme.foreground));
+        if (fadeNextRender) {
+            fadeNextRender = false;
+            flow.setOpacity(0.2);
+            FadeTransition fade = new FadeTransition(Duration.millis(200), flow);
+            fade.setFromValue(0.2);
+            fade.setToValue(1);
+            fade.setInterpolator(Interpolator.EASE_BOTH);
+            fade.play();
+        } else {
+            flow.setOpacity(1);
+        }
     }
 
-    /** 滚轮按像素缓动，连续滚动时累积目标位置，避免整块跳动。 */
+    /** 滚轮按像素缓动；滚到章末继续下滑换下一章，章首继续上滑回上一章。 */
     private void smoothScroll(double deltaY) {
         double viewport = scroll.getViewportBounds().getHeight();
         double contentHeight = flow.getBoundsInLocal().getHeight();
         double max = Math.max(0, contentHeight - viewport);
+        boolean canJump = !loading && System.currentTimeMillis() - lastChapterJump > 350;
+
         if (max <= 0) {
+            if (canJump) {
+                jumpChapter(deltaY < 0);
+            }
             return;
         }
+
         double current = scroll.getVvalue() * max;
         if (scrollTarget < 0 || Math.abs(scrollTarget - current) > viewport) {
             scrollTarget = current;
         }
-        scrollTarget = Math.max(0, Math.min(max, scrollTarget - deltaY * 2.2));
-        if (scrollAnimation != null) {
-            scrollAnimation.stop();
+        double next = scrollTarget - deltaY * 2.2;
+
+        if (canJump && deltaY < 0 && current >= max - 2 && next >= max) {
+            jumpChapter(true);
+            return;
         }
+        if (canJump && deltaY > 0 && current <= 2 && next <= 0) {
+            jumpChapter(false);
+            return;
+        }
+
+        scrollTarget = Math.max(0, Math.min(max, next));
         animatingScroll = true;
-        scrollAnimation = new Timeline(new KeyFrame(Duration.millis(220),
-                new KeyValue(scroll.vvalueProperty(), scrollTarget / max, Interpolator.EASE_OUT)));
-        scrollAnimation.setOnFinished(e -> animatingScroll = false);
-        scrollAnimation.play();
+        if (scrollAnimator == null) {
+            scrollAnimator = new AnimationTimer() {
+                @Override
+                public void handle(long now) {
+                    animateScroll(now);
+                }
+            };
+        }
+        lastScrollFrame = 0;
+        scrollAnimator.start();
+    }
+
+    /** 逐帧指数逼近目标位置，连续滚轮不会因重启动画而顿挫。 */
+    private void animateScroll(long now) {
+        double viewport = scroll.getViewportBounds().getHeight();
+        double max = Math.max(0, flow.getBoundsInLocal().getHeight() - viewport);
+        if (max <= 0) {
+            stopScrollAnimation();
+            return;
+        }
+        double current = scroll.getVvalue() * max;
+        double diff = scrollTarget - current;
+        if (Math.abs(diff) < 0.5) {
+            scroll.setVvalue(Math.max(0, Math.min(1, scrollTarget / max)));
+            stopScrollAnimation();
+            return;
+        }
+        double elapsed = lastScrollFrame == 0 ? 0.016 : Math.min(0.05, (now - lastScrollFrame) / 1_000_000_000.0);
+        lastScrollFrame = now;
+        double factor = 1 - Math.exp(-elapsed / 0.09);
+        scroll.setVvalue(Math.max(0, Math.min(1, (current + diff * factor) / max)));
+    }
+
+    private void stopScrollAnimation() {
+        if (scrollAnimator != null) {
+            scrollAnimator.stop();
+        }
+        lastScrollFrame = 0;
+        animatingScroll = false;
+    }
+
+    /** 翻章：往后落在新章开头，往前落在上一章结尾。 */
+    private void jumpChapter(boolean forward) {
+        if (forward) {
+            if (index + 1 >= chapters.size()) {
+                return;
+            }
+            lastChapterJump = System.currentTimeMillis();
+            loadChapter(index + 1, 0);
+        } else {
+            if (index <= 0) {
+                return;
+            }
+            lastChapterJump = System.currentTimeMillis();
+            loadChapter(index - 1, 1);
+        }
     }
 
     private Theme theme() {
@@ -299,6 +422,59 @@ public class ReaderView implements AppView {
     private void updatePercent() {
         int percent = (int) Math.round(scroll.getVvalue() * 100);
         percentLabel.setText(percent + "%");
+        updateTocFooter();
+    }
+
+    /** 按搜索词重建目录列表；followCurrent 为 true 时选中并滚动到当前章。 */
+    private void refreshTocList(boolean followCurrent) {
+        String query = tocSearch.getText() == null ? "" : tocSearch.getText().trim();
+        List<Chapter> visible = new ArrayList<>();
+        cachedCount = 0;
+        for (Chapter chapter : chapters) {
+            if (chapter.state == ContentState.CACHED) {
+                cachedCount++;
+            }
+            if (query.isEmpty() || (chapter.title != null && chapter.title.contains(query))) {
+                visible.add(chapter);
+            }
+        }
+        selecting = true;
+        toc.getItems().setAll(visible);
+        if (followCurrent && currentChapter != null) {
+            int pos = visible.indexOf(currentChapter);
+            if (pos >= 0) {
+                toc.getSelectionModel().select(pos);
+                toc.scrollTo(Math.max(0, pos - 3));
+            } else {
+                toc.getSelectionModel().clearSelection();
+            }
+        } else {
+            toc.getSelectionModel().clearSelection();
+            if (!query.isEmpty()) {
+                toc.scrollTo(0);
+            }
+        }
+        selecting = false;
+        tocCount.setText("共 " + chapters.size() + " 章");
+        updateTocFooter();
+    }
+
+    private void updateTocFooter() {
+        if (book == null || chapters.isEmpty()) {
+            tocFooter.setText("");
+            return;
+        }
+        int chapterNo = index < 0 ? 0 : index + 1;
+        int percent = (int) Math.round(scroll.getVvalue() * 100);
+        tocFooter.setText("已缓存 " + cachedCount + " 章 · 第 " + chapterNo + " 章 · " + percent + "%");
+    }
+
+    private static String rgba(Color color, double opacity) {
+        return String.format("rgba(%d,%d,%d,%.2f)",
+                (int) Math.round(color.getRed() * 255),
+                (int) Math.round(color.getGreen() * 255),
+                (int) Math.round(color.getBlue() * 255),
+                opacity);
     }
 
     private void saveProgress() {
@@ -411,9 +587,39 @@ public class ReaderView implements AppView {
         flow.setStyle("-fx-background-color:" + theme.background + ";");
         scroll.setStyle("-fx-background:" + theme.background + "; -fx-background-color:" + theme.background + ";");
         toolbar.setStyle("-fx-background-color:" + theme.bar + ";");
-        tocBox.setStyle("-fx-background-color:" + theme.bar + ";");
+        applyTocStyle(theme);
         root.setStyle("-fx-background-color:" + theme.background + ";");
         renderContent();
+    }
+
+    /** 目录配色跟随主题：通过 looked-up color 让 CSS 与代码共用一套颜色。 */
+    private void applyTocStyle(Theme theme) {
+        String key = ctx.settings.theme();
+        Color ink = Color.web(theme.foreground);
+        String accent = "night".equals(key) ? "#e08b7d" : "#a63d32";
+        String selected = switch (key) {
+            case "night" -> "rgba(224,139,125,0.20)";
+            case "green" -> "rgba(166,61,50,0.12)";
+            default -> "rgba(166,61,50,0.10)";
+        };
+        String hover = switch (key) {
+            case "night" -> "rgba(255,255,255,0.05)";
+            case "green" -> "rgba(166,61,50,0.06)";
+            default -> "rgba(166,61,50,0.05)";
+        };
+        String field = switch (key) {
+            case "night" -> "rgba(255,255,255,0.06)";
+            case "green" -> "rgba(255,255,255,0.45)";
+            default -> "rgba(255,253,249,0.65)";
+        };
+        tocBox.setStyle("-fx-background-color:" + theme.bar + ";"
+                + "-toc-ink:" + theme.foreground + ";"
+                + "-toc-muted:" + rgba(ink, 0.62) + ";"
+                + "-toc-line:" + rgba(ink, 0.14) + ";"
+                + "-toc-accent:" + accent + ";"
+                + "-toc-selected:" + selected + ";"
+                + "-toc-hover:" + hover + ";"
+                + "-toc-field:" + field + ";");
     }
 
     /** 设置页保存后调用，让已打开的阅读界面立即套用新样式。 */
