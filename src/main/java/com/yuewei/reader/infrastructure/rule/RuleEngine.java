@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.yuewei.reader.domain.BookDetail;
 import com.yuewei.reader.domain.SearchResult;
 import com.yuewei.reader.domain.TocChapter;
-import com.yuewei.reader.infrastructure.network.HttpGateway;
+import com.yuewei.reader.infrastructure.network.Urls;
 import com.yuewei.reader.infrastructure.txt.TextCleaner;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -250,7 +250,7 @@ public class RuleEngine {
         if (value.isBlank()) {
             return null;
         }
-        return HttpGateway.absolutize(baseUrl, value);
+        return Urls.absolutize(baseUrl, value);
     }
 
     private static List<Element> applySelect(List<Element> current, Step step) {
@@ -302,8 +302,8 @@ public class RuleEngine {
             case TEXT -> el.text();
             case OWN_TEXT -> el.ownText();
             case HTML -> el.html();
-            case HREF -> HttpGateway.absolutize(baseUrl, el.attr("href"));
-            case SRC -> HttpGateway.absolutize(baseUrl, el.attr("src"));
+            case HREF -> Urls.absolutize(baseUrl, el.attr("href"));
+            case SRC -> Urls.absolutize(baseUrl, el.attr("src"));
             case ATTR -> el.attr(step.name);
             default -> null;
         };

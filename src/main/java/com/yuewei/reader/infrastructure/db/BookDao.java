@@ -65,7 +65,7 @@ public class BookDao {
 
     public Book findById(long id) {
         try (Connection c = db.open();
-             PreparedStatement ps = c.prepareStatement(SELECT + " WHERE b.id=?")) {
+             PreparedStatement ps = c.prepareStatement(SELECT + " WHERE b.id=? AND b.deleted=0")) {
             ps.setLong(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? map(rs) : null;
@@ -76,8 +76,17 @@ public class BookDao {
     }
 
     public List<Book> findAll() {
+        return query(SELECT + " WHERE b.deleted=0 ORDER BY COALESCE(b.last_read_at, b.added_at) DESC");
+    }
+
+    /** 同步用：包含已删除的墓碑记录。 */
+    public List<Book> findAllWithDeleted() {
+        return query(SELECT + " ORDER BY COALESCE(b.last_read_at, b.added_at) DESC");
+    }
+
+    private List<Book> query(String sql) {
         try (Connection c = db.open(); Statement s = c.createStatement();
-             ResultSet rs = s.executeQuery(SELECT + " ORDER BY COALESCE(b.last_read_at, b.added_at) DESC")) {
+             ResultSet rs = s.executeQuery(sql)) {
             List<Book> list = new ArrayList<>();
             while (rs.next()) {
                 list.add(map(rs));
@@ -90,7 +99,7 @@ public class BookDao {
 
     public Book findByHash(String hash) {
         try (Connection c = db.open();
-             PreparedStatement ps = c.prepareStatement(SELECT + " WHERE b.file_hash=? LIMIT 1")) {
+             PreparedStatement ps = c.prepareStatement(SELECT + " WHERE b.file_hash=? AND b.deleted=0 LIMIT 1")) {
             ps.setString(1, hash);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? map(rs) : null;
@@ -102,12 +111,26 @@ public class BookDao {
 
     public Book findOnline(long sourceId, String bookUrl) {
         try (Connection c = db.open();
-             PreparedStatement ps = c.prepareStatement(SELECT + " WHERE b.source_id=? AND b.book_url=? LIMIT 1")) {
+             PreparedStatement ps = c.prepareStatement(
+                     SELECT + " WHERE b.source_id=? AND b.book_url=? AND b.deleted=0 LIMIT 1")) {
             ps.setLong(1, sourceId);
             ps.setString(2, bookUrl);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? map(rs) : null;
             }
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** 删除墓碑：保留书名、作者与指纹供其他设备同步。 */
+    public void markDeleted(long id) {
+        try (Connection c = db.open();
+             PreparedStatement ps = c.prepareStatement(
+                     "UPDATE book SET deleted=1, last_read_at=? WHERE id=?")) {
+            ps.setString(1, LocalDateTime.now().toString());
+            ps.setLong(2, id);
+            ps.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException(e);
         }
@@ -162,6 +185,20 @@ public class BookDao {
         }
     }
 
+    /** 同步用：远端最近阅读时间更新时才覆盖，避免把本地更晚的记录改旧。 */
+    public void updateLastReadAt(long id, String lastReadAt) {
+        String sql = "UPDATE book SET last_read_at=? WHERE id=? "
+                + "AND (last_read_at IS NULL OR last_read_at < ?)";
+        try (Connection c = db.open(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, lastReadAt);
+            ps.setLong(2, id);
+            ps.setString(3, lastReadAt);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     public void delete(long id) {
         try (Connection c = db.open()) {
             c.setAutoCommit(false);
@@ -199,6 +236,7 @@ public class BookDao {
         b.offline = rs.getInt("offline") == 1;
         b.addedAt = rs.getString("added_at");
         b.lastReadAt = rs.getString("last_read_at");
+        b.deleted = rs.getInt("deleted") == 1;
         b.sourceName = rs.getString("source_name");
         b.sourceMissing = rs.getInt("source_missing") == 1;
         return b;

@@ -1,4 +1,4 @@
-﻿# 阅微 · 小说阅读器
+# 阅微 · 小说阅读器
 
 一个面向 Windows 的桌面小说阅读器。支持导入本地 TXT，也兼容 Legado（开源阅读）3.0 书源，可在线搜索、阅读和下载。书籍、阅读进度与设置全部保存在本机。
 
@@ -14,6 +14,8 @@
 - 在线书源：导入 Legado 3.0 书源，搜索、详情、目录、正文四段解析，支持规则校验与调试
 - 下载与离线：整本下载、暂停/继续/取消、失败重试，已缓存章节断网可读
 - 键盘翻页：空格/PageDown/→/↓ 下一页，PageUp/←/↑/退格 上一页；翻到章末或章首会继续跨章
+- 多端同步：WebDAV（坚果云 / Nextcloud）上传阅读进度、书架与阅读设置；进度写成 Legado 兼容的 `bookProgress/书名_作者.json`，手机装 Legado 并把 WebDAV 目录设为同一目录，即可白天手机读、晚上电脑自动接上
+- Android 客户端：`mobile/` 提供本地 TXT 导入、在线书源搜索与阅读、按页阅读、WebDAV 双向同步（含删除同步），与桌面端共用同一份进度、书架与设置
 - 阅读排版：默认京华老宋体（缺失时回退宋体并提示），支持导入 ttf/otf/ttc 字体、12–32 号字、1.2–3.0 倍行距（段内换行与段间距同步）、段落首行缩进、按章节预分页（滚轮整页翻页，页内不留滚动残影）、纸白/夜间/护眼三套主题，调整即时生效
 - 标点着色：引号内对话朱红，句号、问号、感叹号、省略号/破折号、括号分别配色；六条规则可逐条开关与调色，阅读器工具栏可一键关闭
 - 数据本地：SQLite 保存书籍与进度，正文缓存落文件，可设置缓存上限并一键清理
@@ -59,14 +61,14 @@ New-Item -ItemType Directory -Force target\package-input
 Copy-Item target\yuewei-reader.jar target\package-input\
 
 # 免安装目录
-jpackage --type app-image --name 阅微阅读器 --app-version 0.4.6 --vendor 阅微 `
+jpackage --type app-image --name 阅微阅读器 --app-version 0.6.0 --vendor 阅微 `
   --input target\package-input --main-jar yuewei-reader.jar `
-  --main-class com.yuewei.reader.Launcher --icon packaging\app.ico --dest dist\0.4.6
+  --main-class com.yuewei.reader.Launcher --icon packaging\app.ico --dest dist\0.6.0
 
 # exe 安装包
-jpackage --type exe --name 阅微阅读器 --app-version 0.4.6 --vendor 阅微 `
+jpackage --type exe --name 阅微阅读器 --app-version 0.6.0 --vendor 阅微 `
   --input target\package-input --main-jar yuewei-reader.jar `
-  --main-class com.yuewei.reader.Launcher --icon packaging\app.ico --dest dist\0.4.6 `
+  --main-class com.yuewei.reader.Launcher --icon packaging\app.ico --dest dist\0.6.0 `
   --java-options "-Dfile.encoding=UTF-8" `
   --win-shortcut --win-menu --win-menu-group 阅微 --win-dir-chooser --win-per-user-install
 
@@ -74,13 +76,55 @@ jpackage --type exe --name 阅微阅读器 --app-version 0.4.6 --vendor 阅微 `
 powershell -ExecutionPolicy Bypass -File packaging\make-shortcut.ps1
 ```
 
-产物为 `dist\0.4.6\阅微阅读器\`（免安装）与 `dist\0.4.6\阅微阅读器-0.4.6.exe`（安装包）。桌面快捷方式指向 `dist\latest`（目录联接），每次出新版本后执行一次 `packaging\make-shortcut.ps1` 即可自动切换到最新版本。详细发布流程见 [docs/开发流程.md](docs/开发流程.md)。
+产物为 `dist\0.6.0\阅微阅读器\`（免安装）与 `dist\0.6.0\阅微阅读器-0.6.0.exe`（安装包）。桌面快捷方式指向 `dist\latest`（目录联接），每次出新版本后执行一次 `packaging\make-shortcut.ps1` 即可自动切换到最新版本。详细发布流程见 [docs/开发流程.md](docs/开发流程.md)。
 
 ## 书源
 
 书源格式与 Legado 3.0 对齐，可复用社区书源。进入「书源」页后点击「导入文件」选择 JSON，或「粘贴导入」直接贴入 JSON 文本；导入后可逐条校验，校验失败时调试面板会指出搜索、详情、目录或正文哪一段不匹配。
 
 当前支持常见 CSS 选择器、索引与排除索引、相对链接补全、gzip 响应；不支持 JS 规则、POST 请求与登录态书源。站点改版可能导致旧书源失效，重新导入更新后的书源即可。
+
+## 多端同步（WebDAV）
+
+在「设置 → 同步（WebDAV）」填写地址、账号、密码与同步目录（默认 `yuewei`）并勾选启用。地址填 WebDAV 根路径，例如坚果云 `https://dav.jianguoyun.com/dav/`。
+
+同步目录结构：
+
+| 文件 | 内容 |
+|---|---|
+| `bookProgress\书名_作者.json` | Legado 兼容的阅读进度（章节、章内位置、更新时间） |
+| `shelf.json` | 书架快照：书名、作者、书源、文件指纹、最近进度 |
+| `settings.json` | 阅读设置快照：字号、行距、字体、主题与标点着色规则 |
+
+同步时机：启动时拉取远端数据并反向合并——较新的阅读进度覆盖本地、书架按 `file_hash`/书源地址对齐并补上最近阅读时间与章节数（手机新增的在线书会按书源重新抓目录入架），阅读设置按快照时间取新；返回书架、切换章节与退出程序时上传。设置页「立即同步」可手动执行双向同步。
+
+合并规则：进度与设置都是“时间新者胜”；本地刚改过的设置不会被旧快照覆盖；本地 TXT 若另一台设备没有对应文件，只跳过该书，不影响其他数据。
+
+手机端互通：安装 Legado（开源阅读），把它的 WebDAV 地址、账号、目录设为与本应用一致，即可共用 `bookProgress` 里的进度。双方以「书名 + 作者」匹配同一本书；章内位置由页比例与章节字数换算，可能存在少量偏差。
+
+## Android 客户端
+
+`mobile/` 是 Android 版（Java + 原生 View，不依赖 AndroidX），已实现本地 TXT 导入、Legado 书源在线搜索与阅读、按章分页阅读、书架管理与 WebDAV 双向同步，与桌面端共用同一套 `bookProgress/{书名_作者}.json`、`shelf.json`、`settings.json`。
+
+在线书源直接复用桌面端的 `RuleEngine`（`mobile/core` 模块以源码方式引入 `domain`、`rule`、`Urls` 等纯 Java 代码），支持搜索、详情、目录与正文多页拼接；正文按章缓存，断网后已读章节仍可打开。
+
+删除同步：书架长按删除只做墓碑标记（本地隐藏、保留记录），`shelf.json` 中该书写 `deleted: true`；另一端同步时隐藏该书并跳过其进度，已删的书不会被旧快照重新加回书架。所有改动均在设备下次同步时上传。
+
+```powershell
+cd mobile
+$env:JAVA_HOME = "C:\Program Files\Java\jdk-17"
+.\gradlew.bat :app:assembleDebug
+```
+
+产物为 `mobile\app\build\outputs\apk\debug\app-debug.apk`，可用 `adb install -r` 安装。`mobile\local.properties` 的 `sdk.dir` 指向本机 Android SDK，默认不入库；换机器时改成自己的 SDK 路径。
+
+逻辑测试在 JVM 上运行（Robolectric，不需要模拟器），覆盖 TXT 导入去重、书库持久化、同步推送/合并/删除墓碑，以及用本地假站点跑通在线书源四段解析：
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest
+```
+
+当前范围：本地 TXT 与在线书源书架、按页阅读（点击左右/滑动/音量键翻页）、WebDAV 进度与书架/设置合并、删除墓碑同步。暂不含标点着色、自定义字体与书源调试面板；模拟器运行需要开启 Windows Hypervisor Platform，否则 x86 镜像会提示缺少硬件加速。
 
 ## 数据目录
 
@@ -104,7 +148,7 @@ powershell -ExecutionPolicy Bypass -File packaging\make-shortcut.ps1
 src/main/java/com/yuewei/reader/
 ├─ application/     服务装配与业务服务（导入、书籍、搜索、下载、设置）
 ├─ domain/          书籍、章节、书源、进度等领域模型
-├─ infrastructure/  数据库、网络、规则引擎、TXT 解析、缓存
+├─ infrastructure/  数据库、网络、规则引擎、TXT 解析、缓存、WebDAV 同步
 ├─ ui/              JavaFX 界面（书架、搜索、书源、下载、设置、阅读器）
 └─ ReaderApp.java   应用入口与窗口图标
 src/main/resources/

@@ -17,6 +17,11 @@ public class ProgressDao {
     }
 
     public void save(long bookId, int chapterIndex, int charOffset) {
+        saveRemote(bookId, chapterIndex, charOffset, LocalDateTime.now().toString());
+    }
+
+    /** 来自同步服务的进度：保留远端时间，便于下次比较新旧。 */
+    public void saveRemote(long bookId, int chapterIndex, int charOffset, String updatedAt) {
         String sql = """
                 INSERT INTO reading_progress(book_id,chapter_index,char_offset,updated_at) VALUES(?,?,?,?)
                 ON CONFLICT(book_id) DO UPDATE SET
@@ -28,7 +33,17 @@ public class ProgressDao {
             ps.setLong(1, bookId);
             ps.setInt(2, chapterIndex);
             ps.setInt(3, Math.max(0, charOffset));
-            ps.setString(4, LocalDateTime.now().toString());
+            ps.setString(4, updatedAt);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    public void deleteByBook(long bookId) {
+        try (Connection c = db.open();
+             PreparedStatement ps = c.prepareStatement("DELETE FROM reading_progress WHERE book_id=?")) {
+            ps.setLong(1, bookId);
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new IllegalStateException(e);

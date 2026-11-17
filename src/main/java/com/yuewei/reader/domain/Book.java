@@ -15,6 +15,8 @@ public class Book {
     public boolean offline;
     public String addedAt;
     public String lastReadAt;
+    /** 删除墓碑：书架不显示，但保留给同步使用。 */
+    public boolean deleted;
 
     /** 展示用：书源名称，不落库。 */
     public String sourceName;

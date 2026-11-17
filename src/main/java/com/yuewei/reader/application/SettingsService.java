@@ -43,6 +43,16 @@ public class SettingsService {
     public static final String USER_AGENT = "network.userAgent";
     public static final String CACHE_LIMIT_MB = "storage.cacheLimitMb";
 
+    public static final String SYNC_ENABLED = "sync.webdav.enabled";
+    public static final String SYNC_URL = "sync.webdav.url";
+    public static final String SYNC_ACCOUNT = "sync.webdav.account";
+    public static final String SYNC_PASSWORD = "sync.webdav.password";
+    public static final String SYNC_DIR = "sync.webdav.dir";
+    public static final String SYNC_LAST_AT = "sync.lastAt";
+    public static final String SYNC_LAST_RESULT = "sync.lastResult";
+    public static final String SETTINGS_LOCAL_AT = "sync.settings.localAt";
+    public static final String SETTINGS_REMOTE_AT = "sync.settings.remoteAt";
+
     private final com.yuewei.reader.infrastructure.db.SettingDao dao;
     private final Map<String, String> cache;
 
@@ -75,6 +85,11 @@ public class SettingsService {
     public void put(String key, String value) {
         cache.put(key, value == null ? "" : value);
         dao.put(key, value);
+        if (key.startsWith("reader.")) {
+            String now = java.time.LocalDateTime.now().toString();
+            cache.put(SETTINGS_LOCAL_AT, now);
+            dao.put(SETTINGS_LOCAL_AT, now);
+        }
     }
 
     public int fontSize() {
@@ -189,6 +204,132 @@ public class SettingsService {
         put(DOWNLOAD_CONCURRENCY, String.valueOf(downloadConcurrency));
         put(REQUEST_INTERVAL, String.valueOf(intervalMs));
         put(USER_AGENT, userAgent);
+    }
+
+    public boolean syncEnabled() {
+        return Boolean.parseBoolean(get(SYNC_ENABLED, "false"));
+    }
+
+    public String syncUrl() {
+        return get(SYNC_URL, "");
+    }
+
+    public String syncAccount() {
+        return get(SYNC_ACCOUNT, "");
+    }
+
+    public String syncPassword() {
+        return get(SYNC_PASSWORD, "");
+    }
+
+    public String syncDir() {
+        return get(SYNC_DIR, "yuewei");
+    }
+
+    /** WebDAV 地址、账号与同步子目录；密码只保存在本地数据库。 */
+    public void saveSync(boolean enabled, String url, String account, String password, String dir) {
+        put(SYNC_ENABLED, String.valueOf(enabled));
+        put(SYNC_URL, url == null ? "" : url.trim());
+        put(SYNC_ACCOUNT, account == null ? "" : account.trim());
+        put(SYNC_PASSWORD, password == null ? "" : password);
+        put(SYNC_DIR, dir == null || dir.isBlank() ? "yuewei" : dir.trim());
+    }
+
+    public String lastSyncText() {
+        String at = get(SYNC_LAST_AT, "");
+        String result = get(SYNC_LAST_RESULT, "");
+        if (at.isBlank()) {
+            return result.isBlank() ? "尚未同步" : result;
+        }
+        return "上次同步 " + at.replace('T', ' ').substring(0, Math.min(16, at.length())) + " · " + result;
+    }
+
+    public void saveSyncResult(String message) {
+        put(SYNC_LAST_RESULT, message == null ? "" : message);
+        put(SYNC_LAST_AT, java.time.LocalDateTime.now().toString());
+    }
+
+    /** 本地设置最近一次修改时间（毫秒），用于与远端比较新旧。 */
+    public long settingsUpdatedAt() {
+        return parseTime(get(SETTINGS_LOCAL_AT, ""));
+    }
+
+    /** 最近一次应用远端设置的时间，避免同一份远端快照反复覆盖本地。 */
+    public long settingsAppliedAt() {
+        return parseTime(get(SETTINGS_REMOTE_AT, ""));
+    }
+
+    public boolean acceptRemoteSettings(long remoteMillis) {
+        return remoteMillis > Math.max(settingsUpdatedAt(), settingsAppliedAt());
+    }
+
+    /**
+     * 应用远端设置快照：只写值，不刷新本地修改时间，避免“拉取后又被推回去”的回环。
+     * 非法或未知的键会被忽略。
+     */
+    public void applyExternalSettings(Map<String, String> values, long remoteMillis) {
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || !key.startsWith("reader.")) {
+                continue;
+            }
+            String clean = sanitize(key, entry.getValue());
+            if (clean != null) {
+                cache.put(key, clean);
+                dao.put(key, clean);
+            }
+        }
+        String marker = java.time.LocalDateTime.ofInstant(
+                java.time.Instant.ofEpochMilli(remoteMillis), java.time.ZoneId.systemDefault()).toString();
+        cache.put(SETTINGS_REMOTE_AT, marker);
+        dao.put(SETTINGS_REMOTE_AT, marker);
+    }
+
+    private String sanitize(String key, String value) {
+        String text = value == null ? "" : value.trim();
+        try {
+            switch (key) {
+                case FONT_SIZE:
+                    return String.valueOf(Math.max(12, Math.min(32, Integer.parseInt(text))));
+                case LINE_SPACING:
+                    return String.valueOf(Math.max(1.2, Math.min(3.0, Double.parseDouble(text))));
+                case TOC_WIDTH:
+                    return String.valueOf(Math.max(180, Math.min(460, Integer.parseInt(text))));
+                case THEME:
+                    return switch (text) {
+                        case "night", "green", "paper" -> text;
+                        default -> null;
+                    };
+                case FONT_FAMILY:
+                    return text.isEmpty() || text.length() > 64 ? null : text;
+                case PUNCT_ENABLED, PUNCT_DIALOGUE, PUNCT_STOP, PUNCT_ASK,
+                     PUNCT_EXCL, PUNCT_ELLIPSIS, PUNCT_PAREN:
+                    return switch (text.toLowerCase(java.util.Locale.ROOT)) {
+                        case "true" -> "true";
+                        case "false" -> "false";
+                        default -> null;
+                    };
+                case PUNCT_DIALOGUE_COLOR, PUNCT_STOP_COLOR, PUNCT_ASK_COLOR,
+                     PUNCT_EXCL_COLOR, PUNCT_ELLIPSIS_COLOR, PUNCT_PAREN_COLOR:
+                    return text.matches("#[0-9a-fA-F]{6}") ? text : null;
+                default:
+                    return null;
+            }
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static long parseTime(String value) {
+        if (value == null || value.isBlank()) {
+            return 0;
+        }
+        try {
+            return java.time.LocalDateTime.parse(value)
+                    .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+        } catch (RuntimeException e) {
+            return 0;
+        }
     }
 
     public void applyTo(HttpGateway http) {

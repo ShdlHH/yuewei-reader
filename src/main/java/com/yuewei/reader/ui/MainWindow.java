@@ -72,6 +72,7 @@ public class MainWindow {
 
         root.addEventFilter(KeyEvent.KEY_PRESSED, this::handleShortcut);
         show("shelf");
+        pullOnStartup();
     }
 
     public Parent root() {
@@ -127,6 +128,85 @@ public class MainWindow {
 
     public void backToShelf() {
         show("shelf");
+        pushQuietly();
+    }
+
+    /** 启动后静默拉取一次进度；失败只提示状态栏，不影响使用。 */
+    private void pullOnStartup() {
+        if (!ctx.syncService.configured()) {
+            return;
+        }
+        Ui.async("sync-pull",
+                () -> ctx.syncService.pull(),
+                result -> {
+                    if (!result.skipped()) {
+                        refreshShelf();
+                        settingsView.refreshSyncHint();
+                        readerView.refreshStyle();
+                        status(result.message());
+                    }
+                },
+                error -> status("同步拉取失败：" + Ui.message(error)));
+    }
+
+    /** 设置页“立即同步”：先拉远端进度，再把本地进度、书架与设置推上去。 */
+    public void syncNow(boolean verbose) {
+        if (!ctx.syncService.configured()) {
+            if (verbose) {
+                Ui.info("请先在设置页填写 WebDAV 地址，并勾选启用同步。");
+            }
+            return;
+        }
+        status("正在同步…");
+        Ui.async("sync-now", () -> {
+                    var pulled = ctx.syncService.pull();
+                    var pushed = ctx.syncService.pushAll();
+                    return pulled.applied() > 0
+                            ? pulled.message() + "；" + pushed.message()
+                            : pushed.message();
+                },
+                message -> {
+                    refreshShelf();
+                    settingsView.refreshSyncHint();
+                    status(message);
+                    readerView.refreshStyle();
+                    if (verbose) {
+                        Ui.info(message);
+                    }
+                },
+                error -> {
+                    String message = Ui.message(error);
+                    status("同步失败：" + message);
+                    if (verbose) {
+                        Ui.error("同步失败", message);
+                    }
+                });
+    }
+
+    /** 切章或退出阅读时顺带上传这本书的进度，失败不打扰阅读。 */
+    public void syncBookProgress(Book book) {
+        if (!ctx.syncService.configured() || book == null) {
+            return;
+        }
+        Ui.async("sync-book", () -> {
+            ctx.syncService.pushBookProgress(book);
+            return null;
+        }, value -> {
+        }, error -> status("进度上传失败：" + Ui.message(error)));
+    }
+
+    /** 关闭窗口前把当前阅读位置落库，再进行退出同步。 */
+    public void flushReader() {
+        readerView.saveNow();
+    }
+
+    private void pushQuietly() {
+        if (!ctx.syncService.configured()) {
+            return;
+        }
+        Ui.async("sync-push", () -> ctx.syncService.pushAll(),
+                result -> status(result.message()),
+                error -> status("同步上传失败：" + Ui.message(error)));
     }
 
     private VBox buildSidebar() {

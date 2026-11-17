@@ -84,8 +84,11 @@ public class BookService {
         bookDao.touchRead(bookId);
     }
 
+    /** 删除书架条目：保留墓碑供其他设备同步，章节与进度按需清理。 */
     public void delete(long bookId, boolean deleteCache) {
-        bookDao.delete(bookId);
+        bookDao.markDeleted(bookId);
+        chapterDao.deleteByBook(bookId);
+        progressDao.deleteByBook(bookId);
         if (deleteCache) {
             cache.deleteBook(bookId);
         }

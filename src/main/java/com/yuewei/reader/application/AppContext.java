@@ -28,6 +28,7 @@ public class AppContext {
     public final OnlineBookService onlineBookService;
     public final ValidationService validationService;
     public final DownloadService downloadService;
+    public final SyncService syncService;
 
     public AppContext(Path dataDir) {
         this.dataDir = dataDir;
@@ -60,6 +61,7 @@ public class AppContext {
         downloadService = new DownloadService(bookDao, chapterDao, downloadDao, sourceDao,
                 onlineBookService, bookService, settings);
         downloadService.pauseUnfinishedOnStartup();
+        syncService = new SyncService(settings, bookDao, chapterDao, progressDao, sourceDao, onlineBookService);
     }
 
     /** 默认数据目录：%USERPROFILE%/.yuewei-reader，可用 -Dyuewei.dataDir 覆盖。 */
@@ -73,5 +75,26 @@ public class AppContext {
 
     public void close() {
         downloadService.shutdown();
+    }
+
+    /** 退出前尽力上传一次进度与书架，最多等 3 秒，避免卡住关闭。 */
+    public void pushSyncOnExit() {
+        if (!syncService.configured()) {
+            return;
+        }
+        Thread thread = new Thread(() -> {
+            try {
+                syncService.pushAll();
+            } catch (Exception ignored) {
+                // 退出路径不打扰用户，下次启动仍会重新同步
+            }
+        }, "sync-exit");
+        thread.setDaemon(true);
+        thread.start();
+        try {
+            thread.join(3000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 }

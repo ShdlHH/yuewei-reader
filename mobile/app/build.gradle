@@ -1,0 +1,46 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace 'com.yuewei.reader.mobile'
+    compileSdk 33
+    buildToolsVersion '32.0.0'
+
+    defaultConfig {
+        applicationId 'com.yuewei.reader'
+        minSdk 26
+        targetSdk 33
+        versionCode 1
+        versionName '0.1.0'
+    }
+
+    compileOptions {
+        encoding 'UTF-8'
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+        }
+    }
+}
+
+dependencies {
+    implementation project(':core')
+    // Android 的 HttpURLConnection 不支持 PROPFIND 等自定义方法，WebDAV 用 OkHttp
+    implementation 'com.squareup.okhttp3:okhttp:3.14.9'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.11.1'
+}
+
+// 项目路径含中文，测试 JVM 单独用 UTF-8 读文件；守护进程保持系统编码，避免 @argfile 乱码
+tasks.withType(Test).configureEach {
+    systemProperty 'file.encoding', 'UTF-8'
+}

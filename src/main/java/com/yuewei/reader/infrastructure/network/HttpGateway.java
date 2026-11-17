@@ -117,43 +117,16 @@ public class HttpGateway {
 
     /** 去掉 Legado URL 后的 ,{...} 选项，并对空格做最小转义。 */
     public static String normalizeUrl(String raw) {
-        String url = raw == null ? "" : raw.trim();
-        int options = url.indexOf(",{");
-        if (options > 0) {
-            url = url.substring(0, options);
-        }
-        return url.replace(" ", "%20");
+        return Urls.normalize(raw);
     }
 
     public static String encode(String value) {
-        return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
+        return Urls.encode(value);
     }
 
     /** 相对链接转为绝对链接；已是绝对链接时原样返回。 */
     public static String absolutize(String baseUrl, String link) {
-        if (link == null || link.isBlank()) {
-            return link;
-        }
-        String value = link.trim();
-        if (value.startsWith("javascript:") || value.startsWith("#")) {
-            return null;
-        }
-        if (value.startsWith("//")) {
-            String scheme = "http";
-            if (baseUrl != null && baseUrl.startsWith("https")) {
-                scheme = "https";
-            }
-            return scheme + ":" + value;
-        }
-        if (value.matches("(?i)^(https?|ftp|file):.*")) {
-            return value.replace(" ", "%20");
-        }
-        try {
-            URI base = URI.create(normalizeUrl(baseUrl));
-            return base.resolve(value.replace(" ", "%20")).toString();
-        } catch (Exception e) {
-            return value;
-        }
+        return Urls.absolutize(baseUrl, link);
     }
 
     private static void sleep(long millis) {

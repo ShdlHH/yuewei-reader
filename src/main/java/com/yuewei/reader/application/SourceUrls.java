@@ -2,7 +2,7 @@ package com.yuewei.reader.application;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.yuewei.reader.domain.BookSource;
-import com.yuewei.reader.infrastructure.network.HttpGateway;
+import com.yuewei.reader.infrastructure.network.Urls;
 
 /** 书源 URL 模板填充。 */
 public final class SourceUrls {
@@ -17,9 +17,9 @@ public final class SourceUrls {
             throw new AppException("书源未配置 searchUrl");
         }
         String url = template
-                .replace("{{key}}", HttpGateway.encode(keyword))
-                .replace("{{keyword}}", HttpGateway.encode(keyword))
+                .replace("{{key}}", Urls.encode(keyword))
+                .replace("{{keyword}}", Urls.encode(keyword))
                 .replace("{{page}}", String.valueOf(page));
-        return HttpGateway.absolutize(source.url, url);
+        return Urls.absolutize(source.url, url);
     }
 }

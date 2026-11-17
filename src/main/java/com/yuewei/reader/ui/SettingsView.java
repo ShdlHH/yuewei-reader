@@ -13,6 +13,7 @@ import javafx.scene.control.ColorPicker;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
+import javafx.scene.control.PasswordField;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
 import javafx.scene.control.Spinner;
@@ -52,6 +53,12 @@ public class SettingsView implements AppView {
     private final TextField userAgent = new TextField();
     private final Spinner<Integer> cacheLimit = new Spinner<>(100, 10240, 1024, 100);
     private final Label cacheUsage = Ui.label("", "muted");
+    private final CheckBox syncEnabled = new CheckBox("启用 WebDAV 同步");
+    private final TextField syncUrl = new TextField();
+    private final TextField syncAccount = new TextField();
+    private final PasswordField syncPassword = new PasswordField();
+    private final TextField syncDir = new TextField();
+    private final Label syncHint = Ui.label("", "muted");
     private final TextFlow previewFlow = new TextFlow();
     private final CheckBox punctEnabled = new CheckBox("开启标点着色");
     private final List<PunctRule> punctRules = new ArrayList<>();
@@ -200,6 +207,38 @@ public class SettingsView implements AppView {
                 Ui.label("仅清理在线书正文缓存；本地导入的 TXT 不受影响。", "muted"));
         storageActions.setAlignment(Pos.CENTER_LEFT);
 
+        syncUrl.setPrefWidth(420);
+        syncAccount.setPrefWidth(220);
+        syncPassword.setPrefWidth(220);
+        syncDir.setPrefWidth(160);
+        syncDir.setPromptText("yuewei");
+        syncUrl.setPromptText("https://dav.jianguoyun.com/dav/");
+
+        GridPane syncGrid = grid();
+        row = 0;
+        syncGrid.add(new Label("WebDAV 地址"), 0, row);
+        syncGrid.add(syncUrl, 1, row++);
+        syncGrid.add(new Label("账号"), 0, row);
+        syncGrid.add(syncAccount, 1, row++);
+        syncGrid.add(new Label("密码 / 应用密码"), 0, row);
+        syncGrid.add(syncPassword, 1, row++);
+        syncGrid.add(new Label("同步目录"), 0, row);
+        syncGrid.add(syncDir, 1, row++);
+        syncGrid.add(new Label("启用"), 0, row);
+        syncGrid.add(syncEnabled, 1, row++);
+        syncGrid.add(syncHint, 1, row);
+        syncHint.setWrapText(true);
+        syncHint.setMaxWidth(560);
+
+        Button syncNowButton = Ui.button("立即同步", "ghost-button");
+        syncNowButton.setOnAction(e -> saveSyncAndRun());
+        Label syncTip = Ui.label("进度按书写入 bookProgress/书名_作者.json，手机端把 Legado 的 WebDAV 目录设为同一目录即可互通。", "muted");
+        syncTip.setWrapText(true);
+        syncTip.setMaxWidth(520);
+        HBox syncActions = new HBox(10, syncNowButton, syncTip);
+        syncActions.setAlignment(Pos.CENTER_LEFT);
+        syncActions.setMaxWidth(760);
+
         Button save = Ui.button("保存设置", "primary-button");
         save.setOnAction(e -> save());
 
@@ -218,6 +257,11 @@ public class SettingsView implements AppView {
                 new Separator(),
                 Ui.label("存储", "section-title"), storageGrid,
                 storageActions,
+                new Separator(),
+                Ui.label("同步（WebDAV）", "section-title"), syncGrid,
+                syncActions,
+                Ui.label("启动时自动拉取远端更新的进度；返回书架、切换章节和退出程序时会自动上传。"
+                        + "密码只保存在本地数据库，不会写进同步文件。", "muted"),
                 new Separator(),
                 actions);
         content.setPadding(new Insets(20, 24, 24, 24));
@@ -298,6 +342,12 @@ public class SettingsView implements AppView {
         requestInterval.getValueFactory().setValue(settings.requestInterval());
         userAgent.setText(settings.userAgent());
         cacheLimit.getValueFactory().setValue(settings.cacheLimitMb());
+        syncEnabled.setSelected(settings.syncEnabled());
+        syncUrl.setText(settings.syncUrl());
+        syncAccount.setText(settings.syncAccount());
+        syncPassword.setText(settings.syncPassword());
+        syncDir.setText(settings.syncDir());
+        refreshSyncHint();
         refreshCacheUsage();
         refreshFontHint();
         updatePreview();
@@ -471,11 +521,28 @@ public class SettingsView implements AppView {
                 downloadConcurrency.getValue(), requestInterval.getValue(), ua);
         ctx.settings.saveStorage(cacheLimit.getValue());
         ctx.settings.applyTo(ctx.http);
+        saveSyncSettings();
         window.applyReaderStyle();
         updatePreview();
         refreshCacheUsage();
         window.status("设置已保存");
         Ui.info("设置已保存。阅读样式已立即应用到阅读界面。");
+    }
+
+    private void saveSyncSettings() {
+        ctx.settings.saveSync(syncEnabled.isSelected(), syncUrl.getText(), syncAccount.getText(),
+                syncPassword.getText(), syncDir.getText());
+        refreshSyncHint();
+    }
+
+    private void saveSyncAndRun() {
+        saveSyncSettings();
+        window.syncNow(true);
+    }
+
+    /** 同步完成后由主窗口调用，刷新“上次同步”提示。 */
+    public void refreshSyncHint() {
+        syncHint.setText(ctx.settings.lastSyncText());
     }
 
     @Override

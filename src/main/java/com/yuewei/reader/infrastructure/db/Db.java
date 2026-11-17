@@ -3,6 +3,7 @@ package com.yuewei.reader.infrastructure.db;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
@@ -114,8 +115,25 @@ public class Db {
             for (String sql : ddl) {
                 s.execute(sql);
             }
+            ensureColumn(c, "book", "deleted", "INTEGER NOT NULL DEFAULT 0");
         } catch (SQLException e) {
             throw new IllegalStateException("初始化数据库失败: " + e.getMessage(), e);
+        }
+    }
+
+    /** 轻量迁移：老库缺少同步需要的列时补上。 */
+    private static void ensureColumn(Connection c, String table, String column, String definition)
+            throws SQLException {
+        try (Statement s = c.createStatement();
+             ResultSet rs = s.executeQuery("PRAGMA table_info(" + table + ")")) {
+            while (rs.next()) {
+                if (column.equalsIgnoreCase(rs.getString("name"))) {
+                    return;
+                }
+            }
+        }
+        try (Statement s = c.createStatement()) {
+            s.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
         }
     }
 }

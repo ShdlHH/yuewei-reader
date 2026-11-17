@@ -1,0 +1,31 @@
+apply plugin: 'java-library'
+
+java {
+    // 桌面端规则执行器使用 switch 表达式与 record，需要 Java 17 源码级别
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['../../src/main/java']
+            include 'com/yuewei/reader/domain/**'
+            include 'com/yuewei/reader/infrastructure/txt/ChapterSplitter.java'
+            include 'com/yuewei/reader/infrastructure/txt/TextCleaner.java'
+            include 'com/yuewei/reader/infrastructure/network/Urls.java'
+            include 'com/yuewei/reader/infrastructure/rule/**'
+            // SourceSupport 使用 record，D8 需要额外的脱糖依赖；移动端用不到书源校验，跳过
+            exclude 'com/yuewei/reader/infrastructure/rule/SourceSupport.java'
+        }
+    }
+}
+
+dependencies {
+    api 'org.jsoup:jsoup:1.17.2'
+    api 'com.fasterxml.jackson.core:jackson-databind:2.17.1'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}

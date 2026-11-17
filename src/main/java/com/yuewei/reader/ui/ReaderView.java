@@ -324,6 +324,7 @@ public class ReaderView implements AppView {
                     loading = false;
                     fadeNextRender = true;
                     setContent(loaded);
+                    window.syncBookProgress(book);
                 },
                 error -> {
                     loading = false;
@@ -711,6 +712,11 @@ public class ReaderView implements AppView {
                 (int) Math.round(color.getGreen() * 255),
                 (int) Math.round(color.getBlue() * 255),
                 opacity);
+    }
+
+    /** 关闭窗口前立即落库，避免退出时丢失当前页。 */
+    public void saveNow() {
+        saveProgress();
     }
 
     private void saveProgress() {
