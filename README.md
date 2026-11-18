@@ -6,6 +6,14 @@
 ![JavaFX](https://img.shields.io/badge/JavaFX-17-3f5c48)
 ![License](https://img.shields.io/badge/License-MIT-3f5c48)
 
+## 下载
+
+Windows x64 安装包（内置运行时，无需安装 Java），下载后双击安装即可，支持覆盖升级：
+
+[下载最新版 yuewei-reader-win64.exe](https://github.com/ShdlHH/yuewei-reader/releases/latest/download/yuewei-reader-win64.exe) · [全部版本与更新日志](https://github.com/ShdlHH/yuewei-reader/releases)
+
+Android 客户端暂不提供安装包，按下方「Android 客户端」小节自行构建 APK。
+
 ## 功能
 
 - 本地 TXT：自动识别编码、按章节标题分章、导入前预览，支持大文件导入
@@ -77,6 +85,8 @@ powershell -ExecutionPolicy Bypass -File packaging\make-shortcut.ps1
 ```
 
 产物为 `dist\0.6.0\阅微阅读器\`（免安装）与 `dist\0.6.0\阅微阅读器-0.6.0.exe`（安装包）。桌面快捷方式指向 `dist\latest`（目录联接），每次出新版本后执行一次 `packaging\make-shortcut.ps1` 即可自动切换到最新版本。详细发布流程见 [docs/开发流程.md](docs/开发流程.md)。
+
+发布到 GitHub Releases 时，把 exe 重命名为 `yuewei-reader-win64.exe` 再上传，README 的「下载最新版」链接（`releases/latest/download/yuewei-reader-win64.exe`）就会始终指向最新版本。
 
 ## 书源
 
