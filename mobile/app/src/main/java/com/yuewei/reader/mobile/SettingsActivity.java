@@ -228,14 +228,23 @@ public class SettingsActivity extends Activity {
         parent.addView(caption);
 
         EditText edit = new EditText(this);
-        edit.setInputType(inputType);
-        edit.setText(value);
         edit.setTextSize(14);
         edit.setTextColor(palette.ink);
         edit.setHintTextColor(palette.muted);
         edit.setSingleLine(true);
         edit.setPadding(dp(12), dp(9), dp(12), dp(9));
         edit.setBackground(Ui.roundStroke(this, palette.bg, palette.line, 10));
+        edit.setText(value);
+        boolean password = (inputType & InputType.TYPE_MASK_VARIATION)
+                == InputType.TYPE_TEXT_VARIATION_PASSWORD;
+        if (password) {
+            edit.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            edit.setTransformationMethod(
+                    android.text.method.PasswordTransformationMethod.getInstance());
+        } else {
+            edit.setInputType(inputType);
+        }
+        edit.setSelection(edit.getText().length());
         parent.addView(edit);
         return edit;
     }
