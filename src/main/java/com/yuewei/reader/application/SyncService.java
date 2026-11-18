@@ -32,7 +32,7 @@ import java.util.Set;
 
 /**
  * 两阶段同步：进度写成 Legado 兼容的 bookProgress JSON；
- * 书架与阅读设置上传快照，并在启动时反向合并远端较新的内容。
+ * 书架快照上传，并在启动时反向合并远端较新的内容。阅读排版设置只在本机生效，不参与同步。
  *
  * <p>推送书架前会先读取远端 shelf.json 并按条目合并，避免某一端导入失败、
  * 离线或未拉取时把远端条目（含删除墓碑）整份覆盖掉。</p>
@@ -77,7 +77,7 @@ public class SyncService {
                 settings.syncAccount(), settings.syncPassword(), settings.timeout());
     }
 
-    /** 启动时调用：远端进度、书架与设置中较新的部分合并到本地。 */
+    /** 启动时调用：远端进度与书架中较新的部分合并到本地。 */
     public synchronized Result pull() throws IOException {
         if (!configured()) {
             return Result.skipped("未启用 WebDAV 同步");
@@ -150,7 +150,7 @@ public class SyncService {
         return applied;
     }
 
-    /** 退出阅读、切章或手动同步时调用：上传进度、书架与设置。 */
+    /** 退出阅读、切章或手动同步时调用：上传进度与书架。 */
     public synchronized Result pushAll() throws IOException {
         if (!configured()) {
             return Result.skipped("未启用 WebDAV 同步");

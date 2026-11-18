@@ -29,7 +29,8 @@ import java.util.Set;
 
 /**
  * 移动端同步：与桌面端共用 WebDAV 目录结构。
- * bookProgress/{书名_作者}.json 为 Legado 兼容进度，shelf.json / settings.json 为快照。
+ * bookProgress/{书名_作者}.json 为 Legado 兼容进度（含删除墓碑），shelf.json 为书架快照；
+ * 阅读排版设置只保存在本机，不参与同步。
  *
  * <p>推送书架前先读取远端并按条目合并，未在本机导入成功的远端条目会原样保留。</p>
  */
