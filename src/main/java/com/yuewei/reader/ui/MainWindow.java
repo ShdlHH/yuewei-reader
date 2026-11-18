@@ -158,13 +158,7 @@ public class MainWindow {
             return;
         }
         status("正在同步…");
-        Ui.async("sync-now", () -> {
-                    var pulled = ctx.syncService.pull();
-                    var pushed = ctx.syncService.pushAll();
-                    return pulled.applied() > 0
-                            ? pulled.message() + "；" + pushed.message()
-                            : pushed.message();
-                },
+        Ui.async("sync-now", () -> ctx.syncService.syncNow().message(),
                 message -> {
                     refreshShelf();
                     settingsView.refreshSyncHint();

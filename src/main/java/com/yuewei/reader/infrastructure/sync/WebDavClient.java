@@ -56,6 +56,7 @@ public class WebDavClient {
         while (base.endsWith("/")) {
             base = base.substring(0, base.length() - 1);
         }
+        base = safeBase(base);
         String dir = directory == null ? "" : directory.trim();
         while (dir.startsWith("/")) {
             dir = dir.substring(1);
@@ -138,7 +139,7 @@ public class WebDavClient {
             if (href == null || href.isBlank()) {
                 continue;
             }
-            String decoded = URLDecoder.decode(href, StandardCharsets.UTF_8);
+            String decoded = decodeHref(href);
             boolean isDir = decoded.endsWith("/");
             String name = lastSegment(decoded);
             if (name.isEmpty() || isDir) {
@@ -233,6 +234,34 @@ public class WebDavClient {
             sb.append(URLEncoder.encode(parts[i], StandardCharsets.UTF_8).replace("+", "%20"));
         }
         return sb.toString();
+    }
+
+    /** 地址含中文/空格时 URI.create 会失败，这里只对路径部分做编码。 */
+    private static String safeBase(String base) {
+        if (base.isEmpty()) {
+            return base;
+        }
+        try {
+            URI.create(base);
+            return base;
+        } catch (IllegalArgumentException ignored) {
+            // 继续按路径分段编码
+        }
+        int scheme = base.indexOf("://");
+        int slash = base.indexOf('/', scheme < 0 ? 0 : scheme + 3);
+        if (slash < 0) {
+            return encodePath(base);
+        }
+        return base.substring(0, slash) + "/" + encodePath(base.substring(slash + 1));
+    }
+
+    /** 服务端可能返回未转义或裸 % 的 href，解码失败时退回原值，避免整次同步异常。 */
+    private static String decodeHref(String href) {
+        try {
+            return URLDecoder.decode(href.replace("+", "%2B"), StandardCharsets.UTF_8);
+        } catch (RuntimeException e) {
+            return href;
+        }
     }
 
     private HttpResponse<byte[]> execute(HttpRequest request) throws IOException {

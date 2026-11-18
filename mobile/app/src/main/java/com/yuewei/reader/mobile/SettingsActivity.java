@@ -178,10 +178,9 @@ public class SettingsActivity extends Activity {
         root.addView(save, saveParams);
     }
 
-    /** 保存后立即自动同步一次，让另一台设备尽快拿到新的排版与同步设置。 */
+    /** 保存后只在本机生效，排版设置不参与 WebDAV 同步。 */
     private void saveAndFinish() {
         saveAll();
-        SyncManager.autoSync(this, 0, null);
         Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show();
         finish();
     }

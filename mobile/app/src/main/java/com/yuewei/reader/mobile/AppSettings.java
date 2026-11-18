@@ -35,13 +35,13 @@ public class AppSettings {
     }
 
     public void saveSync(boolean enabled, String url, String account, String password, String dir) {
+        // 同步参数只影响连接信息，和阅读排版完全独立
         prefs.edit()
                 .putBoolean("sync.enabled", enabled)
                 .putString("sync.url", url == null ? "" : url.trim())
                 .putString("sync.account", account == null ? "" : account.trim())
                 .putString("sync.password", password == null ? "" : password)
                 .putString("sync.dir", dir == null || dir.isBlank() ? "yuewei" : dir.trim())
-                .putLong("settings.localAt", System.currentTimeMillis())
                 .apply();
     }
 
@@ -50,7 +50,7 @@ public class AppSettings {
     }
 
     public float lineSpacing() {
-        return Math.max(1.2f, Math.min(3.0f, prefs.getFloat("reader.lineSpacing", 1.8f)));
+        return Math.max(1.2f, Math.min(3.0f, prefs.getFloat("reader.lineSpacing", 1.6f)));
     }
 
     public String theme() {
@@ -62,12 +62,7 @@ public class AppSettings {
                 .putInt("reader.fontSize", Math.max(12, Math.min(32, fontSize)))
                 .putFloat("reader.lineSpacing", Math.max(1.2f, Math.min(3.0f, lineSpacing)))
                 .putString("reader.theme", theme == null ? "paper" : theme)
-                .putLong("settings.localAt", System.currentTimeMillis())
                 .apply();
-    }
-
-    public long settingsLocalAt() {
-        return prefs.getLong("settings.localAt", 0);
     }
 
     /** 自动同步开关，默认开启；关闭后只能手动点同步。 */
@@ -101,24 +96,5 @@ public class AppSettings {
                 .putLong("sync.lastAt", System.currentTimeMillis())
                 .putString("sync.lastResult", message == null ? "" : message)
                 .apply();
-    }
-
-    public long settingsRemoteAt() {
-        return prefs.getLong("settings.remoteAt", 0);
-    }
-
-    /** 应用远端设置：合法值才写入，并记录远端快照时间防止反复覆盖。 */
-    public void applyRemoteSettings(int fontSize, float lineSpacing, String theme, long remoteAt) {
-        SharedPreferences.Editor editor = prefs.edit();
-        if (fontSize >= 12 && fontSize <= 32) {
-            editor.putInt("reader.fontSize", fontSize);
-        }
-        if (lineSpacing >= 1.2f && lineSpacing <= 3.0f) {
-            editor.putFloat("reader.lineSpacing", lineSpacing);
-        }
-        if ("paper".equals(theme) || "night".equals(theme) || "green".equals(theme)) {
-            editor.putString("reader.theme", theme);
-        }
-        editor.putLong("settings.remoteAt", remoteAt).apply();
     }
 }

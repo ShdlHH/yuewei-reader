@@ -6,6 +6,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import com.yuewei.reader.domain.Book;
+import com.yuewei.reader.domain.BookDetail;
+import com.yuewei.reader.domain.BookSource;
+import com.yuewei.reader.domain.TocChapter;
 import com.yuewei.reader.infrastructure.txt.ChapterSplitter;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +25,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -90,11 +94,8 @@ class SyncServiceTest {
         assertEquals(2, node.path("durChapterIndex").asInt());
         assertTrue(node.path("durChapterPos").asInt() > 0, "章内位置应按字数换算");
         assertTrue(remote.containsKey("/dav/yuewei/shelf.json"));
-        assertTrue(remote.containsKey("/dav/yuewei/settings.json"));
-        JsonNode settings = new ObjectMapper().readTree(remote.get("/dav/yuewei/settings.json"));
-        assertEquals("true", settings.path("values").path("reader.punct.enabled").asText());
-        assertTrue(settings.path("values").path("reader.fontFamily").asText().length() > 0,
-                "设置快照应写入生效值而不是空串");
+        assertFalse(remote.containsKey("/dav/yuewei/settings.json"),
+                "排版设置只在设备本地生效，不参与同步");
 
         long newer = System.currentTimeMillis() + 5000;
         remote.put("/dav/yuewei/bookProgress/三体_刘慈欣.json",
@@ -115,7 +116,84 @@ class SyncServiceTest {
     }
 
     @Test
-    void mergesRemoteShelfAndSettingsOnlyWhenNewer() throws Exception {
+    void remoteReAddedOnlineBookRevivesLocalTombstone() throws Exception {
+        HttpServer site = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        site.createContext("/", exchange -> {
+            String path = exchange.getRequestURI().getPath();
+            String html;
+            if (path.startsWith("/book/")) {
+                html = "<html><body><div class=\"name\">复活之书</div>"
+                        + "<div class=\"author\">作者丁</div>"
+                        + "<a class=\"toc\" href=\"/toc/1\">目录</a></body></html>";
+            } else if (path.startsWith("/toc/")) {
+                html = "<html><body><ul id=\"list\"><li><a href=\"/c/1\">第1章</a></li>"
+                        + "<li><a href=\"/c/2\">第2章</a></li></ul></body></html>";
+            } else {
+                html = "<html><body>正文</body></html>";
+            }
+            respond(exchange, 200, html.getBytes(StandardCharsets.UTF_8));
+        });
+        site.start();
+        try {
+            String siteUrl = "http://127.0.0.1:" + site.getAddress().getPort();
+            String json = """
+                    {
+                      "bookSourceName": "复活测试源",
+                      "bookSourceUrl": "%s",
+                      "enabled": true,
+                      "searchUrl": "/search?q={{key}}",
+                      "ruleSearch": {
+                        "bookList": "class.book-list@tag.li",
+                        "name": "class.name@text",
+                        "author": "class.author@text",
+                        "bookUrl": "class.name@tag.a@href"
+                      },
+                      "ruleBookInfo": {
+                        "name": "class.name@text",
+                        "author": "class.author@text",
+                        "tocUrl": "class.toc@href"
+                      },
+                      "ruleToc": {
+                        "chapterList": "id.list@tag.li",
+                        "chapterName": "tag.a@text",
+                        "chapterUrl": "tag.a@href"
+                      }
+                    }
+                    """.formatted(siteUrl);
+            ctx.sourceService.importJson(json, false);
+            BookSource source = ctx.sourceService.findAll().get(0);
+
+            BookDetail detail = new BookDetail();
+            detail.title = "复活之书";
+            detail.author = "作者丁";
+            detail.bookUrl = siteUrl + "/book/1";
+            detail.chapters = List.of(
+                    new TocChapter(0, "第1章", siteUrl + "/c/1"),
+                    new TocChapter(1, "第2章", siteUrl + "/c/2"));
+            Book online = ctx.onlineBookService.addToShelf(source, detail);
+            ctx.bookService.delete(online.id, true);
+            assertNull(ctx.bookService.find(online.id), "删除后应从书架隐藏");
+
+            String activatedAt = LocalDateTime.now().plusSeconds(30).toString();
+            String shelf = "{\"version\":1,\"books\":[{\"deleted\":false,"
+                    + "\"title\":\"复活之书\",\"author\":\"作者丁\",\"sourceType\":\"ONLINE\","
+                    + "\"sourceUrl\":\"" + siteUrl + "\",\"bookUrl\":\"" + siteUrl + "/book/1\","
+                    + "\"fileHash\":\"\",\"chapterCount\":2,"
+                    + "\"addedAt\":\"" + activatedAt + "\"}]}";
+            remote.put("/dav/yuewei/shelf.json", shelf.getBytes(StandardCharsets.UTF_8));
+
+            ctx.syncService.pull();
+
+            Book revived = ctx.bookService.find(online.id);
+            assertNotNull(revived, "远端在删除后重新入架，本地应复活");
+            assertEquals(2, ctx.bookService.chapters(online.id).size(), "复活时应重新抓目录");
+        } finally {
+            site.stop(0);
+        }
+    }
+
+    @Test
+    void mergesRemoteShelfOnlyWhenNewer() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         long progressTime = System.currentTimeMillis() + 8000;
         String newerRead = LocalDateTime.now().plusSeconds(5).toString();
@@ -153,23 +231,15 @@ class SyncServiceTest {
 
         SyncService.Result result = ctx.syncService.pull();
         assertTrue(result.message().contains("合并 1 本书架"), result.message());
-        assertTrue(result.message().contains("应用远端设置"), result.message());
+        assertFalse(result.message().contains("应用远端设置"), result.message());
 
         assertEquals(4, ctx.bookService.progress(book.id).chapterIndex);
         assertEquals(2500, ctx.bookService.progress(book.id).charOffset);
         assertEquals(newerRead, ctx.bookService.find(book.id).lastReadAt);
         assertEquals(12, ctx.bookService.find(book.id).chapterCount);
-        assertEquals(26, ctx.settings.fontSize());
-        assertEquals("night", ctx.settings.theme());
-        assertFalse(ctx.settings.punctEnabled());
-
-        ctx.settings.put(SettingsService.FONT_SIZE, "20");
-        ObjectNode stale = mapper.createObjectNode();
-        stale.put("updatedAt", iso(System.currentTimeMillis() - 10_000));
-        stale.putObject("values").put(SettingsService.FONT_SIZE, "30");
-        remote.put("/dav/yuewei/settings.json", mapper.writeValueAsBytes(stale));
-        ctx.syncService.pull();
-        assertEquals(20, ctx.settings.fontSize(), "本地刚改过的设置不应被旧远端覆盖");
+        assertEquals(28, ctx.settings.fontSize(), "桌面默认字号");
+        assertEquals("paper", ctx.settings.theme(), "远端排版设置不应用到本机");
+        assertTrue(ctx.settings.punctEnabled());
     }
 
     @Test
@@ -213,6 +283,88 @@ class SyncServiceTest {
         boolean marked = ctx.bookService.books().findAllWithDeleted().stream()
                 .anyMatch(item -> item.id == other.id && item.deleted);
         assertTrue(marked, "本地应保留墓碑记录");
+    }
+
+    @Test
+    void pushKeepsRemoteShelfEntriesThatCannotBeImportedLocally() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode shelf = mapper.createObjectNode();
+        shelf.put("version", 1);
+        ObjectNode mobileLocal = shelf.putArray("books").addObject();
+        mobileLocal.put("deleted", false);
+        mobileLocal.put("title", "手机本地书");
+        mobileLocal.put("author", "作者甲");
+        mobileLocal.put("sourceType", "LOCAL");
+        mobileLocal.put("fileHash", "hash-mobile-only");
+        remote.put("/dav/yuewei/shelf.json", mapper.writeValueAsBytes(shelf));
+
+        ctx.syncService.pushAll();
+
+        JsonNode pushed = mapper.readTree(remote.get("/dav/yuewei/shelf.json"));
+        boolean kept = false;
+        for (JsonNode item : pushed.path("books")) {
+            if ("hash-mobile-only".equals(item.path("fileHash").asText())) {
+                kept = true;
+            }
+        }
+        assertTrue(kept, "无法在本机导入的远端条目不应被整份覆盖删除");
+    }
+
+    @Test
+    void pushKeepsRemoteTombstoneForUnknownBook() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode shelf = mapper.createObjectNode();
+        shelf.put("version", 1);
+        ObjectNode tombstone = shelf.putArray("books").addObject();
+        tombstone.put("deleted", true);
+        tombstone.put("title", "别处删除的书");
+        tombstone.put("author", "作者乙");
+        tombstone.put("sourceType", "LOCAL");
+        tombstone.put("fileHash", "hash-ghost");
+        tombstone.put("lastReadAtMs", System.currentTimeMillis());
+        remote.put("/dav/yuewei/shelf.json", mapper.writeValueAsBytes(shelf));
+
+        ctx.syncService.pushAll();
+
+        JsonNode pushed = mapper.readTree(remote.get("/dav/yuewei/shelf.json"));
+        boolean kept = false;
+        for (JsonNode item : pushed.path("books")) {
+            if ("hash-ghost".equals(item.path("fileHash").asText()) && item.path("deleted").asBoolean()) {
+                kept = true;
+            }
+        }
+        assertTrue(kept, "其它设备创建的墓碑不应被本机全量推送抹掉");
+    }
+
+    @Test
+    void pullDoesNotZeroRemotePositionWhenChapterNotCached() throws Exception {
+        String json = """
+                {
+                  "bookSourceName": "未缓存测试源",
+                  "bookSourceUrl": "https://offline.test",
+                  "enabled": true
+                }
+                """;
+        ctx.sourceService.importJson(json, false);
+        BookSource source = ctx.sourceService.findAll().get(0);
+        BookDetail detail = new BookDetail();
+        detail.title = "未缓存之书";
+        detail.author = "作者戊";
+        detail.bookUrl = "https://offline.test/book/1";
+        detail.chapters = List.of(new TocChapter(0, "第1章", "https://offline.test/c/1"));
+        ctx.onlineBookService.addToShelf(source, detail);
+
+        long remoteTime = System.currentTimeMillis() + 5000;
+        remote.put("/dav/yuewei/bookProgress/未缓存之书_作者戊.json",
+                ("{\"name\":\"未缓存之书\",\"author\":\"作者戊\",\"durChapterIndex\":0,"
+                        + "\"durChapterPos\":500,\"durChapterTime\":" + remoteTime + "}")
+                        .getBytes(StandardCharsets.UTF_8));
+
+        ctx.syncService.pull();
+        ctx.syncService.pushAll();
+
+        JsonNode node = new ObjectMapper().readTree(remote.get("/dav/yuewei/bookProgress/未缓存之书_作者戊.json"));
+        assertEquals(500, node.path("durChapterPos").asInt(), "章内字数未知时不应把远端位点清零");
     }
 
     private static String iso(long millis) {

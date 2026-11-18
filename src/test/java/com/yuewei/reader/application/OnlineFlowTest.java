@@ -187,6 +187,14 @@ class OnlineFlowTest {
         AppException conflict = assertThrows(AppException.class,
                 () -> ctx.downloadService.start(book, DownloadRangeType.ALL, null, null));
         assertTrue(conflict.getMessage().contains("已有未完成的下载任务"));
+
+        // 删除后重新加入同一本书：应复用墓碑记录复活，而不是撞 (source_id, book_url) 唯一索引
+        ctx.bookService.delete(book.id, true);
+        Book revived = ctx.onlineBookService.addToShelf(source, detail);
+        assertEquals(book.id, revived.id);
+        assertFalse(revived.offline);
+        assertEquals(2, revived.chapterCount);
+        assertEquals(2, ctx.bookService.chapters(revived.id).size());
     }
 
     private void awaitState(long taskId, DownloadState expected) {

@@ -123,6 +123,34 @@ public class BookDao {
         }
     }
 
+    /** 重新入架时用：包含已删除的墓碑记录。 */
+    public Book findOnlineWithDeleted(long sourceId, String bookUrl) {
+        try (Connection c = db.open();
+             PreparedStatement ps = c.prepareStatement(
+                     SELECT + " WHERE b.source_id=? AND b.book_url=? LIMIT 1")) {
+            ps.setLong(1, sourceId);
+            ps.setString(2, bookUrl);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? map(rs) : null;
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** 把删除墓碑恢复为正常书籍，并清掉旧的最近阅读时间。 */
+    public void revive(long id) {
+        try (Connection c = db.open();
+             PreparedStatement ps = c.prepareStatement(
+                     "UPDATE book SET deleted=0, added_at=?, last_read_at=NULL WHERE id=?")) {
+            ps.setString(1, LocalDateTime.now().toString());
+            ps.setLong(2, id);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     /** 删除墓碑：保留书名、作者与指纹供其他设备同步。 */
     public void markDeleted(long id) {
         try (Connection c = db.open();

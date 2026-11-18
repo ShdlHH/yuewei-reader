@@ -12,6 +12,7 @@ import android.os.Build;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.widget.TextView;
 
@@ -114,6 +115,39 @@ final class Ui {
                 ? android.R.style.Theme_Material_Dialog
                 : android.R.style.Theme_Material_Light_Dialog;
         return new AlertDialog.Builder(context, style);
+    }
+
+    /** 阅读页允许窗口画进屏幕开孔区，否则隐藏状态栏后顶部会留下一条黑边。 */
+    static void allowDisplayCutout(Activity activity) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            activity.getWindow().getAttributes().layoutInDisplayCutoutMode =
+                    android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        }
+    }
+
+    /** 阅读页沉浸模式：隐藏系统状态栏与导航栏，边缘轻扫可临时呼出，不占正文空间。 */
+    static void immersive(Activity activity, boolean on) {
+        Window window = activity.getWindow();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowInsetsController controller = window.getInsetsController();
+            if (controller == null) {
+                return;
+            }
+            if (on) {
+                controller.hide(WindowInsets.Type.systemBars());
+                controller.setSystemBarsBehavior(
+                        WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            } else {
+                controller.show(WindowInsets.Type.systemBars());
+            }
+            return;
+        }
+        int flags = window.getDecorView().getSystemUiVisibility();
+        int immersiveFlags = View.SYSTEM_UI_FLAG_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+        flags = on ? flags | immersiveFlags : flags & ~immersiveFlags;
+        window.getDecorView().setSystemUiVisibility(flags);
     }
 
     /** 把状态栏、导航栏染成主题色，浅色主题使用深色图标。 */

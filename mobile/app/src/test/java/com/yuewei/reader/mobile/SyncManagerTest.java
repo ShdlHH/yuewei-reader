@@ -96,7 +96,7 @@ public class SyncManagerTest {
         Library.Book online = onlineBook();
         library.setProgress(online, 0, 2000);
 
-        String message = SyncManager.run(library, sources, settings, dav);
+        String message = SyncManager.run(library, sources, dav);
         assertTrue(message.contains("上传"));
 
         JSONObject progress = new JSONObject(dav.files.get("bookProgress/本地书_作者甲.json"));
@@ -128,10 +128,14 @@ public class SyncManagerTest {
         Library.Book book = localBook("待删书", "作者甲", "hash-delete-1");
         library.setProgress(book, 0, 1000);
         library.markDeleted(book);
+        long deletedAt = book.progressAt;
 
-        SyncManager.run(library, sources, settings, dav);
+        SyncManager.run(library, sources, dav);
 
-        assertFalse(dav.files.containsKey("bookProgress/待删书_作者甲.json"));
+        JSONObject progress = new JSONObject(dav.files.get("bookProgress/待删书_作者甲.json"));
+        assertEquals("墓碑进度应从第一章开始", 0, progress.getInt("durChapterIndex"));
+        assertEquals(0, progress.getInt("durChapterPos"));
+        assertEquals("墓碑进度时间应为删除时间", deletedAt, progress.getLong("durChapterTime"));
         JSONObject item = itemByHash(
                 new JSONObject(dav.files.get("shelf.json")).getJSONArray("books"), "hash-delete-1");
         assertTrue(item.getBoolean("deleted"));
@@ -143,7 +147,7 @@ public class SyncManagerTest {
         dav.files.put("shelf.json", "{\"books\":[{\"title\":\"远删书\",\"author\":\"作者甲\","
                 + "\"fileHash\":\"hash-remote-del\",\"deleted\":true}]}");
 
-        SyncManager.run(library, sources, settings, dav);
+        SyncManager.run(library, sources, dav);
 
         assertTrue(book.deleted);
         assertTrue(SyncManager.sortedBooks(library).isEmpty());
@@ -157,17 +161,54 @@ public class SyncManagerTest {
         Library.Book book = localBook("已删书", "作者甲", "hash-deleted-local");
         library.markDeleted(book);
         long deletedAt = book.progressAt;
-        String progressAt = SyncManager.iso(System.currentTimeMillis() + 60_000);
+        String progressAt = SyncManager.iso(deletedAt - 60_000);
         dav.files.put("shelf.json", "{\"books\":[{\"title\":\"已删书\",\"author\":\"作者甲\","
                 + "\"fileHash\":\"hash-deleted-local\",\"deleted\":false,"
                 + "\"chapterIndex\":1,\"percent\":9000,\"progressAt\":\"" + progressAt + "\"}]}");
 
-        SyncManager.run(library, sources, settings, dav);
+        SyncManager.run(library, sources, dav);
 
         assertTrue(book.deleted);
         assertEquals(0, book.percent);
         assertEquals(deletedAt, book.progressAt);
-        assertFalse(dav.files.containsKey("bookProgress/已删书_作者甲.json"));
+        JSONObject tombstone = new JSONObject(dav.files.get("bookProgress/已删书_作者甲.json"));
+        assertEquals(0, tombstone.getInt("durChapterIndex"));
+        assertEquals(deletedAt, tombstone.getLong("durChapterTime"));
+    }
+
+    @Test
+    public void readingAfterDeletionRevivesTombstone() throws Exception {
+        Library.Book book = localBook("删后仍读", "作者甲", "hash-read-after-delete");
+        library.markDeleted(book);
+        long deletedAt = book.progressAt;
+        String progressAt = SyncManager.iso(deletedAt + 60_000);
+        dav.files.put("shelf.json", "{\"books\":[{\"title\":\"删后仍读\",\"author\":\"作者甲\","
+                + "\"fileHash\":\"hash-read-after-delete\",\"deleted\":false,"
+                + "\"chapterIndex\":1,\"percent\":9000,\"progressAt\":\"" + progressAt + "\"}]}");
+
+        SyncManager.run(library, sources, dav);
+
+        assertFalse(book.deleted);
+        assertEquals(1, SyncManager.sortedBooks(library).size());
+    }
+
+    @Test
+    public void newerRemoteAdditionRevivesLocalTombstone() throws Exception {
+        Library.Book book = onlineBook();
+        library.markDeleted(book);
+        long activatedAt = book.lastReadAt + 60_000;
+        dav.files.put("shelf.json", "{\"books\":[{\"title\":\"在线书\",\"author\":\"作者乙\","
+                + "\"sourceType\":\"ONLINE\",\"sourceUrl\":\"https://source.test\","
+                + "\"bookUrl\":\"https://source.test/book/9\",\"deleted\":false,"
+                + "\"addedAt\":\"" + SyncManager.iso(activatedAt) + "\"}]}");
+
+        SyncManager.run(library, sources, dav);
+
+        assertFalse(book.deleted);
+        assertEquals(0, book.chapterIndex);
+        assertEquals(0, book.percent);
+        assertEquals(activatedAt, book.addedAt);
+        assertEquals(1, SyncManager.sortedBooks(library).size());
     }
 
     @Test
@@ -183,7 +224,7 @@ public class SyncManagerTest {
         node.put("durChapterTime", remoteTime);
         dav.files.put("bookProgress/进度书_作者甲.json", node.toString());
 
-        SyncManager.run(library, sources, settings, dav);
+        SyncManager.run(library, sources, dav);
 
         assertEquals(1, book.chapterIndex);
         assertEquals(5000, book.percent);
@@ -191,7 +232,8 @@ public class SyncManagerTest {
     }
 
     @Test
-    public void appliesRemoteReadingSettings() throws Exception {
+    public void settingsAreNotPulledFromRemote() throws Exception {
+        settings.saveReader(18, 1.6f, "paper");
         JSONObject root = new JSONObject();
         root.put("updatedAt", SyncManager.iso(System.currentTimeMillis() + 60_000));
         JSONObject values = new JSONObject();
@@ -201,12 +243,85 @@ public class SyncManagerTest {
         root.put("values", values);
         dav.files.put("settings.json", root.toString());
 
-        SyncManager.run(library, sources, settings, dav);
+        SyncManager.run(library, sources, dav);
 
-        assertEquals(24, settings.fontSize());
-        assertEquals(2.2f, settings.lineSpacing(), 0.001f);
-        assertEquals("night", settings.theme());
-        assertTrue(settings.settingsRemoteAt() > 0);
+        assertEquals(18, settings.fontSize());
+        assertEquals(1.6f, settings.lineSpacing(), 0.001f);
+        assertEquals("paper", settings.theme());
+    }
+
+    @Test
+    public void settingsAreNotPushedToRemote() throws Exception {
+        settings.saveReader(20, 1.9f, "night");
+
+        SyncManager.run(library, sources, dav);
+
+        assertFalse(dav.files.containsKey("settings.json"));
+    }
+
+    @Test
+    public void remoteProgressAppliesEvenWhenBookWasAddedLater() throws Exception {
+        Library.Book book = localBook("时间边界", "作者甲", "hash-time-edge");
+        book.addedAt = System.currentTimeMillis();
+        book.progressAt = 0;
+        library.save();
+
+        long remoteTime = book.addedAt - 10;
+        JSONObject node = new JSONObject();
+        node.put("name", "时间边界");
+        node.put("author", "作者甲");
+        node.put("durChapterIndex", 1);
+        node.put("durChapterPos", 100);
+        node.put("durChapterTitle", "第二章");
+        node.put("durChapterTime", remoteTime);
+        dav.files.put("bookProgress/时间边界_作者甲.json", node.toString());
+
+        SyncManager.run(library, sources, dav);
+
+        assertEquals(1, book.chapterIndex);
+        assertEquals(5000, book.percent);
+        assertEquals(remoteTime, book.progressAt);
+    }
+
+    @Test
+    public void pushKeepsRemoteEntriesThatCouldNotBeImported() throws Exception {
+        String remoteShelf = "{\"books\":[{\"title\":\"远端在线书\",\"author\":\"作者丁\","
+                + "\"sourceType\":\"ONLINE\",\"sourceUrl\":\"https://missing.test\","
+                + "\"bookUrl\":\"https://missing.test/book/1\",\"fileHash\":\"\",\"deleted\":false,"
+                + "\"addedAt\":\"" + SyncManager.iso(System.currentTimeMillis()) + "\"}]}";
+        dav.files.put("shelf.json", remoteShelf);
+
+        SyncManager.run(library, sources, dav);
+
+        JSONObject shelf = new JSONObject(dav.files.get("shelf.json"));
+        itemByTitle(shelf.getJSONArray("books"), "远端在线书");
+    }
+
+    @Test
+    public void pushKeepsRemoteProgressWhenChapterLengthUnknown() throws Exception {
+        Library.Book book = new Library.Book();
+        book.id = "o-unknown";
+        book.title = "未缓存在线书";
+        book.author = "作者己";
+        book.hash = "";
+        book.sourceType = "ONLINE";
+        book.sourceUrl = "https://source.test";
+        book.bookUrl = "https://source.test/book/7";
+        book.addedAt = System.currentTimeMillis() - 60_000;
+        book.chapterTitles.add("第1章");
+        book.chapterLengths.add(0);
+        library.books.add(book);
+        library.save();
+
+        long remoteTime = System.currentTimeMillis() + 60_000;
+        dav.files.put("bookProgress/未缓存在线书_作者己.json",
+                "{\"name\":\"未缓存在线书\",\"author\":\"作者己\",\"durChapterIndex\":0,"
+                        + "\"durChapterPos\":120,\"durChapterTime\":" + remoteTime + "}");
+
+        SyncManager.run(library, sources, dav);
+
+        JSONObject progress = new JSONObject(dav.files.get("bookProgress/未缓存在线书_作者己.json"));
+        assertEquals("章内长度未知时不应把远端位点清零", 120, progress.getInt("durChapterPos"));
     }
 
     private static JSONObject itemByHash(JSONArray books, String hash) throws Exception {

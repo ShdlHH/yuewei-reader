@@ -22,13 +22,18 @@ import java.util.regex.Pattern;
 public class PageView extends View {
 
     public interface Listener {
-        void onPageChanged(int page, int pages, int percent);
+        /** userTurn=true 表示用户主动翻页；排版、跳转、缩窗引起的重排不应写进度。 */
+        void onPageChanged(int page, int pages, int percent, boolean userTurn);
 
         /** 到达最后一页继续后翻，返回是否成功切换章节。 */
         boolean onNextChapter();
 
         /** 到达第一页继续前翻，返回是否成功切换章节。 */
         boolean onPreviousChapter();
+
+        /** 轻点页面中间：呼出或收起上下工具栏。 */
+        default void onToggleChrome() {
+        }
     }
 
     private static final Pattern CHAPTER_TITLE =
@@ -45,12 +50,21 @@ public class PageView extends View {
     private int pageCount = 1;
     private final List<Integer> pageStartLines = new ArrayList<>();
     private float lineSpacing = 1.8f;
+    /** 屏幕开孔/刘海的安全区，正文绘制与分页都要避开。 */
+    private int safeTop;
+    private int safeBottom;
+    /** 上下工具栏显示时占用的高度，正文同样要避开，否则会被切掉半行。 */
+    private int chromeTop;
+    private int chromeBottom;
     private Listener listener;
+    /** 本次 notifyPage 是否由用户主动翻页触发。 */
+    private boolean userTurn;
 
     public PageView(Context context) {
         super(context);
-        paddingX = dp(22);
-        paddingY = dp(16);
+        paddingX = dp(20);
+        // 系统栏隐藏后正文直接贴屏幕边缘，上下各留 12dp 呼吸空间
+        paddingY = dp(12);
         paint.setColor(Color.parseColor("#2F2A24"));
         paint.setTextSize(sp(18));
         // 正文使用衬线字体，接近桌面端的宋体排版
@@ -64,10 +78,13 @@ public class PageView extends View {
 
             @Override
             public boolean onSingleTapUp(MotionEvent e) {
-                if (e.getX() < getWidth() * 0.35f) {
+                float width = getWidth();
+                if (e.getX() < width * 0.32f) {
                     previousPage();
-                } else {
+                } else if (e.getX() > width * 0.68f) {
                     nextPage();
+                } else if (listener != null) {
+                    listener.onToggleChrome();
                 }
                 return true;
             }
@@ -93,16 +110,51 @@ public class PageView extends View {
     }
 
     public void setStyle(int fontSizeSp, float lineSpacing, int color) {
+        int percent = currentPercent();
+        boolean hadPages = layout != null && pageCount > 1;
         paint.setTextSize(sp(fontSizeSp));
         paint.setColor(color);
         this.lineSpacing = Math.max(1.2f, Math.min(3.0f, lineSpacing));
         rebuild();
+        restorePercent(percent, hadPages);
     }
 
     public void setText(String value) {
         text = indent(value == null ? "" : value);
         pageIndex = 0;
         rebuild();
+    }
+
+    /** 设置屏幕开孔安全区；变化后重新分页并保持阅读位置。 */
+    public void setSafeInsets(int top, int bottom) {
+        int safeTopValue = Math.max(0, top);
+        int safeBottomValue = Math.max(0, bottom);
+        if (safeTopValue == safeTop && safeBottomValue == safeBottom) {
+            return;
+        }
+        applyInsetsChange(safeTopValue, safeBottomValue, chromeTop, chromeBottom);
+    }
+
+    /** 顶部/底部工具栏显示时让正文避让对应高度；收起后传 0 恢复满屏。 */
+    public void setChromeInsets(int top, int bottom) {
+        int chromeTopValue = Math.max(0, top);
+        int chromeBottomValue = Math.max(0, bottom);
+        if (chromeTopValue == chromeTop && chromeBottomValue == chromeBottom) {
+            return;
+        }
+        applyInsetsChange(safeTop, safeBottom, chromeTopValue, chromeBottomValue);
+    }
+
+    private void applyInsetsChange(int safeTopValue, int safeBottomValue,
+                                   int chromeTopValue, int chromeBottomValue) {
+        int percent = currentPercent();
+        boolean hadPages = layout != null && pageCount > 1;
+        safeTop = safeTopValue;
+        safeBottom = safeBottomValue;
+        chromeTop = chromeTopValue;
+        chromeBottom = chromeBottomValue;
+        rebuild();
+        restorePercent(percent, hadPages);
     }
 
     public void goToPercent(int percent) {
@@ -123,6 +175,7 @@ public class PageView extends View {
     public void nextPage() {
         if (pageIndex < pageCount - 1) {
             pageIndex++;
+            userTurn = true;
             invalidate();
             notifyPage();
         } else if (listener != null) {
@@ -133,6 +186,7 @@ public class PageView extends View {
     public void previousPage() {
         if (pageIndex > 0) {
             pageIndex--;
+            userTurn = true;
             invalidate();
             notifyPage();
         } else if (listener != null) {
@@ -142,6 +196,7 @@ public class PageView extends View {
 
     public void toLastPage() {
         pageIndex = Math.max(0, pageCount - 1);
+        userTurn = true;
         invalidate();
         notifyPage();
     }
@@ -149,7 +204,22 @@ public class PageView extends View {
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
+        // 沉浸模式切换、旋转等尺寸变化后按百分比回到原阅读位置
+        int percent = currentPercent();
+        boolean hadPages = layout != null && pageCount > 1;
         rebuild();
+        restorePercent(percent, hadPages);
+    }
+
+    /** 分页结果变化后按百分比找回原来的位置。 */
+    private void restorePercent(int percent, boolean hadPages) {
+        if (!hadPages || pageCount <= 1) {
+            return;
+        }
+        pageIndex = Math.max(0, Math.min(pageCount - 1,
+                Math.round(percent / 10000f * (pageCount - 1))));
+        invalidate();
+        notifyPage();
     }
 
     private void rebuild() {
@@ -178,7 +248,8 @@ public class PageView extends View {
 
     private void computePages() {
         pageStartLines.clear();
-        int usable = Math.max(dp(80), getHeight() - paddingY * 2);
+        int usable = Math.max(dp(80), getHeight() - paddingY * 2
+                - safeTop - safeBottom - chromeTop - chromeBottom);
         pageStartLines.add(0);
         int startLine = 0;
         int pageTop = layout.getLineTop(0);
@@ -199,9 +270,17 @@ public class PageView extends View {
             return;
         }
         int line = pageStartLines.get(Math.min(pageIndex, pageStartLines.size() - 1));
+        int lastLine = pageIndex + 1 < pageStartLines.size()
+                ? pageStartLines.get(pageIndex + 1) - 1
+                : layout.getLineCount() - 1;
+        int pageTop = layout.getLineTop(line);
+        int contentTop = paddingY + safeTop + chromeTop;
+        // 只画本页的行：裁剪到本页最后一行的下沿，避免下一页首行从页尾空隙露出半截
+        int contentBottom = contentTop + (layout.getLineBottom(lastLine) - pageTop);
         canvas.save();
-        canvas.clipRect(paddingX, paddingY, getWidth() - paddingX, getHeight() - paddingY);
-        canvas.translate(paddingX, paddingY - layout.getLineTop(line));
+        canvas.clipRect(paddingX, contentTop, getWidth() - paddingX,
+                Math.min(getHeight() - paddingY - safeBottom - chromeBottom, contentBottom));
+        canvas.translate(paddingX, contentTop - pageTop);
         layout.draw(canvas);
         canvas.restore();
     }
@@ -212,8 +291,10 @@ public class PageView extends View {
     }
 
     private void notifyPage() {
+        boolean user = userTurn;
+        userTurn = false;
         if (listener != null) {
-            listener.onPageChanged(pageIndex + 1, pageCount, currentPercent());
+            listener.onPageChanged(pageIndex + 1, pageCount, currentPercent(), user);
         }
     }
 

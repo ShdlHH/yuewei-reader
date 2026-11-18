@@ -15,7 +15,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /** 本地书库：books.json 保存书架元数据，章节正文按书存成独立文件。 */
 public class Library {
@@ -118,7 +123,7 @@ public class Library {
         reload();
     }
 
-    public void reload() {
+    public synchronized void reload() {
         books.clear();
         if (!metaFile.isFile()) {
             return;
@@ -128,20 +133,46 @@ public class Library {
             JSONObject rootNode = new JSONObject(text);
             JSONArray array = rootNode.optJSONArray("books");
             if (array != null) {
+                List<Book> loaded = new ArrayList<>();
                 for (int i = 0; i < array.length(); i++) {
-                    books.add(Book.fromJson(array.getJSONObject(i)));
+                    loaded.add(Book.fromJson(array.getJSONObject(i)));
                 }
+                books.addAll(dedupe(loaded));
             }
         } catch (IOException | JSONException ignored) {
             // 元数据损坏时从空书架开始，章节文件仍在磁盘上
         }
     }
 
-    public void save() {
+    /**
+     * 写盘前与磁盘上的版本按 id 合并：多个页面各自持有 Library 快照时，
+     * 同步线程的旧快照不会覆盖掉用户刚做的删除或最新进度。
+     */
+    public synchronized void save() {
         try {
+            Map<String, Book> disk = readDiskBooks();
+            List<Book> merged = new ArrayList<>();
+            Set<String> seen = new HashSet<>();
+            for (Book book : books) {
+                if (book.id == null || book.id.isEmpty()) {
+                    merged.add(book);
+                    continue;
+                }
+                seen.add(book.id);
+                Book older = disk.get(book.id);
+                merged.add(older == null ? book : newer(book, older));
+            }
+            for (Book book : disk.values()) {
+                if (!seen.contains(book.id)) {
+                    merged.add(book);
+                }
+            }
+            merged = dedupe(merged);
+            books.clear();
+            books.addAll(merged);
             JSONObject rootNode = new JSONObject();
             JSONArray array = new JSONArray();
-            for (Book book : books) {
+            for (Book book : merged) {
                 array.put(book.toJson());
             }
             rootNode.put("version", 1);
@@ -154,7 +185,73 @@ public class Library {
         }
     }
 
-    public Book find(String id) {
+    private Map<String, Book> readDiskBooks() {
+        Map<String, Book> map = new HashMap<>();
+        if (!metaFile.isFile()) {
+            return map;
+        }
+        try {
+            String text = new String(Files.readAllBytes(metaFile.toPath()), StandardCharsets.UTF_8);
+            JSONArray array = new JSONObject(text).optJSONArray("books");
+            if (array != null) {
+                for (int i = 0; i < array.length(); i++) {
+                    Book book = Book.fromJson(array.getJSONObject(i));
+                    if (book.id != null && !book.id.isEmpty()) {
+                        map.put(book.id, book);
+                    }
+                }
+            }
+        } catch (IOException | JSONException ignored) {
+            // 损坏时按空处理
+        }
+        return map;
+    }
+
+    /** 同一本书只保留一条：老版本并发写盘可能留下同 id 的活跃记录与墓碑。 */
+    private static List<Book> dedupe(List<Book> source) {
+        Map<String, Book> byId = new LinkedHashMap<>();
+        List<Book> result = new ArrayList<>();
+        for (Book book : source) {
+            if (book.id == null || book.id.isEmpty()) {
+                result.add(book);
+                continue;
+            }
+            Book existing = byId.get(book.id);
+            if (existing == null) {
+                byId.put(book.id, book);
+            } else {
+                byId.put(book.id, newerState(existing, book));
+            }
+        }
+        result.addAll(byId.values());
+        return result;
+    }
+
+    private static Book newerState(Book a, Book b) {
+        long ta = stateTime(a);
+        long tb = stateTime(b);
+        if (ta != tb) {
+            return ta > tb ? a : b;
+        }
+        // 时间相同优先保留活跃记录，避免把刚复活的书又隐藏掉
+        if (a.deleted != b.deleted) {
+            return a.deleted ? b : a;
+        }
+        return a;
+    }
+
+    /** 同一本书的内存/磁盘版本取“状态时间”更新者：删除、阅读、入架都会推进该时间。 */
+    private static Book newer(Book memory, Book disk) {
+        long a = stateTime(memory);
+        long b = stateTime(disk);
+        return a >= b ? memory : disk;
+    }
+
+    private static long stateTime(Book book) {
+        return Math.max(book.addedAt, Math.max(book.lastReadAt, book.progressAt));
+    }
+
+    public synchronized Book find(String id) {
         for (Book book : books) {
             if (book.id.equals(id)) {
                 return book;
@@ -163,7 +260,7 @@ public class Library {
         return null;
     }
 
-    public Book findByHash(String hash) {
+    public synchronized Book findByHash(String hash) {
         for (Book book : books) {
             if (hash != null && !hash.isEmpty() && hash.equals(book.hash)) {
                 return book;
@@ -173,7 +270,7 @@ public class Library {
     }
 
     /** 在线书按「书源地址 + 书籍地址」匹配，书源 ID 在不同设备上不通用。 */
-    public Book findOnline(String sourceUrl, String bookUrl) {
+    public synchronized Book findOnline(String sourceUrl, String bookUrl) {
         if (sourceUrl == null || sourceUrl.isEmpty() || bookUrl == null || bookUrl.isEmpty()) {
             return null;
         }
@@ -186,9 +283,21 @@ public class Library {
     }
 
     /** 用书源详情里的目录创建一本在线书并入架，搜索页与同步补书共用。 */
-    public Book addOnline(SourceStore.Source source, BookDetail detail) {
-        Book book = new Book();
-        book.id = "o" + Integer.toHexString((source.url + "|" + detail.bookUrl).hashCode());
+    public synchronized Book addOnline(SourceStore.Source source, BookDetail detail) {
+        String id = "o" + Integer.toHexString((source.url + "|" + detail.bookUrl).hashCode());
+        Book book = find(id);
+        if (book == null) {
+            // 老版本可能用别的 id 生成规则，按「书源地址 + 书籍地址」再找一次，避免出现重复条目
+            book = findOnline(source.url, detail.bookUrl);
+        }
+        boolean revived = book != null && book.deleted;
+        if (book == null) {
+            book = new Book();
+            book.id = id;
+            books.add(book);
+        }
+        // 之前删除过的同一条记录直接复活，避免书架出现重复条目
+        book.deleted = false;
         book.title = detail.title == null || detail.title.isBlank() ? "未命名" : detail.title;
         book.author = detail.author == null || detail.author.isBlank() ? "未知" : detail.author;
         book.hash = "";
@@ -198,14 +307,35 @@ public class Library {
         book.sourceUrl = source.url;
         book.sourceName = source.name;
         book.bookUrl = detail.bookUrl;
+        if (revived) {
+            // 目录可能已变化：旧章节文件必须清掉，进度从零开始
+            clearChapterFiles(book.id);
+            book.chapterIndex = 0;
+            book.percent = 0;
+            book.progressAt = 0;
+            book.lastReadAt = 0;
+        }
+        book.chapterTitles.clear();
+        book.chapterUrls.clear();
+        book.chapterLengths.clear();
         for (TocChapter chapter : detail.chapters) {
             book.chapterTitles.add(chapter.title);
             book.chapterUrls.add(chapter.url == null ? "" : chapter.url);
             book.chapterLengths.add(0);
         }
-        books.add(book);
         save();
         return book;
+    }
+
+    private void clearChapterFiles(String bookId) {
+        File[] files = new File(root, bookId).listFiles();
+        if (files == null) {
+            return;
+        }
+        for (File file : files) {
+            //noinspection ResultOfMethodCallIgnored
+            file.delete();
+        }
     }
 
     public File chapterFile(String bookId, int index) {
@@ -229,36 +359,75 @@ public class Library {
         }
     }
 
-    public void setProgress(Book book, int chapterIndex, int percent) {
+    public synchronized void setProgress(Book book, int chapterIndex, int percent) {
+        if (book == null) {
+            return;
+        }
+        Book target = resolve(book);
+        if (target.deleted) {
+            return;
+        }
         touchProgress(book, chapterIndex, percent);
         save();
     }
 
     /** 翻页时只更新内存，避免每页重写整份 books.json；退出阅读页时再调用 setProgress 落盘。 */
-    public void touchProgress(Book book, int chapterIndex, int percent) {
-        book.chapterIndex = Math.max(0, chapterIndex);
-        book.percent = Math.max(0, Math.min(10000, percent));
-        book.progressAt = System.currentTimeMillis();
-        book.lastReadAt = book.progressAt;
+    public synchronized void touchProgress(Book book, int chapterIndex, int percent) {
+        if (book == null) {
+            return;
+        }
+        Book target = resolve(book);
+        if (target.deleted) {
+            return;
+        }
+        target.chapterIndex = Math.max(0, chapterIndex);
+        target.percent = Math.max(0, Math.min(10000, percent));
+        target.progressAt = System.currentTimeMillis();
+        target.lastReadAt = target.progressAt;
+        if (target != book) {
+            book.chapterIndex = target.chapterIndex;
+            book.percent = target.percent;
+            book.progressAt = target.progressAt;
+            book.lastReadAt = target.lastReadAt;
+        }
     }
 
     /** 删除墓碑：本地隐藏，但保留记录让其他设备同步删除。 */
-    public void markDeleted(Book book) {
-        if (book == null || book.deleted) {
+    public synchronized void markDeleted(Book book) {
+        if (book == null) {
             return;
         }
-        book.deleted = true;
-        book.progressAt = System.currentTimeMillis();
-        book.lastReadAt = book.progressAt;
+        Book target = resolve(book);
+        if (target.deleted) {
+            return;
+        }
+        target.deleted = true;
+        target.progressAt = System.currentTimeMillis();
+        target.lastReadAt = target.progressAt;
+        if (target != book) {
+            book.deleted = true;
+            book.progressAt = target.progressAt;
+            book.lastReadAt = target.lastReadAt;
+        }
         save();
     }
 
-    public void cacheChapter(Book book, int index, String content) throws IOException {
+    public synchronized void cacheChapter(Book book, int index, String content) throws IOException {
         writeChapter(book.id, index, content);
-        while (book.chapterLengths.size() <= index) {
-            book.chapterLengths.add(0);
+        Book target = resolve(book);
+        while (target.chapterLengths.size() <= index) {
+            target.chapterLengths.add(0);
         }
-        book.chapterLengths.set(index, content.length());
+        target.chapterLengths.set(index, content.length());
         save();
+    }
+
+    /** reload() 会替换列表里的对象，这里按 id 找回最新对象，避免把进度写到旧快照上。 */
+    private Book resolve(Book book) {
+        if (book.id == null || book.id.isEmpty()) {
+            return book;
+        }
+        Book current = find(book.id);
+        return current == null ? book : current;
     }
 }

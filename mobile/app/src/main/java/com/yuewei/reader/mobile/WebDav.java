@@ -142,7 +142,7 @@ public class WebDav {
             if (!href.find()) {
                 continue;
             }
-            String decoded = URLDecoder.decode(href.group(1).trim(), StandardCharsets.UTF_8);
+            String decoded = decodeHref(unescape(href.group(1).trim()));
             if (decoded.endsWith("/")) {
                 continue;
             }
@@ -204,5 +204,23 @@ public class WebDav {
             }
         }
         return sb.toString();
+    }
+
+    /** XML 里的 &amp; 等实体不影响文件名，但会让后续匹配失败。 */
+    private static String unescape(String text) {
+        return text.replace("&amp;", "&")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&quot;", "\"")
+                .replace("&#39;", "'");
+    }
+
+    /** 服务端返回裸 % 时 URLDecoder 会抛异常，退回原值避免整次同步失败。 */
+    private static String decodeHref(String href) {
+        try {
+            return URLDecoder.decode(href.replace("+", "%2B"), StandardCharsets.UTF_8);
+        } catch (RuntimeException e) {
+            return href;
+        }
     }
 }

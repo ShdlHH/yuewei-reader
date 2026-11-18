@@ -179,6 +179,69 @@ public class UiSmokeTest {
         awaitSyncIdle();
     }
 
+    @Test
+    public void openingReaderDoesNotRewriteProgress() throws Exception {
+        Library seed = new Library(context);
+        Library.Book book = new Library.Book();
+        book.id = "b4";
+        book.title = "进度不动";
+        book.author = "作者丁";
+        book.addedAt = 1_700_000_000_000L;
+        book.chapterTitles.add("第一章");
+        book.chapterTitles.add("第二章");
+        book.chapterLengths.add(8);
+        book.chapterLengths.add(8);
+        book.chapterIndex = 1;
+        book.progressAt = 1_700_000_500_000L;
+        book.lastReadAt = book.progressAt;
+        seed.books.add(book);
+        seed.writeChapter(book.id, 0, "第一章正文");
+        seed.writeChapter(book.id, 1, "第二章正文");
+        seed.save();
+
+        Intent intent = new Intent(context, ReaderActivity.class)
+                .putExtra(ReaderActivity.EXTRA_BOOK_ID, book.id);
+        Robolectric.buildActivity(ReaderActivity.class, intent).setup().get();
+
+        Library.Book loaded = new Library(context).find(book.id);
+        assertEquals(1, loaded.chapterIndex);
+        assertEquals(1_700_000_500_000L, loaded.progressAt);
+    }
+
+    @Test
+    public void readerJumpsToNewerSyncedPositionOnResume() throws Exception {
+        Library seed = new Library(context);
+        Library.Book book = new Library.Book();
+        book.id = "b5";
+        book.title = "同步跳章";
+        book.author = "作者戊";
+        book.addedAt = 1_700_000_000_000L;
+        book.progressAt = 1_700_000_500_000L;
+        book.lastReadAt = book.progressAt;
+        book.chapterTitles.add("第一章");
+        book.chapterTitles.add("第二章");
+        book.chapterLengths.add(8);
+        book.chapterLengths.add(8);
+        seed.books.add(book);
+        seed.writeChapter(book.id, 0, "第一章正文");
+        seed.writeChapter(book.id, 1, "第二章正文");
+        seed.save();
+
+        Intent intent = new Intent(context, ReaderActivity.class)
+                .putExtra(ReaderActivity.EXTRA_BOOK_ID, book.id);
+        org.robolectric.android.controller.ActivityController<ReaderActivity> controller =
+                Robolectric.buildActivity(ReaderActivity.class, intent).setup();
+        ReaderActivity activity = controller.get();
+
+        // 模拟同步把更高章节写进书架
+        Library other = new Library(context);
+        other.setProgress(other.find(book.id), 1, 0);
+
+        controller.pause().resume();
+
+        assertNotNull(findText(activity, "第二章", false));
+    }
+
     private static TextView findText(Activity activity, String text, boolean contains) {
         return find(activity.getWindow().getDecorView(), text, contains);
     }

@@ -30,6 +30,16 @@ public final class TxtImporter {
         String hash = sha256(bytes);
         Library.Book existing = library.findByHash(hash);
         if (existing != null) {
+            if (existing.deleted) {
+                // 之前删除过的同一文件：复用墓碑复活，避免“导入成功但书架不可见”
+                existing.deleted = false;
+                existing.addedAt = System.currentTimeMillis();
+                existing.chapterIndex = 0;
+                existing.percent = 0;
+                existing.progressAt = 0;
+                existing.lastReadAt = 0;
+                library.save();
+            }
             return existing;
         }
 

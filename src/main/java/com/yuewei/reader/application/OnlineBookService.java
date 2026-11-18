@@ -85,9 +85,26 @@ public class OnlineBookService {
     }
 
     public Book addToShelf(BookSource source, BookDetail detail) {
-        Book existing = bookDao.findOnline(source.id, detail.bookUrl);
-        if (existing != null) {
+        Book existing = bookDao.findOnlineWithDeleted(source.id, detail.bookUrl);
+        if (existing != null && !existing.deleted) {
             throw new AppException("这本书已在书架");
+        }
+        if (existing != null) {
+            // 之前删除过：复用原记录复活，避免撞 (source_id, book_url) 唯一索引
+            existing.title = detail.title;
+            existing.author = detail.author;
+            existing.coverUrl = detail.coverUrl;
+            existing.intro = detail.intro;
+            existing.sourceName = source.name;
+            existing.chapterCount = detail.chapters.size();
+            existing.offline = false;
+            bookDao.updateMeta(existing);
+            bookDao.revive(existing.id);
+            chapterDao.deleteByBook(existing.id);
+            // 目录可能已变化，旧正文缓存必须清掉，否则会按旧的章节序号返回错章
+            cache.deleteBook(existing.id);
+            chapterDao.insertBatch(existing.id, detail.chapters, ContentState.NOT_CACHED);
+            return bookDao.findById(existing.id);
         }
         Book book = new Book();
         book.title = detail.title;

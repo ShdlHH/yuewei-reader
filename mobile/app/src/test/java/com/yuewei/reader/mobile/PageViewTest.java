@@ -8,6 +8,7 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /** 正文缩进与分页。 */
@@ -24,12 +25,14 @@ public class PageViewTest {
     public void paginatesLongChapterIntoSeveralPages() {
         PageView view = new PageView(RuntimeEnvironment.getApplication());
         int[] report = new int[]{0, 0, 0};
+        boolean[] userTurn = new boolean[]{false};
         view.setListener(new PageView.Listener() {
             @Override
-            public void onPageChanged(int page, int pages, int percent) {
+            public void onPageChanged(int page, int pages, int percent, boolean user) {
                 report[0] = page;
                 report[1] = pages;
                 report[2] = percent;
+                userTurn[0] = user;
             }
 
             @Override
@@ -54,8 +57,10 @@ public class PageViewTest {
 
         assertEquals(1, report[0]);
         assertTrue(report[1] >= 2);
+        assertFalse("排版触发的 onPageChanged 不算用户翻页", userTurn[0]);
         view.nextPage();
         assertEquals(2, report[0]);
         assertTrue(report[2] > 0);
+        assertTrue("用户翻页应标记 userTurn", userTurn[0]);
     }
 }

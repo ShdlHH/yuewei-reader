@@ -108,6 +108,8 @@ public class ReaderView implements AppView {
     private final List<List<Node>> pages = new ArrayList<>();
     private int pageIndex;
     private int pendingPage = -1;
+    /** 用户是否真的翻页/切章；只打开书或窗口重排不应刷新进度时间。 */
+    private boolean progressDirty;
     private boolean fadeNextRender;
     private Timeline pageAnimation;
 
@@ -120,7 +122,7 @@ public class ReaderView implements AppView {
     private void build() {
         Button back = Ui.button("← 书架", "ghost-button");
         back.setOnAction(e -> {
-            saveProgress();
+            saveIfDirty();
             window.backToShelf();
         });
 
@@ -212,6 +214,7 @@ public class ReaderView implements AppView {
             }
             int real = chapters.indexOf(toc.getItems().get(pos));
             if (real >= 0 && real != index) {
+                progressDirty = true;
                 loadChapter(real, 0);
             }
         });
@@ -267,8 +270,7 @@ public class ReaderView implements AppView {
             event.consume();
         });
 
-        saveTimer.setOnFinished(e -> saveProgress());
-
+        saveTimer.setOnFinished(e -> saveIfDirty());
         HBox main = new HBox(tocBox, resizeHandle);
         main.setFillHeight(true);
         root.setFocusTraversable(true);
@@ -279,11 +281,13 @@ public class ReaderView implements AppView {
     }
 
     public void open(Book book, int chapterIndex, int charOffset) {
-        saveProgress();
+        saveIfDirty();
+        saveTimer.stop();
         this.book = book;
         this.chapters = ctx.bookService.chapters(book.id);
         this.index = -1;
         this.currentChapter = null;
+        this.progressDirty = false;
         this.pendingFraction = Math.max(0, Math.min(1, charOffset / 10000.0));
         this.pendingPage = -1;
         blocks.clear();
@@ -439,12 +443,14 @@ public class ReaderView implements AppView {
         }
         if (forward) {
             if (pageIndex < pages.size() - 1) {
+                progressDirty = true;
                 showPage(pageIndex + 1, true);
             } else if (canJump) {
                 jumpChapter(true);
             }
         } else {
             if (pageIndex > 0) {
+                progressDirty = true;
                 showPage(pageIndex - 1, true);
             } else if (canJump) {
                 jumpChapter(false);
@@ -588,7 +594,7 @@ public class ReaderView implements AppView {
             flow.setTranslateY(0);
         }
         updatePercent();
-        if (!loading && book != null) {
+        if (!loading && book != null && progressDirty) {
             saveTimer.playFromStart();
         }
     }
@@ -633,12 +639,14 @@ public class ReaderView implements AppView {
                 return;
             }
             lastChapterJump = System.currentTimeMillis();
+            progressDirty = true;
             loadChapter(index + 1, 0);
         } else {
             if (index <= 0) {
                 return;
             }
             lastChapterJump = System.currentTimeMillis();
+            progressDirty = true;
             loadChapter(index - 1, 1);
         }
     }
@@ -716,7 +724,13 @@ public class ReaderView implements AppView {
 
     /** 关闭窗口前立即落库，避免退出时丢失当前页。 */
     public void saveNow() {
-        saveProgress();
+        saveIfDirty();
+    }
+
+    private void saveIfDirty() {
+        if (progressDirty) {
+            saveProgress();
+        }
     }
 
     private void saveProgress() {
@@ -726,6 +740,7 @@ public class ReaderView implements AppView {
         int percent = pages.size() <= 1 ? 0
                 : (int) Math.round(pageIndex * 10000.0 / (pages.size() - 1));
         ctx.bookService.saveProgress(book.id, index, percent);
+        progressDirty = false;
     }
 
     private void changeFontSize(int delta) {
@@ -890,12 +905,14 @@ public class ReaderView implements AppView {
 
     public void previousChapter() {
         if (index > 0) {
+            progressDirty = true;
             loadChapter(index - 1, 0);
         }
     }
 
     public void nextChapter() {
         if (index + 1 < chapters.size()) {
+            progressDirty = true;
             loadChapter(index + 1, 0);
         }
     }
