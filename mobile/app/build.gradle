@@ -43,4 +43,7 @@ dependencies {
 // 项目路径含中文，测试 JVM 单独用 UTF-8 读文件；守护进程保持系统编码，避免 @argfile 乱码
 tasks.withType(Test).configureEach {
     systemProperty 'file.encoding', 'UTF-8'
+    // Robolectric 会在 user.home 下创建下载锁并缓存 SDK jar；受限环境下指向可写缓存目录
+    systemProperty 'user.home',
+            new File(System.getProperty('user.home'), '.cache/robolectric-home').absolutePath
 }

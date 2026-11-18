@@ -18,6 +18,7 @@ import static org.junit.Assert.assertTrue;
 @RunWith(RobolectricTestRunner.class)
 public class SyncManagerTest {
 
+    private Context context;
     private Library library;
     private SourceStore sources;
     private AppSettings settings;
@@ -25,11 +26,34 @@ public class SyncManagerTest {
 
     @Before
     public void setUp() {
-        Context context = RuntimeEnvironment.getApplication();
+        context = RuntimeEnvironment.getApplication();
         library = new Library(context);
         sources = new SourceStore(context);
         settings = new AppSettings(context);
         dav = new FakeWebDav();
+    }
+
+    @Test
+    public void autoSyncIsOnByDefaultAndCanBeDisabled() {
+        assertTrue(settings.autoSync());
+        settings.saveAutoSync(false);
+        assertFalse(new AppSettings(context).autoSync());
+    }
+
+    @Test
+    public void autoSyncSkipsWhenIntervalNotElapsed() {
+        settings.saveSync(true, "https://example.test/dav", "a", "b", "yuewei");
+        settings.saveAutoSync(true);
+        settings.saveSyncDone("测试同步");
+        assertFalse(SyncManager.autoSync(context, 60_000, null));
+    }
+
+    @Test
+    public void lastSyncTextReflectsSavedTime() {
+        assertEquals("尚未同步", SyncManager.lastSyncText(context));
+        settings.saveSyncDone("上传 1 本");
+        assertTrue(SyncManager.lastSyncText(context).startsWith("上次同步 "));
+        assertEquals("上传 1 本", settings.lastSyncMessage());
     }
 
     private Library.Book localBook(String title, String author, String hash) {

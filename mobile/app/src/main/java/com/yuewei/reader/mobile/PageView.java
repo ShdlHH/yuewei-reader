@@ -3,9 +3,13 @@ package com.yuewei.reader.mobile;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.text.Layout;
+import android.text.SpannableString;
+import android.text.Spanned;
 import android.text.StaticLayout;
 import android.text.TextPaint;
+import android.text.style.LineHeightSpan;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
@@ -32,7 +36,8 @@ public class PageView extends View {
 
     private final TextPaint paint = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
     private final GestureDetector gestures;
-    private final int padding;
+    private final int paddingX;
+    private final int paddingY;
 
     private String text = "";
     private StaticLayout layout;
@@ -44,9 +49,13 @@ public class PageView extends View {
 
     public PageView(Context context) {
         super(context);
-        padding = dp(24);
+        paddingX = dp(22);
+        paddingY = dp(16);
         paint.setColor(Color.parseColor("#2F2A24"));
         paint.setTextSize(sp(18));
+        // 正文使用衬线字体，接近桌面端的宋体排版
+        paint.setTypeface(Ui.SERIF);
+        paint.setSubpixelText(true);
         gestures = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
             @Override
             public boolean onDown(MotionEvent e) {
@@ -144,7 +153,7 @@ public class PageView extends View {
     }
 
     private void rebuild() {
-        int width = Math.max(dp(120), getWidth() - padding * 2);
+        int width = Math.max(dp(120), getWidth() - paddingX * 2);
         if (text.isEmpty()) {
             layout = null;
             pageCount = 1;
@@ -154,7 +163,7 @@ public class PageView extends View {
             return;
         }
         layout = StaticLayout.Builder
-                .obtain(text, 0, text.length(), paint, width)
+                .obtain(withParagraphGaps(text), 0, text.length(), paint, width)
                 .setLineSpacing(0, lineSpacing)
                 .setIncludePad(false)
                 .setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE)
@@ -169,7 +178,7 @@ public class PageView extends View {
 
     private void computePages() {
         pageStartLines.clear();
-        int usable = Math.max(dp(80), getHeight() - padding * 2);
+        int usable = Math.max(dp(80), getHeight() - paddingY * 2);
         pageStartLines.add(0);
         int startLine = 0;
         int pageTop = layout.getLineTop(0);
@@ -191,8 +200,8 @@ public class PageView extends View {
         }
         int line = pageStartLines.get(Math.min(pageIndex, pageStartLines.size() - 1));
         canvas.save();
-        canvas.clipRect(padding, padding, getWidth() - padding, getHeight() - padding);
-        canvas.translate(padding, padding - layout.getLineTop(line));
+        canvas.clipRect(paddingX, paddingY, getWidth() - paddingX, getHeight() - paddingY);
+        canvas.translate(paddingX, paddingY - layout.getLineTop(line));
         layout.draw(canvas);
         canvas.restore();
     }
@@ -226,6 +235,41 @@ public class PageView extends View {
             }
         }
         return sb.toString();
+    }
+
+    /** 段落之间加一点额外间距，避免整页文字过密；首段不加。 */
+    private CharSequence withParagraphGaps(String value) {
+        int gap = Math.round(paint.getTextSize() * 0.35f);
+        if (gap <= 0 || value.length() < 2) {
+            return value;
+        }
+        SpannableString spannable = new SpannableString(value);
+        for (int i = 1; i < value.length(); i++) {
+            if (value.charAt(i - 1) == '\n' && value.charAt(i) != '\n') {
+                spannable.setSpan(new ParagraphGapSpan(gap), i, i + 1,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+        }
+        return spannable;
+    }
+
+    /** 仅抬高段落首行的上沿，形成段间距。 */
+    private static final class ParagraphGapSpan implements LineHeightSpan {
+        private final int gap;
+
+        ParagraphGapSpan(int gap) {
+            this.gap = gap;
+        }
+
+        @Override
+        public void chooseHeight(CharSequence text, int start, int end, int spanstartv,
+                                 int lineHeight, Paint.FontMetricsInt metrics) {
+            if (spanstartv == 0) {
+                return;
+            }
+            metrics.ascent -= gap;
+            metrics.top -= gap;
+        }
     }
 
     private int dp(int value) {

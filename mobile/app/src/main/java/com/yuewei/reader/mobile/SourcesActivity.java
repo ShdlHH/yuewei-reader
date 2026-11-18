@@ -8,7 +8,6 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
-import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -23,54 +22,56 @@ public class SourcesActivity extends Activity {
     private static final int REQUEST_IMPORT = 2001;
 
     private SourceStore store;
+    private Ui.Palette palette;
     private LinearLayout list;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         store = new SourceStore(this);
+        palette = Ui.palette(new AppSettings(this).theme());
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.parseColor("#F6F1E7"));
+        root.setBackgroundColor(palette.bg);
         setContentView(root);
+        Ui.systemBars(this, palette);
 
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(dp(16), dp(12), dp(16), dp(8));
-        header.setBackgroundColor(Color.parseColor("#ECE4D4"));
+        header.setPadding(dp(18), dp(14), dp(18), dp(8));
 
-        Button back = new Button(this);
-        back.setText("← 书架");
-        back.setAllCaps(false);
+        TextView back = Ui.pill(this, "‹ 书架", false, palette);
         back.setOnClickListener(v -> finish());
         header.addView(back);
 
         TextView title = new TextView(this);
         title.setText("书源");
-        title.setTextSize(18);
-        title.setTextColor(Color.parseColor("#2F2A24"));
-        title.setPadding(dp(12), 0, 0, 0);
+        title.setTextSize(20);
+        title.setTypeface(Ui.SERIF_BOLD);
+        title.setTextColor(palette.ink);
+        title.setPadding(dp(14), 0, 0, 0);
         header.addView(title, new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-        Button importButton = new Button(this);
-        importButton.setText("导入 JSON");
-        importButton.setAllCaps(false);
+        TextView importButton = Ui.pill(this, "导入 JSON", true, palette);
         importButton.setOnClickListener(v -> pickJson());
         header.addView(importButton);
         root.addView(header);
 
         TextView hint = new TextView(this);
         hint.setText("支持 Legado 3.0 单个书源、数组或 {\"bookSources\":[...]}；长按书源可删除。");
-        hint.setTextColor(Color.parseColor("#6B6257"));
-        hint.setPadding(dp(18), dp(10), dp(18), dp(6));
+        hint.setTextSize(12);
+        hint.setTextColor(palette.muted);
+        hint.setPadding(dp(20), dp(4), dp(20), dp(8));
         root.addView(hint);
 
         ScrollView scroll = new ScrollView(this);
+        scroll.setClipToPadding(false);
         list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(dp(16), dp(4), dp(16), dp(24));
         scroll.addView(list);
         root.addView(scroll, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
@@ -82,31 +83,36 @@ public class SourcesActivity extends Activity {
         if (store.sources.isEmpty()) {
             TextView empty = new TextView(this);
             empty.setText("还没有书源，点右上角导入 JSON。");
-            empty.setTextColor(Color.parseColor("#6B6257"));
-            empty.setPadding(dp(20), dp(20), dp(20), dp(20));
+            empty.setTextSize(14);
+            empty.setTextColor(palette.muted);
+            empty.setPadding(dp(8), dp(28), dp(8), dp(20));
             list.addView(empty);
             return;
         }
         for (SourceStore.Source source : store.sources) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.VERTICAL);
-            row.setPadding(dp(20), dp(12), dp(20), dp(12));
-            row.setBackgroundColor(Color.parseColor("#FBF7EF"));
+            row.setPadding(dp(16), dp(12), dp(16), dp(12));
+            row.setBackground(Ui.ripple(this, Ui.round(this, palette.card, 12), 0x14000000));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            params.setMargins(0, dp(5), 0, dp(5));
+            row.setLayoutParams(params);
 
             TextView name = new TextView(this);
             name.setText(source.name);
             name.setTextSize(16);
-            name.setTextColor(Color.parseColor("#2F2A24"));
+            name.setTextColor(palette.ink);
             row.addView(name);
 
             TextView url = new TextView(this);
             url.setText(source.url);
             url.setTextSize(11);
-            url.setTextColor(Color.parseColor("#6B6257"));
+            url.setTextColor(palette.muted);
             row.addView(url);
 
             row.setOnLongClickListener(v -> {
-                new AlertDialog.Builder(this)
+                Ui.dialog(this, new AppSettings(this).theme())
                         .setTitle("删除书源")
                         .setMessage("确定删除「" + source.name + "」？")
                         .setPositiveButton("删除", (dialog, which) -> {
@@ -160,6 +166,6 @@ public class SourcesActivity extends Activity {
     }
 
     private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
+        return Ui.dp(this, value);
     }
 }

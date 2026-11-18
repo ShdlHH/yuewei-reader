@@ -15,7 +15,7 @@
 - 下载与离线：整本下载、暂停/继续/取消、失败重试，已缓存章节断网可读
 - 键盘翻页：空格/PageDown/→/↓ 下一页，PageUp/←/↑/退格 上一页；翻到章末或章首会继续跨章
 - 多端同步：WebDAV（坚果云 / Nextcloud）上传阅读进度、书架与阅读设置；进度写成 Legado 兼容的 `bookProgress/书名_作者.json`，手机装 Legado 并把 WebDAV 目录设为同一目录，即可白天手机读、晚上电脑自动接上
-- Android 客户端：`mobile/` 提供本地 TXT 导入、在线书源搜索与阅读、按页阅读、WebDAV 双向同步（含删除同步），与桌面端共用同一份进度、书架与设置
+- Android 客户端：`mobile/` 提供本地 TXT 导入、在线书源搜索与阅读、按页阅读、WebDAV 双向同步（含删除同步与自动同步），与桌面端共用同一份进度、书架与设置
 - 阅读排版：默认京华老宋体（缺失时回退宋体并提示），支持导入 ttf/otf/ttc 字体、12–32 号字、1.2–3.0 倍行距（段内换行与段间距同步）、段落首行缩进、按章节预分页（滚轮整页翻页，页内不留滚动残影）、纸白/夜间/护眼三套主题，调整即时生效
 - 标点着色：引号内对话朱红，句号、问号、感叹号、省略号/破折号、括号分别配色；六条规则可逐条开关与调色，阅读器工具栏可一键关闭
 - 数据本地：SQLite 保存书籍与进度，正文缓存落文件，可设置缓存上限并一键清理
@@ -106,6 +106,8 @@ powershell -ExecutionPolicy Bypass -File packaging\make-shortcut.ps1
 
 `mobile/` 是 Android 版（Java + 原生 View，不依赖 AndroidX），已实现本地 TXT 导入、Legado 书源在线搜索与阅读、按章分页阅读、书架管理与 WebDAV 双向同步，与桌面端共用同一套 `bookProgress/{书名_作者}.json`、`shelf.json`、`settings.json`。
 
+同步默认自动进行：打开应用、退出阅读页、删除书籍、保存设置后都会在后台同步一次（同一分钟内不重复触发），设置页可关闭「自动同步」；手动「同步」按钮保留。界面与桌面端统一纸白/夜间/护眼三套配色，书架为卡片式列表，正文使用衬线字体并实时应用字号、行距与主题。
+
 在线书源直接复用桌面端的 `RuleEngine`（`mobile/core` 模块以源码方式引入 `domain`、`rule`、`Urls` 等纯 Java 代码），支持搜索、详情、目录与正文多页拼接；正文按章缓存，断网后已读章节仍可打开。
 
 删除同步：书架长按删除只做墓碑标记（本地隐藏、保留记录），`shelf.json` 中该书写 `deleted: true`；另一端同步时隐藏该书并跳过其进度，已删的书不会被旧快照重新加回书架。所有改动均在设备下次同步时上传。
@@ -118,13 +120,13 @@ $env:JAVA_HOME = "C:\Program Files\Java\jdk-17"
 
 产物为 `mobile\app\build\outputs\apk\debug\app-debug.apk`，可用 `adb install -r` 安装。`mobile\local.properties` 的 `sdk.dir` 指向本机 Android SDK，默认不入库；换机器时改成自己的 SDK 路径。
 
-逻辑测试在 JVM 上运行（Robolectric，不需要模拟器），覆盖 TXT 导入去重、书库持久化、同步推送/合并/删除墓碑，以及用本地假站点跑通在线书源四段解析：
+逻辑测试在 JVM 上运行（Robolectric，不需要模拟器），覆盖 TXT 导入去重、书库持久化、同步推送/合并/删除墓碑、自动同步开关与间隔，以及用本地假站点跑通在线书源四段解析：
 
 ```powershell
 .\gradlew.bat :app:testDebugUnitTest
 ```
 
-当前范围：本地 TXT 与在线书源书架、按页阅读（点击左右/滑动/音量键翻页）、WebDAV 进度与书架/设置合并、删除墓碑同步。暂不含标点着色、自定义字体与书源调试面板；模拟器运行需要开启 Windows Hypervisor Platform，否则 x86 镜像会提示缺少硬件加速。
+当前范围：本地 TXT 与在线书源书架、按页阅读（点击左右/滑动/音量键翻页）、自动同步与手动同步、WebDAV 进度与书架/设置合并、删除墓碑同步。暂不含标点着色、自定义字体与书源调试面板；模拟器运行需要开启 Windows Hypervisor Platform，否则 x86 镜像会提示缺少硬件加速。
 
 ## 数据目录
 

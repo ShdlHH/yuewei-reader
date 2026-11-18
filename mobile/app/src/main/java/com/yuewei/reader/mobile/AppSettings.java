@@ -70,6 +70,39 @@ public class AppSettings {
         return prefs.getLong("settings.localAt", 0);
     }
 
+    /** 自动同步开关，默认开启；关闭后只能手动点同步。 */
+    public boolean autoSync() {
+        return prefs.getBoolean("sync.auto", true);
+    }
+
+    public void saveAutoSync(boolean enabled) {
+        prefs.edit().putBoolean("sync.auto", enabled).apply();
+    }
+
+    public long lastSyncAt() {
+        return prefs.getLong("sync.lastAt", 0);
+    }
+
+    public String lastSyncMessage() {
+        return prefs.getString("sync.lastResult", "");
+    }
+
+    public long lastAttemptAt() {
+        return prefs.getLong("sync.lastAttemptAt", 0);
+    }
+
+    public void saveSyncAttempt(long at) {
+        prefs.edit().putLong("sync.lastAttemptAt", at).apply();
+    }
+
+    /** 记录一次成功同步，用于界面显示“上次同步 …”。 */
+    public void saveSyncDone(String message) {
+        prefs.edit()
+                .putLong("sync.lastAt", System.currentTimeMillis())
+                .putString("sync.lastResult", message == null ? "" : message)
+                .apply();
+    }
+
     public long settingsRemoteAt() {
         return prefs.getLong("settings.remoteAt", 0);
     }

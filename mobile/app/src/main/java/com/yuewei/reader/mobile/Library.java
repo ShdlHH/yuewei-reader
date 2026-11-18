@@ -230,11 +230,16 @@ public class Library {
     }
 
     public void setProgress(Book book, int chapterIndex, int percent) {
+        touchProgress(book, chapterIndex, percent);
+        save();
+    }
+
+    /** 翻页时只更新内存，避免每页重写整份 books.json；退出阅读页时再调用 setProgress 落盘。 */
+    public void touchProgress(Book book, int chapterIndex, int percent) {
         book.chapterIndex = Math.max(0, chapterIndex);
         book.percent = Math.max(0, Math.min(10000, percent));
         book.progressAt = System.currentTimeMillis();
         book.lastReadAt = book.progressAt;
-        save();
     }
 
     /** 删除墓碑：本地隐藏，但保留记录让其他设备同步删除。 */

@@ -2,12 +2,10 @@ package com.yuewei.reader.mobile;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
-import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -22,6 +20,7 @@ public class ReaderActivity extends Activity {
     private final Library.Book[] current = new Library.Book[1];
     private Library library;
     private AppSettings settings;
+    private Ui.Palette palette;
     private PageView pageView;
     private TextView titleView;
     private TextView progressView;
@@ -32,6 +31,7 @@ public class ReaderActivity extends Activity {
         super.onCreate(savedInstanceState);
         library = new Library(this);
         settings = new AppSettings(this);
+        palette = Ui.palette(settings.theme());
         String bookId = getIntent().getStringExtra(EXTRA_BOOK_ID);
         Library.Book book = library.find(bookId);
         if (book == null || book.deleted || book.chapterTitles.isEmpty()) {
@@ -42,6 +42,7 @@ public class ReaderActivity extends Activity {
         current[0] = book;
         buildViews();
         applyTheme();
+        Ui.systemBars(this, palette);
         openChapter(book.chapterIndex, book.percent);
         ready = true;
     }
@@ -55,34 +56,26 @@ public class ReaderActivity extends Activity {
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        top.setPadding(dp(16), dp(10), dp(16), dp(10));
+        top.setPadding(dp(14), dp(10), dp(14), dp(8));
         top.setTag("bar");
 
-        Button back = new Button(this);
-        back.setText("← 书架");
-        back.setAllCaps(false);
+        TextView back = Ui.pill(this, "‹ 书架", false, palette);
         back.setOnClickListener(v -> finish());
-        top.addView(back, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        top.addView(back);
 
         titleView = new TextView(this);
-        titleView.setTextSize(16);
+        titleView.setTextSize(15);
         titleView.setSingleLine(true);
         titleView.setEllipsize(android.text.TextUtils.TruncateAt.END);
         titleView.setPadding(dp(12), 0, dp(12), 0);
-        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        top.addView(titleView, titleParams);
+        top.addView(titleView, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-        Button toc = new Button(this);
-        toc.setText("目录");
-        toc.setAllCaps(false);
+        TextView toc = Ui.pill(this, "目录", false, palette);
         toc.setOnClickListener(v -> showToc());
         top.addView(toc);
 
-        Button sync = new Button(this);
-        sync.setText("同步");
-        sync.setAllCaps(false);
+        TextView sync = Ui.pill(this, "同步", false, palette);
         sync.setOnClickListener(v -> SyncManager.sync(this, (message, ok) -> {
             Toast.makeText(this, message, Toast.LENGTH_LONG).show();
             if (ok) {
@@ -110,7 +103,7 @@ public class ReaderActivity extends Activity {
                 progressView.setText((current[0].chapterIndex + 1) + "/" + current[0].chapterTitles.size()
                         + " 章 · " + page + "/" + pages + " 页");
                 if (ready) {
-                    library.setProgress(current[0], current[0].chapterIndex, percent);
+                    library.touchProgress(current[0], current[0].chapterIndex, percent);
                 }
             }
 
@@ -131,20 +124,19 @@ public class ReaderActivity extends Activity {
         LinearLayout bottom = new LinearLayout(this);
         bottom.setOrientation(LinearLayout.HORIZONTAL);
         bottom.setGravity(Gravity.CENTER_VERTICAL);
-        bottom.setPadding(dp(16), dp(8), dp(16), dp(8));
+        bottom.setPadding(dp(14), dp(8), dp(14), dp(10));
         bottom.setTag("bar");
 
-        Button prev = new Button(this);
-        prev.setText("上一页");
-        prev.setAllCaps(false);
+        TextView prev = Ui.pill(this, "上一页", false, palette);
         prev.setOnClickListener(v -> pageView.previousPage());
         bottom.addView(prev);
 
-        Button next = new Button(this);
-        next.setText("下一页");
-        next.setAllCaps(false);
+        TextView next = Ui.pill(this, "下一页", false, palette);
         next.setOnClickListener(v -> pageView.nextPage());
-        bottom.addView(next);
+        LinearLayout.LayoutParams nextParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        nextParams.setMargins(dp(8), 0, 0, 0);
+        bottom.addView(next, nextParams);
 
         progressView = new TextView(this);
         progressView.setTextSize(12);
@@ -169,6 +161,8 @@ public class ReaderActivity extends Activity {
             return false;
         }
         book.chapterIndex = index;
+        // 切章时落盘一次，避免进程被系统回收时丢失整章进度
+        library.setProgress(book, index, percent);
         titleView.setText(book.chapterTitles.get(index));
         int token = ++loadToken;
         if (library.chapterFile(book.id, index).isFile()) {
@@ -225,7 +219,7 @@ public class ReaderActivity extends Activity {
         Library.Book book = current[0];
         List<String> titles = book.chapterTitles;
         String[] items = titles.toArray(new String[0]);
-        new AlertDialog.Builder(this)
+        Ui.dialog(this, settings.theme())
                 .setTitle("目录")
                 .setItems(items, (dialog, which) -> openChapter(which, 0))
                 .setNegativeButton("取消", null)
@@ -233,52 +227,26 @@ public class ReaderActivity extends Activity {
     }
 
     private void applyTheme() {
-        String theme = settings.theme();
-        String background;
-        String ink;
-        String bar;
-        if ("night".equals(theme)) {
-            background = "#1B1C20";
-            ink = "#C8C6C0";
-            bar = "#24262C";
-        } else if ("green".equals(theme)) {
-            background = "#E6EFE4";
-            ink = "#2D3A2B";
-            bar = "#D8E6D5";
-        } else {
-            background = "#F6F1E7";
-            ink = "#2F2A24";
-            bar = "#ECE4D4";
-        }
+        palette = Ui.palette(settings.theme());
         View content = findViewById(android.R.id.content);
         if (content instanceof android.view.ViewGroup) {
             android.view.ViewGroup wrapper = (android.view.ViewGroup) content;
             View rootView = wrapper.getChildAt(0);
-            rootView.setBackgroundColor(Color.parseColor(background));
+            rootView.setBackgroundColor(palette.bg);
             if (rootView instanceof android.view.ViewGroup) {
-                setThemeColors((android.view.ViewGroup) rootView, ink, bar);
+                setThemeColors((android.view.ViewGroup) rootView);
             }
         }
-        pageView.setStyle(settings.fontSize(), settings.lineSpacing(), Color.parseColor(ink));
-        titleView.setTextColor(Color.parseColor(ink));
-        progressView.setTextColor(Color.parseColor(ink));
+        pageView.setStyle(settings.fontSize(), settings.lineSpacing(), palette.ink);
+        titleView.setTextColor(palette.ink);
+        progressView.setTextColor(palette.muted);
     }
 
-    private void setThemeColors(android.view.ViewGroup root, String ink, String bar) {
+    private void setThemeColors(android.view.ViewGroup root) {
         for (int i = 0; i < root.getChildCount(); i++) {
             View child = root.getChildAt(i);
             if ("bar".equals(child.getTag())) {
-                child.setBackgroundColor(Color.parseColor(bar));
-                applyTextColor((android.view.ViewGroup) child, ink);
-            }
-        }
-    }
-
-    private void applyTextColor(android.view.ViewGroup group, String ink) {
-        for (int i = 0; i < group.getChildCount(); i++) {
-            View child = group.getChildAt(i);
-            if (child instanceof TextView) {
-                ((TextView) child).setTextColor(Color.parseColor(ink));
+                child.setBackgroundColor(palette.panel);
             }
         }
     }
@@ -304,7 +272,16 @@ public class ReaderActivity extends Activity {
         }
     }
 
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // 离开阅读页时静默上传进度；30 秒内不重复触发
+        if (ready) {
+            SyncManager.autoSync(this, 30_000, null);
+        }
+    }
+
     private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
+        return Ui.dp(this, value);
     }
 }

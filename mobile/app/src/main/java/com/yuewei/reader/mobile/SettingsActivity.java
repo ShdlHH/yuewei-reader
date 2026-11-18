@@ -2,12 +2,10 @@ package com.yuewei.reader.mobile;
 
 import android.app.Activity;
 import android.content.res.ColorStateList;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
-import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -22,7 +20,9 @@ import android.widget.Toast;
 public class SettingsActivity extends Activity {
 
     private AppSettings settings;
+    private Ui.Palette palette;
     private CheckBox syncEnabled;
+    private CheckBox autoSync;
     private EditText syncUrl;
     private EditText syncAccount;
     private EditText syncPassword;
@@ -31,49 +31,107 @@ public class SettingsActivity extends Activity {
     private TextView fontSizeLabel;
     private EditText lineSpacing;
     private RadioGroup themeGroup;
+    private TextView syncHint;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         settings = new AppSettings(this);
+        palette = Ui.palette(settings.theme());
 
         ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(palette.bg);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(20), dp(16), dp(20), dp(24));
-        root.setBackgroundColor(Color.parseColor("#F6F1E7"));
+        root.setPadding(dp(18), dp(14), dp(18), dp(28));
         scroll.addView(root);
         setContentView(scroll);
+        Ui.systemBars(this, palette);
+
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(0, 0, 0, dp(12));
+        root.addView(header);
+
+        TextView back = Ui.pill(this, "‹ 书架", false, palette);
+        back.setOnClickListener(v -> finish());
+        header.addView(back);
 
         TextView title = new TextView(this);
         title.setText("设置");
         title.setTextSize(22);
-        title.setTextColor(Color.parseColor("#2F2A24"));
-        title.setPadding(0, 0, 0, dp(12));
-        root.addView(title);
+        title.setTypeface(Ui.SERIF_BOLD);
+        title.setTextColor(palette.ink);
+        title.setPadding(dp(14), 0, 0, 0);
+        header.addView(title, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-        root.addView(section("同步（WebDAV）"));
-        syncEnabled = new CheckBox(this);
-        syncEnabled.setText("启用 WebDAV 同步");
-        syncEnabled.setTextColor(Color.parseColor("#2F2A24"));
-        syncEnabled.setChecked(settings.syncEnabled());
-        root.addView(syncEnabled);
+        LinearLayout syncCard = card();
+        syncCard.addView(section("同步（WebDAV）"));
 
-        syncUrl = input(root, "WebDAV 地址", settings.syncUrl(), InputType.TYPE_TEXT_VARIATION_URI);
+        syncEnabled = check("启用 WebDAV 同步", settings.syncEnabled());
+        syncCard.addView(syncEnabled);
+        autoSync = check("自动同步（打开应用、退出阅读时）", settings.autoSync());
+        syncCard.addView(autoSync);
+
+        syncUrl = input(syncCard, "WebDAV 地址", settings.syncUrl(),
+                InputType.TYPE_TEXT_VARIATION_URI);
         syncUrl.setHint("https://dav.jianguoyun.com/dav/");
-        syncAccount = input(root, "账号", settings.syncAccount(), InputType.TYPE_CLASS_TEXT);
-        syncPassword = input(root, "密码 / 应用密码", settings.syncPassword(),
+        syncAccount = input(syncCard, "账号", settings.syncAccount(), InputType.TYPE_CLASS_TEXT);
+        syncPassword = input(syncCard, "密码 / 应用密码", settings.syncPassword(),
                 InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        syncDir = input(root, "同步目录", settings.syncDir(), InputType.TYPE_CLASS_TEXT);
+        syncDir = input(syncCard, "同步目录", settings.syncDir(), InputType.TYPE_CLASS_TEXT);
         syncDir.setHint("yuewei");
 
-        root.addView(section("阅读排版"));
+        syncHint = new TextView(this);
+        syncHint.setTextSize(12);
+        syncHint.setTextColor(palette.muted);
+        syncHint.setPadding(0, dp(10), 0, 0);
+        syncHint.setText(SyncManager.lastSyncText(this));
+        syncCard.addView(syncHint);
+
+        LinearLayout syncActions = new LinearLayout(this);
+        syncActions.setOrientation(LinearLayout.HORIZONTAL);
+        syncActions.setPadding(0, dp(12), 0, 0);
+
+        TextView saveSync = Ui.pill(this, "保存", true, palette);
+        saveSync.setOnClickListener(v -> saveAndFinish());
+        syncActions.addView(saveSync);
+
+        TextView syncNow = Ui.pill(this, "立即同步", false, palette);
+        LinearLayout.LayoutParams syncParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        syncParams.setMargins(dp(10), 0, 0, 0);
+        syncNow.setOnClickListener(v -> {
+            saveAll();
+            syncNow.setEnabled(false);
+            syncHint.setText("正在同步…");
+            Toast.makeText(this, "正在同步…", Toast.LENGTH_SHORT).show();
+            SyncManager.sync(this, (message, ok) -> {
+                syncNow.setEnabled(true);
+                syncHint.setText(SyncManager.lastSyncText(this));
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+            });
+        });
+        syncActions.addView(syncNow, syncParams);
+        syncCard.addView(syncActions);
+        root.addView(syncCard);
+
+        LinearLayout readerCard = card();
+        readerCard.addView(section("阅读排版"));
+
         fontSizeLabel = new TextView(this);
-        fontSizeLabel.setTextColor(Color.parseColor("#2F2A24"));
-        root.addView(fontSizeLabel);
+        fontSizeLabel.setTextColor(palette.ink);
+        fontSizeLabel.setTextSize(14);
+        fontSizeLabel.setText("字号：" + settings.fontSize());
+        readerCard.addView(fontSizeLabel);
+
         fontSize = new SeekBar(this);
         fontSize.setMax(20);
         fontSize.setProgress(settings.fontSize() - 12);
+        fontSize.setProgressTintList(ColorStateList.valueOf(palette.accent));
+        fontSize.setThumbTintList(ColorStateList.valueOf(palette.accent));
         fontSize.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -88,10 +146,9 @@ public class SettingsActivity extends Activity {
             public void onStopTrackingTouch(SeekBar seekBar) {
             }
         });
-        fontSizeLabel.setText("字号：" + (fontSize.getProgress() + 12));
-        root.addView(fontSize);
+        readerCard.addView(fontSize);
 
-        lineSpacing = input(root, "行距（1.2–3.0）", String.valueOf(settings.lineSpacing()),
+        lineSpacing = input(readerCard, "行距（1.2–3.0）", String.valueOf(settings.lineSpacing()),
                 InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
 
         themeGroup = new RadioGroup(this);
@@ -110,58 +167,75 @@ public class SettingsActivity extends Activity {
         } else {
             paper.setChecked(true);
         }
-        root.addView(themeGroup);
+        readerCard.addView(themeGroup);
+        root.addView(readerCard);
 
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setPadding(0, dp(16), 0, 0);
+        TextView save = Ui.pill(this, "保存设置", true, palette);
+        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        saveParams.setMargins(0, dp(16), 0, 0);
+        save.setOnClickListener(v -> saveAndFinish());
+        root.addView(save, saveParams);
+    }
 
-        Button save = new Button(this);
-        save.setText("保存");
-        save.setAllCaps(false);
-        save.setOnClickListener(v -> {
-            saveAll();
-            Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show();
-            finish();
-        });
-        actions.addView(save);
+    /** 保存后立即自动同步一次，让另一台设备尽快拿到新的排版与同步设置。 */
+    private void saveAndFinish() {
+        saveAll();
+        SyncManager.autoSync(this, 0, null);
+        Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show();
+        finish();
+    }
 
-        Button syncNow = new Button(this);
-        syncNow.setText("立即同步");
-        syncNow.setAllCaps(false);
-        syncNow.setOnClickListener(v -> {
-            saveAll();
-            syncNow.setEnabled(false);
-            Toast.makeText(this, "正在同步…", Toast.LENGTH_SHORT).show();
-            SyncManager.sync(this, (message, ok) -> {
-                syncNow.setEnabled(true);
-                Toast.makeText(this, message, Toast.LENGTH_LONG).show();
-            });
-        });
-        actions.addView(syncNow);
-        root.addView(actions);
+    private LinearLayout card() {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(16), dp(14), dp(16), dp(14));
+        card.setBackground(Ui.round(this, palette.card, 14));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, dp(6), 0, dp(6));
+        card.setLayoutParams(params);
+        return card;
     }
 
     private TextView section(String text) {
         TextView view = new TextView(this);
         view.setText(text);
-        view.setTextSize(16);
-        view.setPadding(0, dp(18), 0, dp(6));
-        view.setTextColor(Color.parseColor("#A63D32"));
+        view.setTextSize(15);
+        view.setTypeface(Ui.SERIF_BOLD);
+        view.setPadding(0, dp(2), 0, dp(8));
+        view.setTextColor(palette.accent);
         return view;
+    }
+
+    private CheckBox check(String text, boolean checked) {
+        CheckBox box = new CheckBox(this);
+        box.setText(text);
+        box.setTextSize(14);
+        box.setTextColor(palette.ink);
+        box.setChecked(checked);
+        box.setButtonTintList(ColorStateList.valueOf(palette.accent));
+        box.setPadding(0, dp(4), 0, dp(4));
+        return box;
     }
 
     private EditText input(LinearLayout parent, String label, String value, int inputType) {
         TextView caption = new TextView(this);
         caption.setText(label);
-        caption.setTextColor(Color.parseColor("#2F2A24"));
-        caption.setPadding(0, dp(6), 0, 0);
+        caption.setTextSize(12);
+        caption.setTextColor(palette.muted);
+        caption.setPadding(0, dp(10), 0, dp(4));
         parent.addView(caption);
+
         EditText edit = new EditText(this);
         edit.setInputType(inputType);
         edit.setText(value);
-        edit.setTextColor(Color.parseColor("#2F2A24"));
-        edit.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#A63D32")));
+        edit.setTextSize(14);
+        edit.setTextColor(palette.ink);
+        edit.setHintTextColor(palette.muted);
+        edit.setSingleLine(true);
+        edit.setPadding(dp(12), dp(9), dp(12), dp(9));
+        edit.setBackground(Ui.roundStroke(this, palette.bg, palette.line, 10));
         parent.addView(edit);
         return edit;
     }
@@ -171,7 +245,9 @@ public class SettingsActivity extends Activity {
         button.setId(View.generateViewId());
         button.setText(text);
         button.setTag(key);
-        button.setTextColor(Color.parseColor("#2F2A24"));
+        button.setTextSize(14);
+        button.setTextColor(palette.ink);
+        button.setButtonTintList(ColorStateList.valueOf(palette.accent));
         button.setGravity(Gravity.CENTER_VERTICAL);
         return button;
     }
@@ -180,6 +256,7 @@ public class SettingsActivity extends Activity {
         settings.saveSync(syncEnabled.isChecked(), syncUrl.getText().toString(),
                 syncAccount.getText().toString(), syncPassword.getText().toString(),
                 syncDir.getText().toString());
+        settings.saveAutoSync(autoSync.isChecked());
         int size = 12 + fontSize.getProgress();
         float spacing;
         try {
@@ -194,6 +271,6 @@ public class SettingsActivity extends Activity {
     }
 
     private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
+        return Ui.dp(this, value);
     }
 }

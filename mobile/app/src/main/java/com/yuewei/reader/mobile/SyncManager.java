@@ -11,10 +11,12 @@ import com.yuewei.reader.domain.SearchResult;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -45,11 +47,15 @@ public final class SyncManager {
     public static void sync(Context context, Callback callback) {
         AppSettings settings = new AppSettings(context);
         if (!settings.syncEnabled() || settings.syncUrl().isEmpty()) {
-            callback.finished("请先在设置里填写 WebDAV 地址并启用同步", false);
+            if (callback != null) {
+                callback.finished("请先在设置里填写 WebDAV 地址并启用同步", false);
+            }
             return;
         }
         if (!RUNNING.compareAndSet(false, true)) {
-            callback.finished("正在同步，请稍候", false);
+            if (callback != null) {
+                callback.finished("正在同步，请稍候", false);
+            }
             return;
         }
         new Thread(() -> {
@@ -58,6 +64,7 @@ public final class SyncManager {
             try {
                 message = run(context, settings);
                 ok = true;
+                settings.saveSyncDone(message);
                 Log.i(TAG, "同步完成：" + message);
             } catch (Exception e) {
                 message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
@@ -68,9 +75,49 @@ public final class SyncManager {
             boolean finalOk = ok;
             MAIN.post(() -> {
                 RUNNING.set(false);
-                callback.finished(finalMessage, finalOk);
+                if (callback != null) {
+                    callback.finished(finalMessage, finalOk);
+                }
             });
         }, "yuewei-sync").start();
+    }
+
+    /**
+     * 自动同步：关闭开关、未配置或距上次同步尝试不足 minIntervalMs 时静默跳过。
+     *
+     * @return 是否真正发起了同步
+     */
+    public static boolean autoSync(Context context, long minIntervalMs, Callback callback) {
+        AppSettings settings = new AppSettings(context);
+        if (!settings.autoSync() || !settings.syncEnabled() || settings.syncUrl().isEmpty()) {
+            return false;
+        }
+        // 成功时间与尝试时间取较新者：失败后也不会每次回到应用都重试并弹提示
+        long last = Math.max(settings.lastSyncAt(), settings.lastAttemptAt());
+        if (System.currentTimeMillis() - last < minIntervalMs) {
+            return false;
+        }
+        if (RUNNING.get()) {
+            return false;
+        }
+        settings.saveSyncAttempt(System.currentTimeMillis());
+        sync(context, callback);
+        return true;
+    }
+
+    static boolean running() {
+        return RUNNING.get();
+    }
+
+    /** 书架顶部显示的同步状态。 */
+    static String lastSyncText(Context context) {
+        AppSettings settings = new AppSettings(context);
+        long at = settings.lastSyncAt();
+        if (at <= 0) {
+            return "尚未同步";
+        }
+        String time = new SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(new Date(at));
+        return "上次同步 " + time;
     }
 
     private static String run(Context context, AppSettings settings) throws Exception {

@@ -2,11 +2,10 @@ package com.yuewei.reader.mobile;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.graphics.Color;
 import android.os.Bundle;
+import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -23,9 +22,10 @@ public class SearchActivity extends Activity {
     private Library library;
     private SourceStore sources;
     private OnlineService online;
+    private Ui.Palette palette;
     private EditText keyword;
     private LinearLayout results;
-    private Button searchButton;
+    private TextView searchButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,53 +33,63 @@ public class SearchActivity extends Activity {
         library = new Library(this);
         sources = new SourceStore(this);
         online = new OnlineService();
+        palette = Ui.palette(new AppSettings(this).theme());
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.parseColor("#F6F1E7"));
+        root.setBackgroundColor(palette.bg);
         setContentView(root);
+        Ui.systemBars(this, palette);
 
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(dp(16), dp(12), dp(16), dp(8));
-        header.setBackgroundColor(Color.parseColor("#ECE4D4"));
+        header.setPadding(dp(18), dp(14), dp(18), dp(8));
 
-        Button back = new Button(this);
-        back.setText("← 书架");
-        back.setAllCaps(false);
+        TextView back = Ui.pill(this, "‹ 书架", false, palette);
         back.setOnClickListener(v -> finish());
         header.addView(back);
 
         TextView title = new TextView(this);
         title.setText("在线搜索");
-        title.setTextSize(18);
-        title.setTextColor(Color.parseColor("#2F2A24"));
-        title.setPadding(dp(12), 0, 0, 0);
+        title.setTextSize(20);
+        title.setTypeface(Ui.SERIF_BOLD);
+        title.setTextColor(palette.ink);
+        title.setPadding(dp(14), 0, 0, 0);
         header.addView(title, new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         root.addView(header);
 
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
-        bar.setPadding(dp(16), dp(10), dp(16), dp(6));
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(dp(18), dp(4), dp(18), dp(8));
 
         keyword = new EditText(this);
         keyword.setHint("书名或作者");
+        keyword.setHintTextColor(palette.muted);
+        keyword.setTextSize(14);
+        keyword.setTextColor(palette.ink);
+        keyword.setInputType(InputType.TYPE_CLASS_TEXT);
         keyword.setSingleLine(true);
+        keyword.setPadding(dp(12), dp(9), dp(12), dp(9));
+        keyword.setBackground(Ui.roundStroke(this, palette.card, palette.line, 10));
         bar.addView(keyword, new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-        searchButton = new Button(this);
-        searchButton.setText("搜索");
-        searchButton.setAllCaps(false);
+        searchButton = Ui.pill(this, "搜索", true, palette);
+        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        buttonParams.setMargins(dp(10), 0, 0, 0);
         searchButton.setOnClickListener(v -> doSearch());
-        bar.addView(searchButton);
+        bar.addView(searchButton, buttonParams);
         root.addView(bar);
 
         ScrollView scroll = new ScrollView(this);
+        scroll.setClipToPadding(false);
         results = new LinearLayout(this);
         results.setOrientation(LinearLayout.VERTICAL);
+        results.setPadding(dp(16), dp(4), dp(16), dp(24));
         scroll.addView(results);
         root.addView(scroll, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
@@ -119,21 +129,26 @@ public class SearchActivity extends Activity {
         if (hits.isEmpty()) {
             TextView empty = new TextView(this);
             empty.setText("没有搜索到结果，换一个关键词或书源试试。");
-            empty.setTextColor(Color.parseColor("#6B6257"));
-            empty.setPadding(dp(20), dp(20), dp(20), dp(20));
+            empty.setTextSize(14);
+            empty.setTextColor(palette.muted);
+            empty.setPadding(dp(8), dp(28), dp(8), dp(20));
             results.addView(empty);
             return;
         }
         for (OnlineService.Hit hit : hits) {
             LinearLayout row = new LinearLayout(this);
             row.setOrientation(LinearLayout.VERTICAL);
-            row.setPadding(dp(20), dp(12), dp(20), dp(12));
-            row.setBackgroundColor(Color.parseColor("#FBF7EF"));
+            row.setPadding(dp(16), dp(12), dp(16), dp(12));
+            row.setBackground(Ui.ripple(this, Ui.round(this, palette.card, 12), 0x14000000));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            params.setMargins(0, dp(5), 0, dp(5));
+            row.setLayoutParams(params);
 
             TextView name = new TextView(this);
             name.setText(hit.result.title);
             name.setTextSize(16);
-            name.setTextColor(Color.parseColor("#2F2A24"));
+            name.setTextColor(palette.ink);
             row.addView(name);
 
             TextView meta = new TextView(this);
@@ -141,13 +156,8 @@ public class SearchActivity extends Activity {
                     + " · " + hit.source.name
                     + (hit.result.lastChapter == null ? "" : " · " + hit.result.lastChapter));
             meta.setTextSize(11);
-            meta.setTextColor(Color.parseColor("#6B6257"));
+            meta.setTextColor(palette.muted);
             row.addView(meta);
-
-            View separator = new View(this);
-            separator.setBackgroundColor(Color.parseColor("#E5DCCB"));
-            row.addView(separator, new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, dp(1)));
 
             row.setOnClickListener(v -> openHit(hit));
             results.addView(row);
@@ -193,6 +203,6 @@ public class SearchActivity extends Activity {
     }
 
     private int dp(int value) {
-        return Math.round(value * getResources().getDisplayMetrics().density);
+        return Ui.dp(this, value);
     }
 }
