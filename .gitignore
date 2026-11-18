@@ -8,3 +8,5 @@ dist/
 *.db-shm
 *.db-wal
 .DS_Store
+# 本地真实书源，不入库
+real-book-sources.json
