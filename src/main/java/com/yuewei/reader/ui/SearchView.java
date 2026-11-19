@@ -17,7 +17,6 @@ import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
-import javafx.scene.control.SplitPane;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
@@ -44,13 +43,16 @@ public class SearchView implements AppView {
     private final TextField keyword = new TextField();
     private final ComboBox<String> scope = new ComboBox<>();
     private final Button searchButton = Ui.button("搜索", "primary-button");
-    private final Label progressLabel = Ui.label("输入书名或作者，回车开始搜索", "muted");
+    private final Label progressLabel = Ui.label("", "muted");
     private final ListView<String> progressList = new ListView<>();
     private final TableView<AggregatedResult> results = new TableView<>();
     private final ListView<SearchResult> sourceList = new ListView<>();
     private final Button addButton = Ui.button("加入书架", "primary-button");
     private final Label detailTitle = Ui.label("", "panel-title");
     private final Label detailMeta = Ui.label("", "muted");
+    private final Label detailHint = Ui.label("选中一条结果后可加入书架", "muted");
+    private final Label pageSub = Ui.label("", "page-sub");
+    private final Label scopeHint = Ui.label("", "muted");
 
     public SearchView(AppContext ctx, MainWindow window) {
         this.ctx = ctx;
@@ -60,21 +62,30 @@ public class SearchView implements AppView {
 
     private void build() {
         keyword.setPromptText("书名或作者，回车搜索");
-        keyword.setPrefWidth(280);
+        keyword.setPrefHeight(32);
+        keyword.setMaxWidth(520);
         keyword.setOnAction(e -> search());
+        HBox.setHgrow(keyword, Priority.ALWAYS);
+
+        searchButton.setPrefHeight(32);
         searchButton.setOnAction(e -> search());
 
-        scope.setPrefWidth(200);
+        scope.setPrefWidth(176);
+        scope.setPrefHeight(32);
         scope.setItems(FXCollections.observableArrayList(ALL));
         scope.setValue(ALL);
 
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
+        Label pageTitle = Ui.label("搜索", "page-title");
+        VBox titles = new VBox(4, pageTitle, pageSub);
+        Region headSpacer = new Region();
+        HBox.setHgrow(headSpacer, Priority.ALWAYS);
+        HBox header = new HBox(12, titles, headSpacer, progressLabel);
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.getStyleClass().add("page-header");
 
-        HBox toolbar = new HBox(10, keyword, scope, searchButton, spacer, progressLabel);
-        toolbar.getStyleClass().add("toolbar");
+        HBox toolbar = new HBox(8, keyword, searchButton);
         toolbar.setAlignment(Pos.CENTER_LEFT);
-        toolbar.setPadding(new Insets(12, 16, 12, 16));
+        toolbar.getStyleClass().add("page-toolbar");
 
         TableColumn<AggregatedResult, String> titleCol = resultColumn("书名", 230,
                 result -> result.title);
@@ -86,17 +97,12 @@ public class SearchView implements AppView {
                 AggregatedResult::sourceSummary);
         results.getColumns().addAll(titleCol, authorCol, lastCol, sourceCol);
         results.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        results.setPlaceholder(Ui.label("搜索结果会显示在这里", "muted"));
+        results.setFixedCellSize(40);
+        results.setPlaceholder(Ui.label("输入书名或作者开始搜索", "muted"));
         results.getSelectionModel().selectedItemProperty().addListener(
                 (observable, oldValue, newValue) -> showSources(newValue));
 
-        VBox progressBox = new VBox(6, Ui.label("书源进度", "panel-title"), progressList);
-        progressBox.setPadding(new Insets(10));
-        progressBox.setPrefWidth(240);
-        progressBox.setMinWidth(200);
-        progressList.setPlaceholder(Ui.label("尚未搜索", "muted"));
-
-        sourceList.setPlaceholder(Ui.label("选择左侧结果查看来源", "muted"));
+        sourceList.setPlaceholder(Ui.label("", "muted"));
         sourceList.setCellFactory(list -> new ListCell<>() {
             @Override
             protected void updateItem(SearchResult item, boolean empty) {
@@ -108,29 +114,61 @@ public class SearchView implements AppView {
                 }
             }
         });
+        sourceList.setPrefHeight(84);
+        sourceList.setVisible(false);
+        sourceList.setManaged(false);
 
         addButton.setDisable(true);
         addButton.setOnAction(e -> addToShelf());
-        addButton.setMaxWidth(Double.MAX_VALUE);
+        addButton.setPrefWidth(132);
+        addButton.setMaxWidth(132);
+        addButton.getStyleClass().remove("primary-button");
+        addButton.getStyleClass().add("ghost-button");
+        addButton.disableProperty().addListener((observable, oldValue, disabled) -> {
+            addButton.getStyleClass().removeAll("primary-button", "ghost-button");
+            addButton.getStyleClass().add(disabled ? "ghost-button" : "primary-button");
+        });
 
-        VBox detailBox = new VBox(8, detailTitle, detailMeta, sourceList, addButton);
-        detailBox.setPadding(new Insets(10));
-        detailBox.setPrefWidth(320);
-        VBox.setVgrow(sourceList, Priority.ALWAYS);
+        detailTitle.setVisible(false);
+        detailTitle.setManaged(false);
+        detailMeta.setVisible(false);
+        detailMeta.setManaged(false);
 
-        BorderPane body = new BorderPane();
-        body.setCenter(results);
-        body.setRight(detailBox);
-        BorderPane.setMargin(detailBox, new Insets(0, 0, 0, 8));
+        VBox detailInfo = new VBox(4, detailTitle, detailMeta, detailHint);
+        HBox.setHgrow(detailInfo, Priority.ALWAYS);
+        HBox detailRow = new HBox(12, detailInfo, addButton);
+        detailRow.setAlignment(Pos.CENTER_LEFT);
+        VBox detailCard = new VBox(8, detailRow, sourceList);
+        detailCard.getStyleClass().add("search-detail");
 
-        SplitPane main = new SplitPane(progressBox, body);
-        main.setDividerPositions(0.2);
+        VBox resultCard = new VBox(results);
+        VBox.setVgrow(results, Priority.ALWAYS);
+        VBox mainColumn = new VBox(12, resultCard, detailCard);
+        VBox.setVgrow(resultCard, Priority.ALWAYS);
+        HBox.setHgrow(mainColumn, Priority.ALWAYS);
 
-        root.setTop(toolbar);
-        root.setCenter(main);
-        BorderPane.setMargin(main, new Insets(0, 16, 16, 16));
+        progressList.setPlaceholder(Ui.label("", "muted"));
+        progressList.setVisible(false);
+        progressList.setManaged(false);
+        progressList.setPrefHeight(200);
+        VBox sideCard = new VBox(10, Ui.label("书源", "card-title"), scope, progressList, scopeHint);
+        sideCard.getStyleClass().add("search-side");
+        sideCard.setPrefWidth(200);
+        sideCard.setMinWidth(200);
+        sideCard.setMaxWidth(200);
+        VBox.setVgrow(progressList, Priority.ALWAYS);
 
-        addButton.setOnAction(e -> addToShelf());
+        HBox body = new HBox(12, mainColumn, sideCard);
+        body.setPadding(new Insets(0, Ui.SPACE_LIST, Ui.SPACE_LIST, Ui.SPACE_LIST));
+
+        root.setTop(new VBox(header, toolbar));
+        root.setCenter(body);
+    }
+
+    /** 进度列表只在有内容时出现，空状态只留结果区一条。 */
+    private void setProgressVisible(boolean visible) {
+        progressList.setVisible(visible);
+        progressList.setManaged(visible);
     }
 
     private TableColumn<AggregatedResult, String> resultColumn(
@@ -161,11 +199,10 @@ public class SearchView implements AppView {
         }
         searchButton.setDisable(true);
         progressList.getItems().clear();
+        setProgressVisible(true);
         results.getItems().clear();
         sourceList.getItems().clear();
-        detailTitle.setText("");
-        detailMeta.setText("");
-        addButton.setDisable(true);
+        showSources(null);
         progressLabel.setText("正在搜索 " + chosen.size() + " 个书源…");
         window.status("正在搜索「" + text + "」…");
 
@@ -200,6 +237,7 @@ public class SearchView implements AppView {
         if (aggregated.isEmpty() && !outcome.failures.isEmpty()) {
             progressList.getItems().addAll(outcome.failures);
         }
+        setProgressVisible(!progressList.getItems().isEmpty());
     }
 
     private void showSources(AggregatedResult aggregated) {
@@ -207,12 +245,28 @@ public class SearchView implements AppView {
             sourceList.getItems().clear();
             detailTitle.setText("");
             detailMeta.setText("");
+            detailTitle.setVisible(false);
+            detailTitle.setManaged(false);
+            detailMeta.setVisible(false);
+            detailMeta.setManaged(false);
+            detailHint.setVisible(true);
+            detailHint.setManaged(true);
+            sourceList.setVisible(false);
+            sourceList.setManaged(false);
             addButton.setDisable(true);
             return;
         }
         detailTitle.setText(aggregated.title);
         detailMeta.setText((aggregated.author == null ? "未知作者" : aggregated.author)
                 + " · " + aggregated.sources.size() + " 个来源");
+        detailTitle.setVisible(true);
+        detailTitle.setManaged(true);
+        detailMeta.setVisible(true);
+        detailMeta.setManaged(true);
+        detailHint.setVisible(false);
+        detailHint.setManaged(false);
+        sourceList.setVisible(true);
+        sourceList.setManaged(true);
         sourceList.setItems(FXCollections.observableArrayList(aggregated.sources));
         sourceList.getSelectionModel().selectFirst();
         addButton.setDisable(false);
@@ -286,6 +340,9 @@ public class SearchView implements AppView {
         }
         scope.setItems(FXCollections.observableArrayList(items));
         scope.setValue(items.contains(current) ? current : ALL);
+        int count = searchable.size();
+        pageSub.setText(count + " 个书源 · 可搜索");
+        scopeHint.setText(count == 0 ? "尚未添加书源" : "搜索时显示进度");
     }
 
     @Override

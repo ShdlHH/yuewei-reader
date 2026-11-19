@@ -4,16 +4,20 @@ import com.yuewei.reader.application.AppContext;
 import com.yuewei.reader.application.ImportReport;
 import com.yuewei.reader.domain.BookSource;
 import com.yuewei.reader.domain.SourceStatus;
+import com.yuewei.reader.domain.SupportLevel;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.geometry.Side;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
@@ -23,6 +27,7 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 
 import java.io.File;
@@ -74,23 +79,37 @@ public class SourceView implements AppView {
         });
 
         TableColumn<BookSource, String> nameCol = column("名称", 170,
-                source -> source.name);
-        TableColumn<BookSource, String> groupCol = column("分组", 90,
-                source -> source.group == null ? "" : source.group);
-        TableColumn<BookSource, String> supportCol = column("兼容性", 110,
-                source -> switch (source.support) {
-                    case FULL -> "完整支持";
-                    case PARTIAL -> "部分支持";
-                    case UNSUPPORTED -> "不支持";
-                });
+                source -> cleanName(source.name));
+        TableColumn<BookSource, String> groupCol = column("分组 / 兼容", 160,
+                source -> (source.group == null || source.group.isBlank() ? "" : source.group + " · ")
+                        + supportText(source.support));
         TableColumn<BookSource, String> statusCol = column("状态", 90,
                 source -> statusText(source.status));
+        statusCol.setCellFactory(column -> new TableCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                getStyleClass().removeAll("status-ok", "status-bad", "status-idle");
+                BookSource source = getTableRow() == null ? null : getTableRow().getItem();
+                if (empty || item == null || source == null) {
+                    setText(null);
+                    return;
+                }
+                setText(item);
+                getStyleClass().add(switch (source.status) {
+                    case OK -> "status-ok";
+                    case ERROR -> "status-bad";
+                    default -> "status-idle";
+                });
+            }
+        });
         TableColumn<BookSource, String> checkCol = column("最近校验", 120,
                 source -> Ui.formatTime(source.lastCheck));
         TableColumn<BookSource, String> errorCol = column("最近错误", 280,
                 source -> source.lastError == null ? "" : source.lastError);
 
-        table.getColumns().addAll(enabledCol, nameCol, groupCol, supportCol, statusCol, checkCol, errorCol);
+        table.getColumns().addAll(enabledCol, nameCol, groupCol, statusCol, checkCol, errorCol);
+        table.setFixedCellSize(40);
         table.setPlaceholder(Ui.label("还没有书源，点击「导入文件」或「粘贴导入」", "muted"));
         table.getSelectionModel().selectedItemProperty().addListener(
                 (observable, oldValue, newValue) -> refreshSummary());
@@ -105,27 +124,33 @@ public class SourceView implements AppView {
         edit.setOnAction(e -> edit());
         Button validate = Ui.button("校验 / 调试", "ghost-button");
         validate.setOnAction(e -> validate());
-        Button remove = Ui.button("删除", "ghost-button");
-        remove.setOnAction(e -> delete());
-        Button enableAll = Ui.button("全部启用", "ghost-button");
-        enableAll.setOnAction(e -> setAllEnabled(true));
-        Button disableAll = Ui.button("全部停用", "ghost-button");
-        disableAll.setOnAction(e -> setAllEnabled(false));
-        Button export = Ui.button("导出", "ghost-button");
-        export.setOnAction(e -> export());
+
+        MenuItem removeItem = new MenuItem("删除");
+        removeItem.setOnAction(e -> delete());
+        MenuItem enableAllItem = new MenuItem("全部启用");
+        enableAllItem.setOnAction(e -> setAllEnabled(true));
+        MenuItem disableAllItem = new MenuItem("全部停用");
+        disableAllItem.setOnAction(e -> setAllEnabled(false));
+        MenuItem exportItem = new MenuItem("导出");
+        exportItem.setOnAction(e -> export());
+        ContextMenu moreMenu = new ContextMenu(removeItem, enableAllItem, disableAllItem, exportItem);
+
+        Button more = Ui.button("更多 ▾", "ghost-button");
+        more.setOnAction(e -> moreMenu.show(more, Side.BOTTOM, 0, 4));
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox toolbar = new HBox(8, importFile, paste, create, edit, validate, remove,
-                enableAll, disableAll, export, spacer, summary);
-        toolbar.getStyleClass().add("toolbar");
+        HBox toolbar = new HBox(8, importFile, paste, create, edit, validate, more, spacer);
         toolbar.setAlignment(Pos.CENTER_LEFT);
-        toolbar.setPadding(new Insets(12, 16, 12, 16));
+        toolbar.getStyleClass().add("page-toolbar");
 
-        root.setTop(toolbar);
+        VBox head = new VBox(4, Ui.label("书源", "page-title"), summary);
+        head.getStyleClass().add("page-header");
+
+        root.setTop(new VBox(head, toolbar));
         root.setCenter(table);
-        BorderPane.setMargin(table, new Insets(0, 16, 16, 16));
+        BorderPane.setMargin(table, new Insets(0, Ui.SPACE_LIST, Ui.SPACE_LIST, Ui.SPACE_LIST));
         refresh();
     }
 
@@ -159,6 +184,36 @@ public class SourceView implements AppView {
             case PARTIAL -> "部分支持";
             case UNSUPPORTED -> "不支持";
         };
+    }
+
+    private String supportText(SupportLevel support) {
+        return switch (support) {
+            case FULL -> "完整支持";
+            case PARTIAL -> "部分支持";
+            case UNSUPPORTED -> "不支持";
+        };
+    }
+
+    /** 名称列只保留文字：去掉 ✈、★ 等符号与 emoji，保留括号等常规标点。 */
+    private String cleanName(String name) {
+        if (name == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder(name.length());
+        for (int i = 0; i < name.length(); ) {
+            int codePoint = name.codePointAt(i);
+            int type = Character.getType(codePoint);
+            boolean symbol = type == Character.OTHER_SYMBOL
+                    || type == Character.MODIFIER_SYMBOL
+                    || type == Character.MATH_SYMBOL
+                    || type == Character.CURRENCY_SYMBOL;
+            if (!symbol) {
+                sb.appendCodePoint(codePoint);
+            }
+            i += Character.charCount(codePoint);
+        }
+        String cleaned = sb.toString().strip().replaceAll(" {2,}", " ");
+        return cleaned.isEmpty() ? name.strip() : cleaned;
     }
 
     private BookSource selected() {
@@ -195,9 +250,10 @@ public class SourceView implements AppView {
         dialog.initOwner(window.stage());
         dialog.getDialogPane().getButtonTypes().addAll(
                 javafx.scene.control.ButtonType.OK, javafx.scene.control.ButtonType.CANCEL);
+        Ui.styleDialog(dialog, window.stage());
         javafx.scene.layout.VBox box = new javafx.scene.layout.VBox(8,
                 Ui.label("粘贴 Legado 3.0 书源 JSON（对象或数组）", "muted"), area, overwrite);
-        box.setPadding(new Insets(10));
+        box.setPadding(new Insets(Ui.SPACE_FORM));
         dialog.getDialogPane().setContent(box);
         dialog.getDialogPane().setPrefWidth(680);
         if (dialog.showAndWait().orElse(null) != javafx.scene.control.ButtonType.OK) {
@@ -227,9 +283,10 @@ public class SourceView implements AppView {
         dialog.initOwner(window.stage());
         dialog.getDialogPane().getButtonTypes().addAll(
                 javafx.scene.control.ButtonType.OK, javafx.scene.control.ButtonType.CANCEL);
+        Ui.styleDialog(dialog, window.stage());
         javafx.scene.layout.VBox box = new javafx.scene.layout.VBox(8,
                 Ui.label("按 Legado 3.0 格式填写，保存后请运行校验。", "muted"), area);
-        box.setPadding(new Insets(10));
+        box.setPadding(new Insets(Ui.SPACE_FORM));
         dialog.getDialogPane().setContent(box);
         dialog.getDialogPane().setPrefWidth(680);
         if (dialog.showAndWait().orElse(null) != javafx.scene.control.ButtonType.OK) {
@@ -257,9 +314,10 @@ public class SourceView implements AppView {
         dialog.initOwner(window.stage());
         dialog.getDialogPane().getButtonTypes().addAll(
                 javafx.scene.control.ButtonType.OK, javafx.scene.control.ButtonType.CANCEL);
+        Ui.styleDialog(dialog, window.stage());
         javafx.scene.layout.VBox box = new javafx.scene.layout.VBox(8,
                 Ui.label("保存后状态会回到「未校验」，请重新校验。", "muted"), area);
-        box.setPadding(new Insets(10));
+        box.setPadding(new Insets(Ui.SPACE_FORM));
         dialog.getDialogPane().setContent(box);
         dialog.getDialogPane().setPrefWidth(700);
         if (dialog.showAndWait().orElse(null) != javafx.scene.control.ButtonType.OK) {
@@ -360,6 +418,8 @@ public class SourceView implements AppView {
         alert.setHeaderText(report.summary());
         alert.setContentText(builder.toString());
         alert.getDialogPane().setPrefWidth(560);
+        alert.initOwner(window.stage());
+        Ui.styleDialog(alert, window.stage());
         alert.show();
     }
 

@@ -22,12 +22,15 @@ public class SourceStore {
         public String name;
         public String url;
         public String ruleJson;
+        /** 停用后不参与搜索，已入架的书仍可阅读。 */
+        public boolean enabled = true;
 
         JSONObject toJson() throws Exception {
             JSONObject node = new JSONObject();
             node.put("name", name);
             node.put("url", url);
             node.put("ruleJson", ruleJson);
+            node.put("enabled", enabled);
             return node;
         }
 
@@ -36,6 +39,7 @@ public class SourceStore {
             source.name = node.optString("name");
             source.url = node.optString("url");
             source.ruleJson = node.optString("ruleJson");
+            source.enabled = node.optBoolean("enabled", true);
             return source;
         }
     }
@@ -126,6 +130,11 @@ public class SourceStore {
 
     public void remove(Source source) {
         sources.remove(source);
+        save();
+    }
+
+    public void setEnabled(Source source, boolean enabled) {
+        source.enabled = enabled;
         save();
     }
 }

@@ -1,9 +1,13 @@
 package com.yuewei.reader.mobile;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Typeface;
 import android.text.Layout;
 import android.text.SpannableString;
 import android.text.Spanned;
@@ -13,6 +17,7 @@ import android.text.style.LineHeightSpan;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.animation.PathInterpolator;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -50,6 +55,11 @@ public class PageView extends View {
     private int pageCount = 1;
     private final List<Integer> pageStartLines = new ArrayList<>();
     private float lineSpacing = 1.8f;
+    private Typeface typeface = Ui.SERIF;
+    /** 标点着色开关、六条规则与主题色。 */
+    private boolean punctEnabled;
+    private boolean[] punctRules = {true, true, true, true, false, false};
+    private int[] punctColors = new int[6];
     /** 屏幕开孔/刘海的安全区，正文绘制与分页都要避开。 */
     private int safeTop;
     private int safeBottom;
@@ -59,10 +69,13 @@ public class PageView extends View {
     private Listener listener;
     /** 本次 notifyPage 是否由用户主动翻页触发。 */
     private boolean userTurn;
+    /** 翻页过渡：横向轻移 + 淡入，只影响绘制，不改变分页。 */
+    private ValueAnimator turnAnimator;
+    private float turnShift;
 
     public PageView(Context context) {
         super(context);
-        paddingX = dp(20);
+        paddingX = dp(24);
         // 系统栏隐藏后正文直接贴屏幕边缘，上下各留 12dp 呼吸空间
         paddingY = dp(12);
         paint.setColor(Color.parseColor("#2F2A24"));
@@ -110,13 +123,28 @@ public class PageView extends View {
     }
 
     public void setStyle(int fontSizeSp, float lineSpacing, int color) {
+        setStyle(fontSizeSp, lineSpacing, color, typeface);
+    }
+
+    public void setStyle(int fontSizeSp, float lineSpacing, int color, Typeface typeface) {
         int percent = currentPercent();
         boolean hadPages = layout != null && pageCount > 1;
+        this.typeface = typeface == null ? Ui.SERIF : typeface;
+        paint.setTypeface(this.typeface);
         paint.setTextSize(sp(fontSizeSp));
         paint.setColor(color);
         this.lineSpacing = Math.max(1.2f, Math.min(3.0f, lineSpacing));
         rebuild();
         restorePercent(percent, hadPages);
+    }
+
+    /** 设置标点着色；颜色只影响绘制，不改变分页。 */
+    public void setPunctuation(boolean enabled, boolean[] rules, int[] colors) {
+        this.punctEnabled = enabled;
+        this.punctRules = rules == null
+                ? new boolean[]{true, true, true, true, false, false} : rules.clone();
+        this.punctColors = colors == null ? new int[6] : colors.clone();
+        rebuild();
     }
 
     public void setText(String value) {
@@ -127,22 +155,26 @@ public class PageView extends View {
 
     /** 设置屏幕开孔安全区；变化后重新分页并保持阅读位置。 */
     public void setSafeInsets(int top, int bottom) {
-        int safeTopValue = Math.max(0, top);
-        int safeBottomValue = Math.max(0, bottom);
-        if (safeTopValue == safeTop && safeBottomValue == safeBottom) {
-            return;
-        }
-        applyInsetsChange(safeTopValue, safeBottomValue, chromeTop, chromeBottom);
+        setInsets(top, bottom, chromeTop, chromeBottom);
     }
 
     /** 顶部/底部工具栏显示时让正文避让对应高度；收起后传 0 恢复满屏。 */
     public void setChromeInsets(int top, int bottom) {
-        int chromeTopValue = Math.max(0, top);
-        int chromeBottomValue = Math.max(0, bottom);
-        if (chromeTopValue == chromeTop && chromeBottomValue == chromeBottom) {
+        setInsets(safeTop, safeBottom, top, bottom);
+    }
+
+    /** 一次性更新四类留白，避免连续两次重排。 */
+    public void setInsets(int safeTopValue, int safeBottomValue,
+                          int chromeTopValue, int chromeBottomValue) {
+        int top = Math.max(0, safeTopValue);
+        int bottom = Math.max(0, safeBottomValue);
+        int cTop = Math.max(0, chromeTopValue);
+        int cBottom = Math.max(0, chromeBottomValue);
+        if (top == safeTop && bottom == safeBottom
+                && cTop == chromeTop && cBottom == chromeBottom) {
             return;
         }
-        applyInsetsChange(safeTop, safeBottom, chromeTopValue, chromeBottomValue);
+        applyInsetsChange(top, bottom, cTop, cBottom);
     }
 
     private void applyInsetsChange(int safeTopValue, int safeBottomValue,
@@ -176,7 +208,7 @@ public class PageView extends View {
         if (pageIndex < pageCount - 1) {
             pageIndex++;
             userTurn = true;
-            invalidate();
+            playTurnAnimation(true);
             notifyPage();
         } else if (listener != null) {
             listener.onNextChapter();
@@ -187,7 +219,7 @@ public class PageView extends View {
         if (pageIndex > 0) {
             pageIndex--;
             userTurn = true;
-            invalidate();
+            playTurnAnimation(false);
             notifyPage();
         } else if (listener != null) {
             listener.onPreviousChapter();
@@ -199,6 +231,45 @@ public class PageView extends View {
         userTurn = true;
         invalidate();
         notifyPage();
+    }
+
+    /** 新页从阅读方向轻移 8% 并淡入，160ms 收住；系统关闭动画时直接重绘。 */
+    private void playTurnAnimation(boolean forward) {
+        cancelTurnAnimation();
+        if (!ValueAnimator.areAnimatorsEnabled() || getWidth() <= 0) {
+            invalidate();
+            return;
+        }
+        float start = getWidth() * 0.06f * (forward ? 1f : -1f);
+        ValueAnimator animator = ValueAnimator.ofFloat(start, 0f);
+        animator.setDuration(200);
+        animator.setInterpolator(new PathInterpolator(0.22f, 0.8f, 0.24f, 1f));
+        setAlpha(0.55f);
+        animator.addUpdateListener(animation -> {
+            turnShift = (float) animation.getAnimatedValue();
+            setAlpha(0.55f + 0.45f * animation.getAnimatedFraction());
+            invalidate();
+        });
+        animator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                turnShift = 0f;
+                setAlpha(1f);
+                turnAnimator = null;
+                invalidate();
+            }
+        });
+        turnAnimator = animator;
+        animator.start();
+    }
+
+    private void cancelTurnAnimation() {
+        if (turnAnimator != null) {
+            turnAnimator.cancel();
+            turnAnimator = null;
+        }
+        turnShift = 0f;
+        setAlpha(1f);
     }
 
     @Override
@@ -223,6 +294,7 @@ public class PageView extends View {
     }
 
     private void rebuild() {
+        cancelTurnAnimation();
         int width = Math.max(dp(120), getWidth() - paddingX * 2);
         if (text.isEmpty()) {
             layout = null;
@@ -280,7 +352,7 @@ public class PageView extends View {
         canvas.save();
         canvas.clipRect(paddingX, contentTop, getWidth() - paddingX,
                 Math.min(getHeight() - paddingY - safeBottom - chromeBottom, contentBottom));
-        canvas.translate(paddingX, contentTop - pageTop);
+        canvas.translate(paddingX + turnShift, contentTop - pageTop);
         layout.draw(canvas);
         canvas.restore();
     }
@@ -319,18 +391,19 @@ public class PageView extends View {
     }
 
     /** 段落之间加一点额外间距，避免整页文字过密；首段不加。 */
-    private CharSequence withParagraphGaps(String value) {
+    private SpannableString withParagraphGaps(String value) {
         int gap = Math.round(paint.getTextSize() * 0.35f);
-        if (gap <= 0 || value.length() < 2) {
-            return value;
-        }
         SpannableString spannable = new SpannableString(value);
-        for (int i = 1; i < value.length(); i++) {
-            if (value.charAt(i - 1) == '\n' && value.charAt(i) != '\n') {
-                spannable.setSpan(new ParagraphGapSpan(gap), i, i + 1,
-                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if (gap > 0 && value.length() >= 2) {
+            for (int i = 1; i < value.length(); i++) {
+                if (value.charAt(i - 1) == '\n' && value.charAt(i) != '\n') {
+                    spannable.setSpan(new ParagraphGapSpan(gap), i, i + 1,
+                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                }
             }
         }
+        // 同一份 Spannable 上叠加标点颜色，避免再复制一次正文
+        PunctuationSplitter.apply(spannable, punctEnabled, punctRules, punctColors);
         return spannable;
     }
 

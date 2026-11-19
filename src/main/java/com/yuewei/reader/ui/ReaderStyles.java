@@ -48,6 +48,11 @@ final class ReaderStyles {
         }
     }
 
+    /** 章节标题不参与首行缩进，也不作为首段样式候选。 */
+    static boolean isChapterTitle(String line) {
+        return line != null && CHAPTER_TITLE.matcher(line.stripLeading()).find();
+    }
+
     /** 每个自然段首行缩进两个字，空行保持不变。 */
     static String indent(String content) {
         String[] lines = content.split("\n", -1);
@@ -59,7 +64,7 @@ final class ReaderStyles {
             String line = lines[i];
             if (!line.isBlank()) {
                 String trimmed = line.stripLeading();
-                if (!CHAPTER_TITLE.matcher(trimmed).find()) {
+                if (!isChapterTitle(trimmed)) {
                     sb.append("　　");
                 }
                 sb.append(trimmed);

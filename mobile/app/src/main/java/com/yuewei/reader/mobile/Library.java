@@ -342,6 +342,11 @@ public class Library {
         return new File(new File(root, bookId), index + ".txt");
     }
 
+    /** 书的章节文件目录，供缓存统计与清理使用。 */
+    public File bookDir(String bookId) {
+        return new File(root, bookId);
+    }
+
     public String chapterText(Book book, int index) throws IOException {
         File file = chapterFile(book.id, index);
         if (!file.isFile()) {

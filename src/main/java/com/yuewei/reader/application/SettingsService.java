@@ -14,6 +14,8 @@ public class SettingsService {
     public static final String FONT_FAMILY = "reader.fontFamily";
     public static final String THEME = "reader.theme";
     public static final String TOC_WIDTH = "reader.tocWidth";
+    /** 阅读默认值迁移版本：旧默认 28px / 1.8 只迁移一次。 */
+    public static final String STYLE_VERSION = "reader.styleVersion";
 
     public static final String PUNCT_ENABLED = "reader.punct.enabled";
     public static final String PUNCT_DIALOGUE = "reader.punct.dialogue";
@@ -57,6 +59,19 @@ public class SettingsService {
     public SettingsService(com.yuewei.reader.infrastructure.db.SettingDao dao) {
         this.dao = dao;
         this.cache = dao.all();
+        migrateReaderDefaults();
+    }
+
+    /** 未自定义过排版的用户，从旧默认 28 / 1.8 迁到新默认 18 / 2.0。 */
+    private void migrateReaderDefaults() {
+        if (cache.containsKey(STYLE_VERSION)) {
+            return;
+        }
+        if ("28".equals(cache.get(FONT_SIZE)) && "1.8".equals(cache.get(LINE_SPACING))) {
+            put(FONT_SIZE, "18");
+            put(LINE_SPACING, "2.0");
+        }
+        put(STYLE_VERSION, "2");
     }
 
     public String get(String key, String fallback) {
@@ -86,11 +101,11 @@ public class SettingsService {
     }
 
     public int fontSize() {
-        return Math.max(12, Math.min(32, getInt(FONT_SIZE, 28)));
+        return Math.max(12, Math.min(32, getInt(FONT_SIZE, 18)));
     }
 
     public double lineSpacing() {
-        return Math.max(1.2, Math.min(3.0, getDouble(LINE_SPACING, 1.8)));
+        return Math.max(1.2, Math.min(3.0, getDouble(LINE_SPACING, 2.0)));
     }
 
     public String fontFamily() {

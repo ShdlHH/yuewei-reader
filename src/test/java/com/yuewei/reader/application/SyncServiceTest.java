@@ -237,7 +237,7 @@ class SyncServiceTest {
         assertEquals(2500, ctx.bookService.progress(book.id).charOffset);
         assertEquals(newerRead, ctx.bookService.find(book.id).lastReadAt);
         assertEquals(12, ctx.bookService.find(book.id).chapterCount);
-        assertEquals(28, ctx.settings.fontSize(), "桌面默认字号");
+        assertEquals(18, ctx.settings.fontSize(), "桌面默认字号");
         assertEquals("paper", ctx.settings.theme(), "远端排版设置不应用到本机");
         assertTrue(ctx.settings.punctEnabled());
     }

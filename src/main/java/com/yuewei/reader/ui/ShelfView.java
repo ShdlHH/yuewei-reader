@@ -3,6 +3,7 @@ package com.yuewei.reader.ui;
 import com.yuewei.reader.application.AppContext;
 import com.yuewei.reader.domain.Book;
 import com.yuewei.reader.domain.DownloadRangeType;
+import com.yuewei.reader.domain.ReadingProgress;
 import com.yuewei.reader.domain.SourceType;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -16,28 +17,27 @@ import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 
 /** 书架：搜索、筛选、排序、导入 TXT 与书籍操作。 */
 public class ShelfView implements AppView {
 
-    private static final String[] COVER_COLORS = {
-            "#5b7c99", "#7d6b91", "#6f8f6a", "#b08060", "#8a7a5c",
-            "#5f8a8b", "#96707c", "#6b7fa3", "#7a8b5c", "#8b6f5f"};
-
     private final AppContext ctx;
     private final MainWindow window;
     private final BorderPane root = new BorderPane();
-    private final FlowPane grid = new FlowPane(18, 18);
+    private final VBox rows = new VBox();
+    private final VBox heroHolder = new VBox();
     private final TextField query = new TextField();
     private final ComboBox<String> filter = new ComboBox<>();
     private final ComboBox<String> sort = new ComboBox<>();
@@ -64,23 +64,42 @@ public class ShelfView implements AppView {
 
         Button importButton = Ui.button("导入 TXT", "primary-button");
         importButton.setOnAction(e -> importTxt());
-        Button refreshButton = Ui.button("刷新", "ghost-button");
-        refreshButton.setOnAction(e -> refresh());
+        Button searchButton = Ui.button("搜索", "ghost-button");
+        searchButton.setOnAction(e -> window.show("search"));
+        Button sourcesButton = Ui.button("书源", "ghost-button");
+        sourcesButton.setOnAction(e -> window.show("sources"));
+        Button syncButton = Ui.button("同步", "ghost-button");
+        syncButton.setOnAction(e -> window.syncNow(true));
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        HBox toolbar = new HBox(10, query, filter, sort, spacer, summary, importButton, refreshButton);
-        toolbar.getStyleClass().add("toolbar");
-        toolbar.setAlignment(Pos.CENTER_LEFT);
-        toolbar.setPadding(new Insets(12, 16, 12, 16));
+        Label greeting = Ui.label(greetingText(), "shelf-greeting");
+        Label title = Ui.label("书架", "shelf-title");
+        VBox titles = new VBox(4, greeting, title);
+        HBox header = new HBox(12, titles, spacer, summary, importButton, searchButton,
+                sourcesButton, syncButton);
+        header.getStyleClass().add("shelf-header");
+        header.setAlignment(Pos.CENTER_LEFT);
 
-        grid.setPadding(new Insets(6, 16, 24, 16));
-        ScrollPane scroll = new ScrollPane(grid);
+        HBox tools = new HBox(10, query, filter, sort);
+        tools.getStyleClass().add("shelf-tools");
+        tools.setAlignment(Pos.CENTER_LEFT);
+
+        VBox top = new VBox(header, tools);
+
+        heroHolder.setSpacing(12);
+        rows.setSpacing(0);
+        VBox body = new VBox(24, heroHolder, rows);
+        body.setMaxWidth(980);
+        body.setPadding(new Insets(10, 24, 24, 32));
+        StackPane center = new StackPane(body);
+        center.setAlignment(Pos.TOP_CENTER);
+        ScrollPane scroll = new ScrollPane(center);
         scroll.setFitToWidth(true);
         scroll.getStyleClass().add("shelf-scroll");
 
-        root.setTop(toolbar);
+        root.setTop(top);
         root.setCenter(scroll);
         refresh();
     }
@@ -97,12 +116,13 @@ public class ShelfView implements AppView {
             default -> "recent";
         };
         List<Book> books = ctx.bookService.shelf(query.getText(), type, sortKey);
-        grid.getChildren().clear();
-        for (Book book : books) {
-            grid.getChildren().add(card(book));
+        refreshHero(books);
+        rows.getChildren().clear();
+        for (int i = 0; i < books.size(); i++) {
+            rows.getChildren().add(bookRow(books.get(i), i));
         }
         if (books.isEmpty()) {
-            grid.getChildren().add(emptyState());
+            rows.getChildren().add(emptyState());
         }
         long cacheSize = ctx.bookService.totalCacheSize();
         String text = "共 " + books.size() + " 本 · 缓存 " + Ui.humanSize(cacheSize);
@@ -110,6 +130,57 @@ public class ShelfView implements AppView {
             text += " · 已超出上限，可在设置中清理";
         }
         summary.setText(text);
+    }
+
+    private void refreshHero(List<Book> books) {
+        heroHolder.getChildren().clear();
+        if (!books.isEmpty()) {
+            heroHolder.getChildren().add(heroCard(books.get(0)));
+        }
+    }
+
+    /** 继续阅读：最近一本书的书脊卡片。 */
+    private Node heroCard(Book book) {
+        HBox hero = new HBox(16);
+        hero.getStyleClass().add("hero-book");
+        hero.setAlignment(Pos.CENTER_LEFT);
+
+        ReadingProgress progress = ctx.bookService.progress(book.id);
+        int chapterIndex = progress == null ? 0 : progress.chapterIndex;
+        int total = Math.max(1, book.chapterCount);
+        String chapter = "在读 · 第 " + (chapterIndex + 1) + " 章 · " + progressText(progress, total);
+
+        Label title = Ui.label(book.title, "hero-title");
+        Label meta = Ui.label(chapter, "hero-meta");
+        VBox info = new VBox(7, title, meta);
+        HBox.setHgrow(info, Priority.ALWAYS);
+
+        Label action = Ui.label("继续阅读", "hero-continue");
+        hero.getChildren().addAll(verticalSpine(book.title), info, action);
+        hero.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 1) {
+                window.openBook(book);
+            }
+        });
+        return hero;
+    }
+
+    private String greetingText() {
+        LocalDate now = LocalDate.now();
+        return now.getMonthValue() + " 月 " + now.getDayOfMonth() + " 日 · 夜读";
+    }
+
+    /** 竖排书脊：逐字排布，最多五个字，超出只取前四字。 */
+    private Node verticalSpine(String title) {
+        VBox spine = new VBox(0);
+        spine.getStyleClass().add("hero-spine");
+        spine.setAlignment(Pos.CENTER);
+        String text = title == null || title.isBlank() ? "书" : title.strip();
+        int limit = Math.min(5, text.length());
+        for (int i = 0; i < limit; i++) {
+            spine.getChildren().add(new Label(String.valueOf(text.charAt(i))));
+        }
+        return spine;
     }
 
     public void importTxt() {
@@ -157,45 +228,48 @@ public class ShelfView implements AppView {
                 });
     }
 
-    private Node card(Book book) {
-        VBox box = new VBox(6);
-        box.getStyleClass().add("book-card");
-        box.setPrefWidth(150);
+    /** 书目行：序号 + 书名/来源章节 + 阅读百分比，行间以发丝线分隔。 */
+    private Node bookRow(Book book, int position) {
+        Label index = Ui.label(String.format(Locale.ROOT, "%02d", position + 1), "shelf-index");
+        index.setMinWidth(28);
 
-        Label cover = new Label(initials(book.title));
-        cover.getStyleClass().add("book-cover");
-        cover.setStyle("-fx-background-color:" + colorFor(book.title) + ";");
-        cover.setPrefSize(142, 178);
-        cover.setAlignment(Pos.CENTER);
-        cover.setWrapText(true);
+        String author = book.author == null || book.author.isBlank() ? "未知" : book.author;
+        String mode = book.isOnline() ? "在线阅读" : "本地 TXT";
+        ReadingProgress progress = ctx.bookService.progress(book.id);
+        int total = Math.max(1, book.chapterCount);
+        String chapter = progress == null
+                ? "共 " + total + " 章"
+                : "读至第 " + (progress.chapterIndex + 1) + " 章";
 
-        Label title = Ui.label(book.title, "book-title");
-        title.setWrapText(true);
-        title.setMaxWidth(142);
+        Label title = Ui.label(book.title, "shelf-row-title");
+        Label meta = Ui.label(author + " · " + chapter + " · " + mode, "shelf-row-meta");
+        VBox info = new VBox(4, title, meta);
+        HBox.setHgrow(info, Priority.ALWAYS);
 
-        String metaText = (book.author == null || book.author.isBlank() ? "未知" : book.author)
-                + (book.isOnline() ? " · " + (book.sourceMissing ? "书源已删除" : book.sourceName) : " · 本地");
-        Label meta = Ui.label(metaText, "book-meta");
-        meta.setWrapText(true);
-        meta.setMaxWidth(142);
+        Label percent = Ui.label(progressText(progress, total), "shelf-row-pct");
+        percent.setMinWidth(64);
+        percent.setAlignment(Pos.CENTER_RIGHT);
 
-        HBox badges = new HBox(4);
-        if (book.offline) {
-            badges.getChildren().add(Ui.label("离线可读", "badge-offline"));
-        }
-        if (book.isOnline() && book.sourceMissing) {
-            badges.getChildren().add(Ui.label("书源缺失", "badge-warn"));
-        }
-
-        box.getChildren().addAll(cover, title, meta, badges);
-        box.setOnMouseClicked(event -> {
+        HBox row = new HBox(14, index, info, percent);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.getStyleClass().add("shelf-row");
+        row.setOnMouseClicked(event -> {
             if (event.getClickCount() == 1) {
                 window.openBook(book);
             }
         });
-        box.setOnContextMenuRequested(event -> contextMenu(book, box)
-                .show(box, event.getScreenX(), event.getScreenY()));
-        return box;
+        row.setOnContextMenuRequested(event -> contextMenu(book, row)
+                .show(row, event.getScreenX(), event.getScreenY()));
+        return row;
+    }
+
+    private String progressText(ReadingProgress progress, int total) {
+        if (progress == null) {
+            return "未读";
+        }
+        double ratio = (progress.chapterIndex + Math.max(0, progress.charOffset) / 10000.0) / total;
+        ratio = Math.max(0, Math.min(1, ratio));
+        return String.format(Locale.ROOT, "%.1f%%", ratio * 100);
     }
 
     private ContextMenu contextMenu(Book book, Node anchor) {
@@ -259,6 +333,8 @@ public class ShelfView implements AppView {
                 + "\n加入时间：" + Ui.formatTime(book.addedAt)
                 + (book.intro == null || book.intro.isBlank() ? "" : "\n\n简介：" + book.intro));
         alert.getDialogPane().setPrefWidth(480);
+        alert.initOwner(window.stage());
+        Ui.styleDialog(alert, window.stage());
         alert.show();
     }
 
@@ -290,18 +366,6 @@ public class ShelfView implements AppView {
                 Ui.label("导入本地 TXT，或到「搜索」里用书源找一本书", "muted"),
                 Ui.label("快捷键 Ctrl+O 导入 · Ctrl+F 全网搜索", "muted"));
         return box;
-    }
-
-    private String initials(String title) {
-        if (title == null || title.isBlank()) {
-            return "书";
-        }
-        return title.length() <= 2 ? title : title.substring(0, 2);
-    }
-
-    private String colorFor(String title) {
-        int hash = title == null ? 0 : Math.abs(title.hashCode());
-        return COVER_COLORS[hash % COVER_COLORS.length];
     }
 
     @Override

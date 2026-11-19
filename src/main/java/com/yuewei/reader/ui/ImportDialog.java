@@ -40,11 +40,12 @@ public final class ImportDialog {
         dialog.setTitle("导入 TXT");
         dialog.initOwner(owner);
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        Ui.styleDialog(dialog, owner);
 
         GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(8);
-        grid.setPadding(new Insets(12));
+        grid.setHgap(Ui.SPACE_FORM);
+        grid.setVgap(Ui.SPACE_CARD);
+        grid.setPadding(new Insets(Ui.SPACE_FORM + 2));
 
         Label fileInfo = Ui.label(preview.fileName + " · " + Ui.humanSize(preview.fileSize)
                 + " · 编码 " + (preview.charset == null ? "未知" : preview.charset.name()), "muted");

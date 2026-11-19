@@ -40,6 +40,9 @@ public class OnlineService {
         List<Hit> hits = new ArrayList<>();
         StringBuilder errors = new StringBuilder();
         for (SourceStore.Source source : sources) {
+            if (!source.enabled) {
+                continue;
+            }
             try {
                 JsonNode rules = rules(source);
                 String template = rules.path("searchUrl").asText("");

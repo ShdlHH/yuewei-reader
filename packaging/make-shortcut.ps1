@@ -22,9 +22,17 @@ if (-not (Test-Path $exe)) {
 
 $link = Join-Path $dist "latest"
 if (Test-Path $link) {
-    cmd /c rmdir "$link" | Out-Null
+    $item = Get-Item $link -Force
+    if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+        [System.IO.Directory]::Delete($link)
+    } else {
+        Remove-Item -LiteralPath $link -Recurse -Force
+    }
+    if (Test-Path $link) {
+        throw "无法清理旧的 latest"
+    }
 }
-cmd /c mklink /J "$link" "$targetDir" | Out-Null
+New-Item -ItemType Junction -Path $link -Target $targetDir | Out-Null
 if (-not (Test-Path $link)) {
     throw "创建 latest 目录联接失败"
 }

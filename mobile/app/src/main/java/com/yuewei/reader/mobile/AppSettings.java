@@ -7,11 +7,27 @@ import android.content.SharedPreferences;
 public class AppSettings {
 
     private static final String FILE = "yuewei-settings";
+    /** 视觉升级：旧默认 18sp/1.6 一次性迁移到 16sp/2.1，用户自调过的值不动。 */
+    private static final String MIGRATED_VISUAL = "reader.visual.migrated";
 
     private final SharedPreferences prefs;
 
     public AppSettings(Context context) {
         prefs = context.getSharedPreferences(FILE, Context.MODE_PRIVATE);
+        migrateVisualDefaults();
+    }
+
+    private void migrateVisualDefaults() {
+        if (prefs.getBoolean(MIGRATED_VISUAL, false)) {
+            return;
+        }
+        int size = prefs.getInt("reader.fontSize", 18);
+        float spacing = prefs.getFloat("reader.lineSpacing", 1.6f);
+        SharedPreferences.Editor editor = prefs.edit().putBoolean(MIGRATED_VISUAL, true);
+        if (size == 18 && Math.abs(spacing - 1.6f) < 0.01f) {
+            editor.putInt("reader.fontSize", 16).putFloat("reader.lineSpacing", 2.1f);
+        }
+        editor.apply();
     }
 
     public boolean syncEnabled() {
@@ -46,11 +62,15 @@ public class AppSettings {
     }
 
     public int fontSize() {
-        return Math.max(12, Math.min(32, prefs.getInt("reader.fontSize", 18)));
+        return Math.max(12, Math.min(32, prefs.getInt("reader.fontSize", 16)));
     }
 
     public float lineSpacing() {
-        return Math.max(1.2f, Math.min(3.0f, prefs.getFloat("reader.lineSpacing", 1.6f)));
+        return Math.max(1.2f, Math.min(3.0f, prefs.getFloat("reader.lineSpacing", 2.1f)));
+    }
+
+    public String fontKey() {
+        return prefs.getString("reader.fontKey", MobileFonts.KEY_SERIF);
     }
 
     public String theme() {
@@ -58,11 +78,67 @@ public class AppSettings {
     }
 
     public void saveReader(int fontSize, float lineSpacing, String theme) {
+        saveReader(fontSize, lineSpacing, theme, fontKey());
+    }
+
+    public void saveReader(int fontSize, float lineSpacing, String theme, String fontKey) {
         prefs.edit()
                 .putInt("reader.fontSize", Math.max(12, Math.min(32, fontSize)))
                 .putFloat("reader.lineSpacing", Math.max(1.2f, Math.min(3.0f, lineSpacing)))
                 .putString("reader.theme", theme == null ? "paper" : theme)
+                .putString("reader.fontKey", fontKey == null ? MobileFonts.KEY_SERIF : fontKey)
                 .apply();
+    }
+
+    /** 标点着色总开关，默认开启。 */
+    public boolean punctEnabled() {
+        return prefs.getBoolean("reader.punct.enabled", true);
+    }
+
+    public boolean punctDialogue() {
+        return prefs.getBoolean("reader.punct.dialogue", true);
+    }
+
+    public boolean punctStop() {
+        return prefs.getBoolean("reader.punct.stop", true);
+    }
+
+    public boolean punctAsk() {
+        return prefs.getBoolean("reader.punct.ask", true);
+    }
+
+    public boolean punctExcl() {
+        return prefs.getBoolean("reader.punct.excl", true);
+    }
+
+    public boolean punctEllipsis() {
+        return prefs.getBoolean("reader.punct.ellipsis", false);
+    }
+
+    public boolean punctParen() {
+        return prefs.getBoolean("reader.punct.paren", false);
+    }
+
+    public void savePunctuation(boolean enabled, boolean dialogue, boolean stop, boolean ask,
+                                boolean excl, boolean ellipsis, boolean paren) {
+        prefs.edit()
+                .putBoolean("reader.punct.enabled", enabled)
+                .putBoolean("reader.punct.dialogue", dialogue)
+                .putBoolean("reader.punct.stop", stop)
+                .putBoolean("reader.punct.ask", ask)
+                .putBoolean("reader.punct.excl", excl)
+                .putBoolean("reader.punct.ellipsis", ellipsis)
+                .putBoolean("reader.punct.paren", paren)
+                .apply();
+    }
+
+    /** 在线书正文缓存上限，默认 200MB。 */
+    public int cacheLimitMb() {
+        return Math.max(50, Math.min(2048, prefs.getInt("storage.cacheLimitMb", 200)));
+    }
+
+    public void saveCacheLimit(int mb) {
+        prefs.edit().putInt("storage.cacheLimitMb", Math.max(50, Math.min(2048, mb))).apply();
     }
 
     /** 自动同步开关，默认开启；关闭后只能手动点同步。 */

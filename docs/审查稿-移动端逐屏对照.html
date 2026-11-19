@@ -1,0 +1,2081 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="paper">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>阅微 · 移动端视觉审查稿｜逐屏朱批</title>
+<style>
+  :root {
+    --paper: #F4EDDF;
+    --paper-2: #EAE0CB;
+    --card: #FBF6EA;
+    --card-2: #F7F0E1;
+    --ink: #221D18;
+    --ink-2: #4B4238;
+    --muted: #8B7F6C;
+    --faint: #B7AB96;
+    --accent: #A63B2C;
+    --accent-2: #C76A53;
+    --brass: #A9834D;
+    --warn: #8C5A32;
+    --line: #DED1B8;
+    --line-soft: rgba(94, 78, 54, .14);
+    --device: #131313;
+    --shadow: 0 26px 50px -30px rgba(52, 40, 24, .55);
+    --serif: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", "STSong", "SimSun", serif;
+    --sans: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+    --display: "STKaiti", "Kaiti SC", "KaiTi", var(--serif);
+  }
+
+  :root[data-theme="night"] {
+    --paper: #141519;
+    --paper-2: #1B1D23;
+    --card: #191B21;
+    --card-2: #1E2027;
+    --ink: #D2CEC4;
+    --ink-2: #A9A399;
+    --muted: #8B877D;
+    --faint: #5E5B54;
+    --accent: #D07A66;
+    --accent-2: #E29A86;
+    --brass: #B99A68;
+    --warn: #C08A5E;
+    --line: #2D3038;
+    --line-soft: rgba(210, 206, 196, .10);
+    --shadow: 0 26px 50px -26px rgba(0, 0, 0, .85);
+  }
+
+  :root[data-theme="green"] {
+    --paper: #E8F0E3;
+    --paper-2: #DCE8D5;
+    --card: #F2F8EE;
+    --card-2: #EAF2E5;
+    --ink: #22301F;
+    --ink-2: #45533F;
+    --muted: #67735F;
+    --faint: #9AAA94;
+    --accent: #3F5C3D;
+    --accent-2: #5E7C58;
+    --brass: #8C7A4E;
+    --warn: #8A5A2B;
+    --line: #C9DAC2;
+    --line-soft: rgba(52, 74, 46, .14);
+    --shadow: 0 26px 50px -30px rgba(34, 48, 31, .4);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    -webkit-font-smoothing: antialiased;
+    transition: background .45s ease, color .45s ease;
+    position: relative;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: .5;
+    background-image:
+      radial-gradient(circle at 18% 8%, rgba(255,255,255,.52), transparent 56%),
+      radial-gradient(circle at 86% 92%, rgba(120,95,60,.10), transparent 60%),
+      repeating-linear-gradient(0deg, rgba(80,60,35,.018) 0 1px, transparent 1px 4px);
+    mix-blend-mode: multiply;
+  }
+  :root[data-theme="night"] body::before { mix-blend-mode: screen; opacity: .3; }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 60px 40px 120px;
+  }
+
+  /* ---------------- 封面 ---------------- */
+  .cover { position: relative; padding: 20px 0 46px; border-bottom: 1px solid var(--line); }
+  .cover .seal {
+    position: absolute; right: 6px; top: 4px;
+    width: 60px; height: 60px;
+    background: var(--accent); color: #FFF6EA;
+    font: 700 22px/1 var(--serif);
+    letter-spacing: .1em;
+    display: grid; place-items: center;
+    border-radius: 6px;
+    transform: rotate(-2.5deg);
+    box-shadow: inset 0 0 0 2px rgba(255,246,234,.35), 0 10px 30px -14px rgba(120,40,28,.6);
+    user-select: none;
+  }
+  .cover .proof {
+    position: absolute; right: 4px; top: 84px;
+    padding: 6px 10px;
+    border: 1px dashed color-mix(in srgb, var(--accent) 50%, var(--line));
+    color: var(--accent);
+    font: 500 9.5px/1 var(--sans);
+    letter-spacing: .2em;
+    transform: rotate(-2deg);
+    opacity: .82;
+  }
+  .eyebrow {
+    margin: 0 0 22px;
+    font: 500 10.5px/1 var(--sans);
+    letter-spacing: .32em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .cover h1 {
+    margin: 0;
+    font-family: var(--display);
+    font-size: clamp(48px, 7vw, 78px);
+    line-height: 1.04;
+    letter-spacing: .05em;
+    font-weight: 500;
+  }
+  .cover h1 em { font-style: normal; color: var(--accent); }
+  .cover .lede {
+    margin: 24px 0 0;
+    max-width: 780px;
+    font-size: 16.5px;
+    line-height: 2;
+    color: var(--ink-2);
+  }
+  .cover .meta {
+    margin-top: 30px;
+    display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center;
+  }
+  .tag {
+    padding: 7px 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font: 11px/1.5 var(--sans);
+    color: var(--muted);
+    letter-spacing: .06em;
+  }
+  .tag.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 32%, var(--line)); }
+
+  .toc-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 30px; }
+  .toc-strip a {
+    font: 11.5px/1 var(--sans);
+    letter-spacing: .05em;
+    color: var(--ink-2);
+    text-decoration: none;
+    padding: 9px 13px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--card) 60%, transparent);
+    transition: color .2s, border-color .2s, background .2s;
+  }
+  .toc-strip a:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+  .toc-strip a i { font-style: normal; color: var(--faint); margin-right: 7px; font-size: 10px; letter-spacing: .1em; }
+
+  /* ---------------- 图例 ---------------- */
+  .legend {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 1px; background: var(--line);
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    margin-top: 26px;
+  }
+  .legend > div {
+    background: var(--card);
+    padding: 13px 15px;
+    display: flex; align-items: center; gap: 9px;
+    font: 11.5px/1.6 var(--sans); color: var(--ink-2);
+  }
+  .legend b { font-weight: 500; color: var(--ink); }
+  .legend .mark { width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; font: 700 8px/1 var(--sans); color: #FFF6EA; flex: none; }
+  .legend .mark.warn { background: var(--warn); }
+  .legend .mark.acc { background: var(--accent); }
+  .legend .line { width: 18px; height: 1px; background: var(--faint); flex: none; }
+
+  /* ---------------- 章节 ---------------- */
+  section { margin-top: 72px; }
+  .label {
+    display: flex; align-items: center; gap: 14px;
+    font: 500 10.5px/1 var(--sans);
+    letter-spacing: .3em; color: var(--muted);
+    text-transform: uppercase;
+  }
+  .label::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  h2 {
+    margin: 22px 0 10px;
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: clamp(28px, 3.4vw, 40px);
+    line-height: 1.34;
+    letter-spacing: .03em;
+  }
+  .sub { margin: 0 0 32px; max-width: 800px; color: var(--ink-2); font-size: 15px; line-height: 1.95; }
+
+  .principles {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 1px; background: var(--line);
+    border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+  }
+  .principle { background: var(--card); padding: 24px 22px 28px; }
+  .principle .no { font: 500 11px/1 var(--sans); letter-spacing: .2em; color: var(--accent); }
+  .principle h3 { margin: 16px 0 10px; font-size: 19px; font-weight: 500; letter-spacing: .04em; }
+  .principle p { margin: 0; color: var(--ink-2); font-size: 13.5px; line-height: 1.9; }
+  .principle p b { font-weight: 500; color: var(--ink); }
+
+  /* ---------------- 屏头 ---------------- */
+  .sec-head {
+    display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: baseline;
+    padding-top: 18px; border-top: 1px solid var(--line);
+  }
+  .sec-head .no { font: 500 11px/1 var(--sans); letter-spacing: .18em; color: var(--accent); flex: none; padding-top: 6px; }
+  .sec-head h3 { margin: 0; font-family: var(--display); font-size: 27px; font-weight: 500; letter-spacing: .06em; }
+  .sec-head .route {
+    margin-left: auto;
+    font: 10.5px/1 var(--sans); letter-spacing: .06em; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px; padding: 5px 9px;
+    background: color-mix(in srgb, var(--card) 60%, transparent);
+  }
+  .sec-head .judge {
+    flex-basis: 100%; margin: 0; max-width: 860px;
+    font: 12.5px/1.75 var(--sans); color: var(--muted);
+  }
+  .sec-head .judge b { color: var(--warn); font-weight: 500; }
+
+  .block-title {
+    display: flex; align-items: baseline; gap: 12px;
+    margin: 34px 0 0; padding-bottom: 10px;
+    border-bottom: 1px dashed var(--line-soft);
+  }
+  .block-title h4 { margin: 0; font: 500 17px/1.2 var(--display); letter-spacing: .06em; }
+  .block-title span { font: 10.5px/1 var(--sans); color: var(--faint); letter-spacing: .08em; }
+
+  /* ---------------- 手机 ---------------- */
+  .batch { display: flex; flex-wrap: wrap; gap: 26px 30px; justify-content: center; margin-top: 24px; }
+  .ph { width: 300px; flex: none; }
+  .ph .cap {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    margin-bottom: 8px;
+    font: 10px/1.45 var(--sans); letter-spacing: .12em; color: var(--muted);
+  }
+  .ph .cap .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 7px; }
+  .ph .cap.before .dot { background: var(--warn); }
+  .ph .cap.after .dot { background: var(--accent); }
+  .ph .cap .hint { letter-spacing: .04em; color: var(--faint); text-align: right; }
+
+  .phone {
+    width: 300px; height: 649px;
+    border: 9px solid var(--device);
+    border-radius: 40px;
+    position: relative;
+    overflow: hidden;
+    background: var(--paper);
+    box-shadow: var(--shadow);
+  }
+  .phone::before {
+    content: "";
+    position: absolute; left: 50%; top: 7px; transform: translateX(-50%);
+    width: 78px; height: 18px; border-radius: 999px;
+    background: var(--device);
+    z-index: 40;
+  }
+
+  .p-status {
+    position: relative; z-index: 6;
+    height: 30px;
+    padding: 9px 18px 0;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    font: 600 8px/1 var(--sans); color: var(--ink);
+  }
+  .p-status span:last-child { font-weight: 500; letter-spacing: .04em; }
+
+  .p-body {
+    position: absolute; top: 30px; left: 0; right: 0; bottom: 0;
+    padding: 5px 16px 0;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  .p-head { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; }
+  .p-seal {
+    width: 29px; height: 29px; border-radius: 4px; flex: none;
+    background: var(--accent); color: #FFF6EA;
+    display: grid; place-items: center;
+    font: 700 10px/1 var(--serif);
+    transform: rotate(-2deg);
+    box-shadow: inset 0 0 0 1.5px rgba(255,246,234,.35);
+  }
+  .p-brand { font: 500 20px/1 var(--display); letter-spacing: .1em; color: var(--ink); }
+  .p-page-title { font: 500 17px/1 var(--display); letter-spacing: .08em; color: var(--ink); }
+  .p-sync { margin-top: 3px; font: 7.5px/1.35 var(--sans); color: var(--muted); letter-spacing: .04em; }
+  .p-gear {
+    margin-left: auto; width: 27px; height: 27px; flex: none;
+    border: 1px solid var(--line); border-radius: 50%;
+    display: grid; place-items: center;
+    font: 11px/1 var(--sans); color: var(--muted);
+  }
+  .p-pill {
+    flex: 1; text-align: center;
+    padding: 6px 0; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--card);
+    font: 8.5px/1 var(--sans); color: var(--ink-2); white-space: nowrap;
+  }
+  .p-pill.pri { background: var(--accent); border-color: var(--accent); color: #FFF6EA; }
+  .p-pill.sm { flex: none; padding: 6px 9px; }
+  .p-acts { display: flex; gap: 4px; padding: 5px 0 8px; }
+
+  .p-hero {
+    border: 1px solid var(--line); border-radius: 12px;
+    background: var(--card); padding: 10px;
+    display: flex; align-items: center; gap: 9px;
+  }
+  .p-spine-bad {
+    width: 36px; height: 60px; flex: none; border-radius: 4px;
+    background: var(--accent); color: #FFF6EA;
+    display: grid; place-items: center;
+    font: 500 10px/1 var(--serif); letter-spacing: .12em;
+  }
+  .p-spine {
+    width: 34px; height: 64px; flex: none;
+    border-radius: 2px 4px 4px 2px;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 74%, #000 26%), var(--accent) 48%, var(--accent-2));
+    color: #FFF6EA;
+    writing-mode: vertical-rl;
+    display: grid; place-items: center;
+    font: 500 10px/1 var(--display); letter-spacing: .2em;
+    padding-top: 4px;
+    box-shadow: inset -3px 0 0 rgba(0,0,0,.18), inset 1px 0 0 rgba(255,246,234,.24);
+  }
+  .p-hero-info { flex: 1; min-width: 0; }
+  .p-eyebrow { font: 7px/1 var(--sans); letter-spacing: .16em; color: var(--muted); }
+  .p-booktitle { margin-top: 3px; font: 500 12.5px/1.25 var(--serif); letter-spacing: .04em; color: var(--ink); }
+  .p-meta { margin-top: 3px; font: 7.5px/1.5 var(--sans); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .p-line { height: 2px; background: var(--line); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .p-line i { display: block; height: 2px; background: var(--accent); }
+  .p-link { font: 7.5px/1 var(--sans); color: var(--accent); letter-spacing: .04em; white-space: nowrap; }
+
+  .p-list { margin-top: 6px; overflow: hidden; }
+  .p-row { display: flex; gap: 7px; padding: 7px 0; border-bottom: 1px solid var(--line-soft); align-items: flex-start; }
+  .p-idx { width: 14px; flex: none; padding-top: 2px; font: 7px/1.4 ui-monospace, Consolas, monospace; color: var(--faint); }
+  .p-row-info { flex: 1; min-width: 0; }
+  .p-row-title { font: 11.5px/1.3 var(--serif); color: var(--ink); letter-spacing: .03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .p-row-meta { margin-top: 2px; font: 7.5px/1.5 var(--sans); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .p-pct { flex: none; font: 8px/1.4 ui-monospace, Consolas, monospace; color: var(--accent); }
+  .p-miniline { height: 2px; background: var(--line); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+  .p-miniline i { display: block; height: 2px; background: var(--accent); }
+
+  /* ---------------- 阅读 ---------------- */
+  .reading {
+    position: absolute; inset: 0;
+    padding: 32px 18px 0;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .reading.panel-open { padding-top: 82px; padding-bottom: 126px; }
+  .prose { font: 11.8px/1.95 var(--serif); color: var(--ink); }
+  .prose p { margin: 0 0 7px; text-indent: 2em; }
+  .prose p.first { text-indent: 0; font-family: var(--display); font-size: 13px; letter-spacing: .06em; margin-bottom: 8px; }
+  .dlg { color: var(--accent); }
+  .stop { color: #2F6FA8; }
+  :root[data-theme="night"] .stop { color: #6FA3D0; }
+  :root[data-theme="green"] .stop { color: #3A6B93; }
+
+  .reader-foot {
+    margin-top: auto;
+    padding: 7px 2px 12px;
+    display: flex; justify-content: space-between; gap: 10px;
+    font: 7.5px/1.4 var(--sans); color: var(--muted); letter-spacing: .06em;
+    border-top: 1px solid var(--line-soft);
+  }
+  .reader-foot .pct { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .hint-chip {
+    align-self: center;
+    margin-top: auto; margin-bottom: 8px;
+    padding: 6px 10px;
+    border: 1px solid var(--line); border-radius: 999px;
+    background: var(--card);
+    font: 8px/1 var(--sans); color: var(--ink-2); letter-spacing: .06em;
+  }
+
+  .chrome-top {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+    padding: 33px 14px 9px;
+    display: flex; align-items: center; gap: 8px;
+    background: var(--panel, var(--paper-2));
+    border-bottom: 1px solid var(--line);
+  }
+  .c-back {
+    width: 27px; height: 27px; flex: none;
+    border: 1px solid var(--line); border-radius: 50%;
+    display: grid; place-items: center;
+    font: 12px/1 var(--sans); color: var(--ink);
+  }
+  .c-back.plain { border: 0; width: 22px; font-size: 16px; }
+  .c-title-block { flex: 1; min-width: 0; }
+  .c-book { font: 11.5px/1.2 var(--serif); color: var(--ink); letter-spacing: .05em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .c-chapter { margin-top: 2px; font: 7px/1.3 var(--sans); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .c-tools { display: flex; gap: 4px; flex: none; }
+  .c-pill {
+    padding: 5px 8px; border: 1px solid var(--line); border-radius: 999px;
+    font: 7.5px/1 var(--sans); color: var(--ink-2); white-space: nowrap;
+  }
+
+  .chrome-bottom {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 10;
+    padding: 9px 14px 15px;
+    background: var(--panel, var(--paper-2));
+    border-top: 1px solid var(--line);
+  }
+  .chapter-meta { font: 7px/1 var(--sans); color: var(--muted); letter-spacing: .08em; padding: 2px 1px 7px; }
+  .chapter-row { display: flex; align-items: center; gap: 6px; }
+  .ch-side { font: 7.5px/1 var(--sans); color: var(--ink-2); white-space: nowrap; padding: 5px 0; }
+  .ch-side.box { width: 34px; height: 30px; border: 1px solid var(--line); border-radius: 8px; display: grid; place-items: center; color: var(--ink-2); }
+  .ch-track { flex: 1; height: 2px; background: var(--line); position: relative; border-radius: 2px; }
+  .ch-track i { position: absolute; inset: 0 auto 0 0; width: 42%; background: var(--accent); border-radius: 2px; }
+  .ch-track b {
+    position: absolute; left: 42%; top: 50%; width: 9px; height: 9px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%; background: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+  .panel-items { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 8px; }
+  .panel-item { display: grid; justify-items: center; gap: 4px; padding-top: 5px; }
+  .panel-item .g { font: 13px/1 var(--serif); color: var(--ink); }
+  .panel-item .g.line { font: 12px/1 var(--sans); }
+  .panel-item .l { font: 7px/1 var(--sans); color: var(--muted); letter-spacing: .08em; }
+
+  /* ---------------- sheet / dialog ---------------- */
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 12;
+    height: 78%;
+    background: var(--paper);
+    border-radius: 16px 16px 0 0;
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -22px 40px -30px rgba(40, 30, 16, .55);
+    padding: 9px 14px 14px;
+    display: flex; flex-direction: column;
+  }
+  .sheet.type-sheet { height: 64%; }
+  .sheet.sources-sheet { height: 52%; }
+  .grabber { width: 32px; height: 3px; border-radius: 2px; background: var(--line); margin: 0 auto 8px; flex: none; }
+  .sheet-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .sheet-title { font: 500 14px/1 var(--display); letter-spacing: .08em; color: var(--ink); }
+  .sheet-count { font: 7px/1 var(--sans); color: var(--muted); letter-spacing: .06em; }
+  .searchbox {
+    margin-top: 8px; height: 27px; flex: none;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--bg, var(--paper-2));
+    display: flex; align-items: center; padding: 0 8px;
+    font: 7.5px/1 var(--sans); color: var(--muted); letter-spacing: .04em;
+  }
+  .toc-list { margin-top: 8px; overflow: hidden; flex: 1; }
+  .toc-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 4px; border-bottom: 1px solid var(--line-soft);
+    font: 10px/1.4 var(--serif); color: var(--ink-2);
+  }
+  .toc-row .no { width: 22px; flex: none; font: 7px/1.5 ui-monospace, Consolas, monospace; color: var(--faint); }
+  .toc-row .now {
+    margin-left: auto; flex: none;
+    font: 6.5px/1 var(--sans); color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+    border-radius: 999px; padding: 1px 4px;
+  }
+  .toc-row.on {
+    color: var(--accent);
+    background: var(--card);
+    box-shadow: inset 2px 0 0 var(--accent);
+    padding-left: 8px;
+  }
+  .toc-row.on .no { color: var(--accent); }
+
+  .dialog-wrap {
+    position: absolute; inset: 0; z-index: 15;
+    background: rgba(20, 16, 10, .38);
+    display: grid; place-items: center;
+    padding: 24px;
+  }
+  :root[data-theme="night"] .dialog-wrap { background: rgba(0, 0, 0, .55); }
+  .dialog {
+    width: 100%;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 13px 13px 10px;
+    box-shadow: 0 20px 40px -24px rgba(0,0,0,.5);
+  }
+  .dialog-title { font: 500 13px/1 var(--serif); color: var(--ink); letter-spacing: .06em; }
+  .dialog .searchbox { background: var(--bg, var(--paper-2)); }
+  .dialog-list { margin-top: 8px; }
+  .dialog-row { padding: 8px 6px; border-bottom: 1px solid var(--line-soft); font: 10px/1.4 var(--serif); color: var(--ink-2); }
+  .dialog-row.on { background: var(--card); color: var(--accent); border-radius: 6px; box-shadow: inset 2px 0 0 var(--accent); }
+  .dialog-actions { margin-top: 8px; text-align: right; font: 7.5px/1 var(--sans); color: var(--muted); padding: 4px 2px 0; }
+
+  /* 排版面板 */
+  .type-preview {
+    margin-top: 9px;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--card); padding: 10px 11px;
+    font: 10.5px/1.9 var(--serif); color: var(--ink);
+  }
+  .type-preview .first { font-family: var(--display); letter-spacing: .05em; }
+  .seg {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px;
+    margin-top: 8px; padding: 3px;
+    border: 1px solid var(--line); border-radius: 999px;
+    background: var(--bg, var(--paper-2));
+  }
+  .seg span { text-align: center; padding: 6px 0; border-radius: 999px; font: 7.5px/1 var(--sans); color: var(--muted); }
+  .seg span.on { background: var(--ink); color: var(--paper); }
+  .slider-row { display: flex; align-items: center; gap: 6px; margin-top: 9px; }
+  .slider-row .lab { width: 24px; flex: none; font: 7.5px/1 var(--sans); color: var(--ink-2); }
+  .slider-row .val { width: 20px; flex: none; text-align: right; font: 7.5px/1 ui-monospace, Consolas, monospace; color: var(--muted); }
+  .s-track { flex: 1; height: 2px; background: var(--line); position: relative; border-radius: 2px; }
+  .s-track i { position: absolute; inset: 0 auto 0 0; width: 56%; background: var(--accent); border-radius: 2px; }
+  .s-track b {
+    position: absolute; left: 56%; top: 50%; width: 8px; height: 8px;
+    transform: translate(-50%, -50%); border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+  .font-row {
+    margin-top: 9px; height: 27px;
+    border: 1px solid var(--line); border-radius: 7px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 8px; font: 7.5px/1 var(--sans); color: var(--ink-2);
+  }
+  .font-row .mini { color: var(--accent); }
+
+  /* ---------------- 搜索 ---------------- */
+  .p-searchbar { display: flex; gap: 5px; padding: 4px 0 8px; }
+  .p-input {
+    flex: 1; height: 28px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--bg, var(--paper-2));
+    display: flex; align-items: center; padding: 0 8px;
+    font: 7.5px/1 var(--sans); color: var(--muted);
+  }
+  .p-input.pri-border { border-color: color-mix(in srgb, var(--accent) 30%, var(--line)); }
+  .p-btn {
+    flex: none; padding: 0 10px; height: 28px;
+    display: grid; place-items: center;
+    border-radius: 8px; border: 1px solid var(--accent);
+    background: var(--accent); color: #FFF6EA;
+    font: 7.5px/1 var(--sans);
+  }
+  .p-count { margin-left: auto; font: 7px/1 var(--sans); color: var(--muted); white-space: nowrap; }
+  .p-progress { height: 2px; background: var(--line); border-radius: 2px; overflow: hidden; margin: 2px 0 5px; }
+  .p-progress i { display: block; height: 2px; width: 38%; background: var(--accent); border-radius: 2px; }
+  .p-progress-note { font: 7px/1 var(--sans); color: var(--muted); padding-bottom: 6px; }
+
+  .p-result { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
+  .p-thumb {
+    width: 30px; height: 42px; flex: none; border-radius: 3px;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 74%, #000 26%), var(--accent-2));
+    color: #FFF6EA; display: grid; place-items: center;
+    writing-mode: vertical-rl; font: 500 8px/1 var(--display); letter-spacing: .12em;
+    padding-top: 3px;
+  }
+  .p-result-info { flex: 1; min-width: 0; }
+  .p-result-title { font: 11px/1.3 var(--serif); color: var(--ink); letter-spacing: .03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .p-result-meta { margin-top: 2px; font: 7px/1.45 var(--sans); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .p-add {
+    flex: none; font: 7px/1 var(--sans); color: var(--ink-2);
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 4px 7px; background: var(--card);
+  }
+  .p-added { flex: none; font: 7px/1 var(--sans); color: var(--faint); }
+
+  .states { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 20px; }
+  .state { border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 14px 16px; }
+  .state-k { font: 500 9.5px/1 var(--sans); letter-spacing: .16em; color: var(--muted); }
+  .state-p { margin-top: 8px; font: 13px/1.65 var(--serif); color: var(--ink-2); }
+  .state-btn { display: inline-block; margin-top: 9px; font: 10.5px/1 var(--sans); color: var(--accent); border-bottom: 1px solid var(--accent); padding-bottom: 2px; }
+
+  /* ---------------- 书源 ---------------- */
+  .p-hint { font: 7.5px/1.6 var(--sans); color: var(--muted); padding: 2px 0 6px; }
+  .p-hint-line { display: flex; align-items: center; gap: 5px; font: 7.5px/1.4 var(--sans); color: var(--muted); padding: 2px 0 6px; }
+  .p-hint-line .q { margin-left: auto; width: 12px; height: 12px; border: 1px solid var(--line); border-radius: 50%; display: grid; place-items: center; font: 7px/1 var(--sans); color: var(--muted); }
+  .src-row { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line-soft); }
+  .src-row .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; }
+  .src-row .dot.off { background: var(--faint); }
+  .src-row-info { flex: 1; min-width: 0; }
+  .src-name { font: 11px/1.3 var(--serif); color: var(--ink); letter-spacing: .03em; }
+  .src-url { margin-top: 2px; font: 7px/1.4 ui-monospace, Consolas, monospace; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .src-state { flex: none; font: 7px/1 var(--sans); color: var(--muted); }
+  .src-state.off { color: var(--faint); }
+
+  .sheet-action { display: flex; align-items: center; justify-content: space-between; padding: 9px 4px; border-bottom: 1px solid var(--line-soft); font: 10px/1.3 var(--serif); color: var(--ink-2); }
+  .sheet-action.danger { color: var(--warn); }
+  .sheet-action .sub { font: 7px/1 var(--sans); color: var(--faint); margin-top: 3px; }
+
+  /* ---------------- 设置 ---------------- */
+  .set-card {
+    border: 1px solid var(--line); border-radius: 12px;
+    background: var(--card); padding: 9px;
+    margin-top: 8px;
+  }
+  .set-h { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; margin-bottom: 5px; }
+  .set-h .t { font: 500 9px/1 var(--serif); color: var(--accent); letter-spacing: .06em; }
+  .set-h .m { font: 7px/1 var(--sans); color: var(--faint); }
+  .set-check { display: flex; align-items: center; gap: 6px; padding: 3px 0; font: 7.5px/1.4 var(--sans); color: var(--ink-2); }
+  .cb { width: 9px; height: 9px; flex: none; border: 1px solid var(--line); border-radius: 2px; background: var(--bg, var(--paper-2)); }
+  .cb.on { background: var(--accent); border-color: var(--accent); }
+  .set-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
+  .set-row .lab { width: 46px; flex: none; font: 7.5px/1.3 var(--sans); color: var(--ink-2); }
+  .set-input {
+    flex: 1; height: 21px;
+    border: 1px solid var(--line); border-radius: 6px;
+    background: var(--bg, var(--paper-2));
+    display: flex; align-items: center; padding: 0 6px;
+    font: 7px/1 var(--sans); color: var(--muted);
+    white-space: nowrap; overflow: hidden;
+  }
+  .set-btns { display: flex; gap: 5px; margin-top: 7px; }
+  .set-btns .p-pill { padding: 5px 0; font-size: 7.5px; }
+  .set-note { margin-top: 5px; font: 7px/1.5 var(--sans); color: var(--muted); }
+  .seg3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; margin-top: 6px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg, var(--paper-2)); }
+  .seg3 span { display: flex; align-items: center; justify-content: center; gap: 3px; padding: 5px 0; border-radius: 999px; font: 7px/1 var(--sans); color: var(--muted); }
+  .seg3 span.on { background: var(--ink); color: var(--paper); }
+  .seg3 .sw { width: 7px; height: 7px; border-radius: 50%; background: var(--paper); border: 1px solid var(--line); }
+  .preview-mini {
+    margin-top: 6px; border: 1px solid var(--line-soft); border-radius: 8px;
+    background: var(--paper-2); padding: 7px 8px;
+    font: 9px/1.85 var(--serif); color: var(--ink);
+  }
+  .punct-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 8px; margin-top: 5px; }
+  .punct-item { display: flex; align-items: center; gap: 4px; font: 7px/1.4 var(--sans); color: var(--ink-2); }
+  .punct-item .sw2 { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; }
+  .punct-item .sw2.blue { background: #2F6FA8; }
+  .punct-item .sw2.brass { background: var(--brass); }
+  .punct-item .sw2.grey { background: var(--muted); }
+  .switch { width: 19px; height: 10px; border-radius: 999px; background: var(--accent); position: relative; flex: none; }
+  .switch::after { content: ""; position: absolute; right: 1.5px; top: 1.5px; width: 7px; height: 7px; border-radius: 50%; background: #FFF6EA; }
+  .switch.off { background: var(--line); }
+  .switch.off::after { right: auto; left: 1.5px; background: var(--card); }
+  .usage { height: 2px; background: var(--line); border-radius: 2px; margin: 6px 0 4px; overflow: hidden; }
+  .usage i { display: block; width: 38%; height: 2px; background: var(--accent); }
+
+  .sticky-save {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 11;
+    padding: 9px 14px 14px;
+    background: var(--panel, var(--paper-2));
+    border-top: 1px solid var(--line);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .sticky-save .txt { flex: 1; font: 7px/1.4 var(--sans); color: var(--muted); }
+  .sticky-save .p-pill.pri { flex: none; padding: 7px 18px; font-size: 8px; }
+
+  /* ---------------- 批注点 ---------------- */
+  .mk {
+    position: absolute; z-index: 25;
+    width: 16px; height: 16px; border-radius: 50%;
+    display: grid; place-items: center;
+    color: #FFF6EA; font: 700 8px/1 var(--sans);
+    box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent);
+  }
+  .mk.warn { background: var(--warn); }
+  .mk.acc { background: var(--accent); }
+
+  /* ---------------- 说明 ---------------- */
+  .notes { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 22px; }
+  .notes h4 {
+    margin: 0 0 10px; font: 500 10px/1 var(--sans);
+    letter-spacing: .22em; color: var(--muted); text-transform: uppercase;
+  }
+  .notes .after h4 { color: var(--accent); }
+  .notes ul { margin: 0; padding: 0; list-style: none; }
+  .notes li {
+    position: relative; padding-left: 17px;
+    font-size: 13px; line-height: 1.85; color: var(--ink-2);
+    margin-bottom: 8px;
+  }
+  .notes li::before { content: ""; position: absolute; left: 0; top: 10px; width: 7px; height: 1px; background: var(--faint); }
+  .notes .after li::before { background: var(--accent); width: 9px; }
+  .notes li b { font-weight: 500; color: var(--ink); }
+  .notes li .n { display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: var(--warn); color: #FFF6EA; font: 700 7px/1 var(--sans); margin-right: 4px; vertical-align: 1px; }
+  .notes .after li .n { background: var(--accent); }
+
+  .spec {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 1px; background: var(--line);
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    margin-top: 22px;
+  }
+  .spec > div { background: var(--card); padding: 12px 14px; }
+  .spec span { display: block; font: 10px/1.4 var(--sans); color: var(--muted); letter-spacing: .08em; }
+  .spec b { display: block; margin-top: 6px; font: 500 13px/1.5 var(--serif); color: var(--ink); }
+
+  /* ---------------- 规则表 ---------------- */
+  .rules { margin-top: 24px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .rules table { width: 100%; border-collapse: collapse; }
+  .rules th {
+    text-align: left; padding: 13px 18px;
+    font: 500 10px/1 var(--sans); letter-spacing: .2em; text-transform: uppercase;
+    color: var(--muted); background: var(--card-2);
+    border-bottom: 1px solid var(--line);
+  }
+  .rules td {
+    padding: 13px 18px; font-size: 13px; line-height: 1.8; color: var(--ink-2);
+    border-bottom: 1px solid var(--line-soft); vertical-align: top;
+  }
+  .rules tr:last-child td { border-bottom: 0; }
+  .rules td:first-child { color: var(--ink); font-weight: 500; width: 140px; }
+  .rules code { font: 11px/1.6 ui-monospace, Consolas, monospace; color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); padding: 1px 4px; border-radius: 3px; }
+  .rules.code td:first-child { width: 78px; }
+  .rules.code td:nth-child(2) { width: 170px; }
+
+  /* ---------------- 优先级 ---------------- */
+  .prio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 24px; }
+  .prio .col { border: 1px solid var(--line); border-radius: 14px; background: var(--card); padding: 20px 20px 22px; }
+  .prio .col.p0 { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+  .prio .k { font: 500 10px/1 var(--sans); letter-spacing: .22em; color: var(--muted); }
+  .prio .col.p0 .k { color: var(--accent); }
+  .prio h4 { margin: 12px 0 12px; font-size: 16px; font-weight: 500; letter-spacing: .05em; }
+  .prio ol { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 13px; line-height: 1.9; }
+  .prio ol li { margin-bottom: 6px; }
+
+  .page-foot {
+    margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
+    display: flex; justify-content: space-between; gap: 20px;
+    font: 11px/1.8 var(--sans); color: var(--faint);
+  }
+
+  .switcher {
+    position: fixed; right: 26px; bottom: 26px; z-index: 50;
+    display: flex; gap: 4px; padding: 5px;
+    background: color-mix(in srgb, var(--card) 88%, transparent);
+    border: 1px solid var(--line); border-radius: 999px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 12px 30px -18px rgba(0,0,0,.45);
+  }
+  .switcher button {
+    border: 0; background: transparent; color: var(--muted);
+    font: 11.5px/1 var(--sans); padding: 8px 13px; border-radius: 999px;
+    cursor: pointer; letter-spacing: .06em;
+    transition: background .25s, color .25s;
+  }
+  .switcher button:hover { color: var(--ink); }
+  .switcher button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+
+  @media (max-width: 980px) {
+    .wrap { padding: 40px 20px 100px; }
+    .principles, .notes, .prio, .spec, .states, .legend { grid-template-columns: 1fr; }
+    .sec-head .route { margin-left: 0; }
+    .cover .seal { width: 48px; height: 48px; font-size: 18px; }
+    .cover .proof { display: none; }
+    .batch { justify-content: flex-start; overflow-x: auto; padding-bottom: 10px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ================= 封面 ================= -->
+  <header class="cover">
+    <div class="seal">批</div>
+    <div class="proof">审查稿 · 移动端</div>
+    <p class="eyebrow">Mobile audit · 5 screens · 逐屏朱批</p>
+    <h1>口袋本 <em>朱批</em></h1>
+    <p class="lede">
+      桌面端已经按「纸本 · 朱印」落过一轮；移动端仍停在「功能正确、界面各自生长」。
+      本稿把书架、阅读、目录 / 排版、搜索、书源、设置六处现状与建议逐屏并排：
+      赭圈标现状问题，朱圈标建议改动，灰线表示保留不动。只做审查，不改代码。
+    </p>
+    <div class="meta">
+      <span class="tag">范围 · 书架 / 阅读 / 目录 / 搜索 / 书源 / 设置</span>
+      <span class="tag">依据 · 视觉升级方案 · 纸本 / 朱印</span>
+      <span class="tag warn">结论 · 令牌已对齐，层级未对齐</span>
+      <span class="tag">2026-11-19</span>
+    </div>
+
+    <nav class="toc-strip">
+      <a href="#verdict"><i>00</i>总体判断</a>
+      <a href="#p1"><i>01</i>书架</a>
+      <a href="#p2"><i>02</i>阅读</a>
+      <a href="#p3"><i>03</i>目录与排版</a>
+      <a href="#p4"><i>04</i>搜索</a>
+      <a href="#p5"><i>05</i>书源</a>
+      <a href="#p6"><i>06</i>设置</a>
+      <a href="#rules"><i>07</i>跨屏规则</a>
+      <a href="#priority"><i>08</i>落地</a>
+    </nav>
+  </header>
+
+  <div class="legend">
+    <div><span class="mark warn">1</span><span><b>赭圈</b> · 现状问题，对应下方批注序号</span></div>
+    <div><span class="mark acc">1</span><span><b>朱圈</b> · 建议改动，对应规格与代码落点</span></div>
+    <div><span class="line"></span><span><b>灰线</b> · 现有实现可保留，不进入本轮改动</span></div>
+  </div>
+
+  <!-- ================= 总体判断 ================= -->
+  <section id="verdict">
+    <div class="label">Verdict</div>
+    <h2>不是换皮，是把工具收进书里</h2>
+    <p class="sub">
+      <code>Ui.java</code> 里已经有 20 / 16 / 8 的间距、14 的卡片圆角、12 / 14 / 16 / 17 / 22 的字号，
+      说明移动端并不缺令牌；缺的是每一屏只讲一件事的排序。阅读页最接近提案，
+      书架与设置仍像 Android 默认表单，搜索与书源停在「结果列表 + Toast」。
+    </p>
+
+    <div class="principles">
+      <div class="principle">
+        <div class="no">01 · 已对齐</div>
+        <h3>材料</h3>
+        <p>三套 <b>Ui.Palette</b>、页面 / 列表 / 卡片间距、14/12/10/22 圆角、宋体正文、2dp 章节滑杆与浮层位移曲线，都已经和《视觉升级方案》同一套语言。</p>
+      </div>
+      <div class="principle">
+        <div class="no">02 · 仍偏离</div>
+        <h3>结构</h3>
+        <p>书架把「阅微」当页面标题、四个等宽胶囊抢焦点；阅读顶栏没有章节、底栏符号与文字混排；设置两个保存入口；搜索 / 书源仍是系统列表的换色版。</p>
+      </div>
+      <div class="principle">
+        <div class="no">03 · 判断</div>
+        <h3>一屏一事</h3>
+        <p>手机没有并排空间，页头、主对象、工具必须形成 <b>1 : 2 : 1</b> 的层级。令牌再准，若第一眼落在四个按钮上，读起来仍然是工具页。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 01 书架 ================= -->
+  <section id="p1">
+    <div class="sec-head">
+      <span class="no">01</span>
+      <h3>书架</h3>
+      <span class="route">MainActivity.java · 书架</span>
+      <p class="judge">页头把品牌当标题，<b>四个等宽胶囊</b>与「在读」卡片抢同一眼；书脊只有两个字。</p>
+    </div>
+
+    <div class="batch">
+      <!-- 现状 -->
+      <div class="ph">
+        <div class="cap before"><span><span class="dot"></span>现状</span><span class="hint">页头 3 行 + 4 个等宽动作</span></div>
+        <div class="phone">
+          <span class="mk warn" style="top:44px;left:58px">1</span>
+          <span class="mk warn" style="top:84px;right:13px">2</span>
+          <span class="mk warn" style="top:150px;left:13px">3</span>
+          <span class="mk warn" style="top:332px;right:13px">4</span>
+
+          <div class="p-status"><span>19:29</span><span>5G ▮▮ 86%</span></div>
+          <div class="p-body">
+            <div class="p-head">
+              <div class="p-seal">阅微</div>
+              <div style="flex:1;min-width:0">
+                <div class="p-brand">阅微</div>
+                <div class="p-sync">上次同步 · 今天 19:21</div>
+              </div>
+              <span class="p-pill sm">设置</span>
+            </div>
+
+            <div class="p-acts">
+              <span class="p-pill pri">导入 TXT</span>
+              <span class="p-pill">搜索</span>
+              <span class="p-pill">书源</span>
+              <span class="p-pill">同步</span>
+            </div>
+
+            <div class="p-hero">
+              <div class="p-spine-bad">皓玉</div>
+              <div class="p-hero-info">
+                <div class="p-booktitle">皓玉真仙</div>
+                <div class="p-meta">小道不讲武德 · 第 460 / 1141 章</div>
+                <div class="p-line"><i style="width:40%"></i></div>
+              </div>
+              <span class="p-link">继续阅读 →</span>
+            </div>
+
+            <div class="p-list">
+              <div class="p-row">
+                <div class="p-idx">01</div>
+                <div class="p-row-info">
+                  <div class="p-row-title">凡人修仙传</div>
+                  <div class="p-row-meta">忘语 · 在线阅读 · 第二百五十六章</div>
+                </div>
+                <div class="p-pct">38.2%</div>
+              </div>
+              <div class="p-row">
+                <div class="p-idx">02</div>
+                <div class="p-row-info">
+                  <div class="p-row-title">玉懒仙</div>
+                  <div class="p-row-meta">深深妹儿 · 已缓存 42 章</div>
+                </div>
+                <div class="p-pct">62.0%</div>
+              </div>
+              <div class="p-row">
+                <div class="p-idx">03</div>
+                <div class="p-row-info">
+                  <div class="p-row-title">夜航船</div>
+                  <div class="p-row-meta">张岱 · 本地 TXT · 卷三</div>
+                </div>
+                <div class="p-pct">12.5%</div>
+              </div>
+              <div class="p-row">
+                <div class="p-idx">04</div>
+                <div class="p-row-info">
+                  <div class="p-row-title">山月记</div>
+                  <div class="p-row-meta">中岛敦 · 本地 TXT</div>
+                </div>
+                <div class="p-pct">7.4%</div>
+              </div>
+              <div class="p-row">
+                <div class="p-idx">05</div>
+                <div class="p-row-info">
+                  <div class="p-row-title">沧海拾遗</div>
+                  <div class="p-row-meta">佚名 · 在线阅读</div>
+                </div>
+                <div class="p-pct">0.0%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 建议 -->
+      <div class="ph">
+        <div class="cap after"><span><span class="dot"></span>建议</span><span class="hint">页头 2 行 + 3 个动作</span></div>
+        <div class="phone">
+          <span class="mk acc" style="top:44px;left:50px">1</span>
+          <span class="mk acc" style="top:44px;right:13px">2</span>
+          <span class="mk acc" style="top:148px;left:13px">3</span>
+          <span class="mk acc" style="top:340px;right:13px">4</span>
+
+          <div class="p-status"><span>19:29</span><span>5G ▮▮ 86%</span></div>
+          <div class="p-body">
+            <div class="p-head">
+              <div class="p-seal" style="width:31px;height:31px">阅微</div>
+              <div style="flex:1;min-width:0">
+                <div class="p-page-title">书架</div>
+                <div class="p-sync">上次同步 · 今天 19:21 · 点击同步</div>
+              </div>
+              <div class="p-gear">⚙</div>
+            </div>
+
+            <div class="p-acts">
+              <span class="p-pill pri" style="flex:1.35">导入 TXT</span>
+              <span class="p-pill">搜索</span>
+              <span class="p-pill">书源</span>
+            </div>
+
+            <div class="p-hero" style="padding:11px 10px">
+              <div class="p-spine">皓玉真仙</div>
+              <div class="p-hero-info">
+                <div class="p-eyebrow">在读 · 少年修仙</div>
+                <div class="p-booktitle" style="margin-top:4px">皓玉真仙</div>
+                <div class="p-meta">小道不讲武德 · 第 460 章 天兽岛</div>
+                <div class="p-line" style="margin-top:7px"><i style="width:40.9%"></i></div>
+              </div>
+              <span class="p-link">继续阅读</span>
+            </div>
+
+            <div class="p-list">
+              <div class="p-row">
+                <div class="p-idx">01</div>
+                <div class="p-row-info">
+                  <div class="p-row-title">凡人修仙传</div>
+                  <div class="p-row-meta">忘语 · 在线阅读 · 第二百五十六章</div>
+                  <div class="p-miniline"><i style="width:38%"></i></div>
+                </div>
+                <div class="p-pct">38.2%</div>
+              </div>
+              <div class="p-row">
+                <div class="p-idx">02</div>
+                <div class="p-row-info">
+                  <div class="p-row-title">玉懒仙</div>
+                  <div class="p-row-meta">深深妹儿 · 已缓存 42 章</div>
+                  <div class="p-miniline"><i style="width:62%"></i></div>
+                </div>
+                <div class="p-pct">62.0%</div>
+              </div>
+              <div class="p-row">
+                <div class="p-idx">03</div>
+                <div class="p-row-info">
+                  <div class="p-row-title">夜航船</div>
+                  <div class="p-row-meta">张岱 · 本地 TXT · 卷三</div>
+                  <div class="p-miniline"><i style="width:12.5%"></i></div>
+                </div>
+                <div class="p-pct">12.5%</div>
+              </div>
+              <div class="p-row">
+                <div class="p-idx">04</div>
+                <div class="p-row-info">
+                  <div class="p-row-title">山月记</div>
+                  <div class="p-row-meta">中岛敦 · 本地 TXT</div>
+                  <div class="p-miniline"><i style="width:7.4%"></i></div>
+                </div>
+                <div class="p-pct">7.4%</div>
+              </div>
+              <div class="p-row">
+                <div class="p-idx">05</div>
+                <div class="p-row-info">
+                  <div class="p-row-title">沧海拾遗</div>
+                  <div class="p-row-meta">佚名 · 在线阅读</div>
+                  <div class="p-miniline"><i style="width:0"></i></div>
+                </div>
+                <div class="p-pct">0.0%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="before">
+        <h4>现状问题</h4>
+        <ul>
+          <li><span class="n">1</span>页头把「阅微」当页面标题（26sp），真正的「书架」不存在；同步状态 12sp 紧贴标题下，读起来像副标题。</li>
+          <li><span class="n">2</span>四个动作由 <b>Ui.pill</b> 等宽铺满（导入 / 搜索 / 书源 / 同步），导入常驻朱砂实色；hero 卡的「继续阅读」也是朱砂，两个主按钮抢同一眼。</li>
+          <li><span class="n">3</span>在读书脊 46 × 78dp，只放书名首二字，横排；没有竖排书脊与书名，和桌面稿的实体感不一致。</li>
+          <li><span class="n">4</span>书目行是序号 28dp + 书名 17sp + meta 12sp + 百分比，除 hero 外没有 2dp 进度线；百分比与书的关系靠猜。</li>
+        </ul>
+      </div>
+      <div class="after">
+        <h4>改造建议</h4>
+        <ul>
+          <li><span class="n">1</span>页头两行：32dp 印章 +「书架」22sp；第二行「上次同步 · 今天 19:21」11sp，点击即同步，把「同步」从动作行拿掉。</li>
+          <li><span class="n">2</span>动作收为三枚：导入 TXT 朱砂实色（96dp）、搜索与书源次按钮；设置改为 44dp 圆形图标，不再与导入同权。</li>
+          <li><span class="n">3</span>书脊改 40 × 72dp 竖排书名 + 朱砂渐变；信息区固定「在读 10.5sp / 书名 17sp / 作者 · 章节 11sp / 2dp 进度」四层。</li>
+          <li><span class="n">4</span>书目行加 2dp 细进度线，只覆盖信息列；序号 10.5sp monospace，标题 16sp，meta 11sp，行高 56dp。</li>
+          <li>空状态改为印章 + 一句主文案 + 两个动作（导入 / 去搜索），与搜索页共用同一套空状态。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="spec">
+      <div><span>页面留白</span><b>20dp</b></div>
+      <div><span>动作高度</span><b>34 → 44dp</b></div>
+      <div><span>在读书脊</span><b>46 × 78 → 40 × 72</b></div>
+      <div><span>书目行高</span><b>48 → 56dp</b></div>
+    </div>
+  </section>
+
+  <!-- ================= 02 阅读 ================= -->
+  <section id="p2">
+    <div class="sec-head">
+      <span class="no">02</span>
+      <h3>阅读</h3>
+      <span class="route">ReaderActivity.java · 阅读页</span>
+      <p class="judge">最接近提案，但顶栏缺章节、底栏把 8 个入口压成一行符号；<b>首次进入没有任何提示</b>。</p>
+    </div>
+
+    <div class="block-title"><h4>A · 呼出浮层</h4><span>顶部 380ms / 底部 420ms · 正文不重排</span></div>
+
+    <div class="batch">
+      <!-- 现状浮层 -->
+      <div class="ph">
+        <div class="cap before"><span><span class="dot"></span>现状</span><span class="hint">顶栏 4 项同级 · 底栏一行滑杆</span></div>
+        <div class="phone">
+          <span class="mk warn" style="top:50px;left:116px">1</span>
+          <span class="mk warn" style="top:556px;left:calc(50% - 8px)">2</span>
+          <span class="mk warn" style="top:602px;right:13px">3</span>
+
+          <div class="chrome-top" style="background:var(--paper-2)">
+            <span class="c-back plain">←</span>
+            <span class="c-book" style="flex:1">皓玉真仙</span>
+            <span class="c-pill">Aa</span>
+            <span class="c-pill">目录</span>
+          </div>
+
+          <div class="reading panel-open" style="padding-top:84px;padding-bottom:132px">
+            <div class="prose">
+              <p><span class="dlg">“本蛟贵为三阶妖兽，抓住本蛟的御兽宗都要好生伺候着。”</span></p>
+              <p><span class="dlg">“本座的日子也过的很艰苦，麻烦雷蛟道友忍忍吧。”</span>陈平脸色不变，淡淡的说道。</p>
+              <p>话一毕，他就掐断了两者的神识联系，并封死了灵兽镯。</p>
+              <p>外界，陈平有规律的敲击着船檐，心底冷笑连连。</p>
+            </div>
+          </div>
+
+          <div class="chrome-bottom" style="background:var(--paper-2)">
+            <div class="chapter-row">
+              <span class="ch-side">上一章</span>
+              <span class="ch-track"><i></i><b></b></span>
+              <span class="ch-side">下一章</span>
+            </div>
+            <div class="panel-items">
+              <div class="panel-item"><span class="g">☰</span><span class="l">目录</span></div>
+              <div class="panel-item"><span class="g line">Aa</span><span class="l">界面</span></div>
+              <div class="panel-item"><span class="g">↻</span><span class="l">同步</span></div>
+              <div class="panel-item"><span class="g">⚙</span><span class="l">设置</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 建议浮层 -->
+      <div class="ph">
+        <div class="cap after"><span><span class="dot"></span>建议</span><span class="hint">书名 + 章节双层 · 底栏两行</span></div>
+        <div class="phone">
+          <span class="mk acc" style="top:48px;left:120px">1</span>
+          <span class="mk acc" style="top:558px;left:16px">2</span>
+          <span class="mk acc" style="top:606px;right:13px">3</span>
+
+          <div class="chrome-top">
+            <span class="c-back">←</span>
+            <div class="c-title-block">
+              <div class="c-book">皓玉真仙</div>
+              <div class="c-chapter">第四百六十章 天兽岛</div>
+            </div>
+            <div class="c-tools">
+              <span class="c-pill">目录</span>
+              <span class="c-pill">Aa</span>
+            </div>
+          </div>
+
+          <div class="reading panel-open" style="padding-top:88px;padding-bottom:138px">
+            <div class="prose">
+              <p><span class="dlg">“本蛟贵为三阶妖兽，抓住本蛟的御兽宗都要好生伺候着。”</span></p>
+              <p><span class="dlg">“本座的日子也过的很艰苦，麻烦雷蛟道友忍忍吧。”</span>陈平脸色不变，淡淡的说道。</p>
+              <p>话一毕，他就掐断了两者的神识联系，并封死了灵兽镯。</p>
+              <p>外界，陈平有规律的敲击着船檐，心底冷笑连连。</p>
+            </div>
+          </div>
+
+          <div class="chrome-bottom">
+            <div class="chapter-meta">第 460 / 1141 章 · 42.5%</div>
+            <div class="chapter-row">
+              <span class="ch-side box" style="font-size:10px">‹</span>
+              <span class="ch-track"><i></i><b></b></span>
+              <span class="ch-side box" style="font-size:10px">›</span>
+            </div>
+            <div class="panel-items">
+              <div class="panel-item"><span class="g line">☰</span><span class="l">目录</span></div>
+              <div class="panel-item"><span class="g line">Aa</span><span class="l">界面</span></div>
+              <div class="panel-item"><span class="g line">↻</span><span class="l">同步</span></div>
+              <div class="panel-item"><span class="g line">⚙</span><span class="l">设置</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="before">
+        <h4>现状问题</h4>
+        <ul>
+          <li><span class="n">1</span>顶栏只有「← / 书名 16sp / Aa / 目录」，四项同级文字；没有当前章节，长书名截断后不知道读到哪。</li>
+          <li><span class="n">2</span>底栏把「上一章 / 滑杆 / 下一章」压在同一行，两侧文字 11.5sp，低于 44dp 触控；滑杆 thumb 12dp，边缘难抓。</li>
+          <li><span class="n">3</span>四个入口用 ☰ Aa ↻ ⚙，符号来自不同字族，笔画粗细与视觉重量不一致。</li>
+          <li>呼出面板时页脚直接 <code>GONE</code>，章节信息只靠滑杆位置表达。</li>
+        </ul>
+      </div>
+      <div class="after">
+        <h4>改造建议</h4>
+        <ul>
+          <li><span class="n">1</span>顶栏：44dp 返回热区；书名 15sp + 章节 10.5sp 两行；右侧「目录」「Aa」两枚 28dp 胶囊，底边 1px 发丝线。</li>
+          <li><span class="n">2</span>底栏分两行：第一行「第 460 / 1141 章」10sp + 44dp 方形上一章 / 下一章；第二行四个 20px 线性图标 + 10sp 标签。</li>
+          <li><span class="n">3</span>滑杆保持 2dp 轨道 + 12dp 圆点 + 4dp 光晕，两侧触控区加宽，不再用文字当按钮。</li>
+          <li>页脚不再消失，改为面板上方 11sp 的章节行；面板收起后回到屏幕底部。</li>
+          <li>动效沿用现有 380 / 420ms 与 <code>cubic-bezier(.22,.8,.24,1)</code>，正文不重排。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block-title"><h4>B · 沉浸态与首次提示</h4><span>正文满屏 · 页脚常驻</span></div>
+
+    <div class="batch">
+      <div class="ph">
+        <div class="cap before"><span><span class="dot"></span>现状</span><span class="hint">页脚 12sp · 无提示</span></div>
+        <div class="phone">
+          <span class="mk warn" style="top:78px;right:13px">1</span>
+          <span class="mk warn" style="bottom:26px;left:16px">2</span>
+
+          <div class="reading">
+            <div class="prose">
+              <p><span class="dlg">“本蛟贵为三阶妖兽，抓住本蛟的御兽宗都要好生伺候着，你究竟是什么意思？”</span></p>
+              <p><span class="dlg">“本座的日子也过的很艰苦，麻烦雷蛟道友忍忍吧。”</span></p>
+              <p>陈平脸色不变，淡淡的说道。</p>
+              <p>话一毕，他就掐断了两者的神识联系，并封死了灵兽镯。</p>
+              <p>外界，陈平有规律的敲击着船檐，心底冷笑连连。</p>
+              <p>这些年，雷蛟每隔一段时间便会折腾一次，张口讨要雷属性灵物。</p>
+              <p>但他绝不可能像御兽宗那样，花费十几万灵石好吃好喝的供着雷蛟。</p>
+              <p>海雾更浓了，船头的灯只剩一圈模糊的光。</p>
+            </div>
+            <div class="reader-foot">
+              <span>第四百六十章 天兽岛</span>
+              <span class="pct">2/11 42.5%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ph">
+        <div class="cap after"><span><span class="dot"></span>建议</span><span class="hint">页脚 11sp 加字距 · 一次性提示</span></div>
+        <div class="phone">
+          <span class="mk acc" style="top:120px;left:13px">1</span>
+          <span class="mk acc" style="bottom:48px;left:calc(50% - 8px)">2</span>
+
+          <div class="reading">
+            <div class="prose">
+              <p class="first">天兽岛外，海雾未散。</p>
+              <p><span class="dlg">“陈师兄，多谢你的解围，否则师弟今日还不晓得该怎么收场。”</span>羊子宇一路小跑的跟上，巴结的道。</p>
+              <p>他干脆水到渠成的把道友的称呼更换了，仿佛认陈平做师兄，能沾天大的光似的。</p>
+              <p>不过，事实上他还真就这样考虑的。</p>
+              <p><span class="dlg">“道友客气了。”</span>陈平脚步不停，只在海面上留下一线浅浅的白痕<span class="stop">。</span></p>
+              <p>仅两年未见，自家的荣誉长老竟又提升了一阶，简直堪比天灵根的修炼速度啊<span class="stop">！</span></p>
+              <p>海雾更浓了，船头的灯只剩一圈模糊的光。</p>
+            </div>
+            <div class="hint-chip">轻点中间 · 呼出工具栏</div>
+            <div class="reader-foot">
+              <span>第四百六十章 天兽岛</span>
+              <span class="pct">2 / 11 · 42.5%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="before">
+        <h4>现状问题</h4>
+        <ul>
+          <li><span class="n">1</span>沉浸态只有页脚：章节名与「2/11 42.5%」同为 12sp 灰褐，没有字距与分隔，信息糊在一起。</li>
+          <li><span class="n">2</span>首次进入没有任何提示；用户不知道轻点中间能呼出工具栏。</li>
+          <li>默认字号已迁移到 16sp / 2.1，但首段没有提案里的楷体、无缩进样式。</li>
+        </ul>
+      </div>
+      <div class="after">
+        <h4>改造建议</h4>
+        <ul>
+          <li><span class="n">1</span>页脚：左章节名 11sp，右「2 / 11 · 42.5%」11sp monospace，字距 .06em；距手势区 ≥ 20dp。</li>
+          <li><span class="n">2</span>首次提示：进入 0.8s 后浮出「轻点中间 · 呼出工具栏」11sp 胶囊，2.4s 淡出，只出现一次。</li>
+          <li>首段无缩进、楷体 17sp、字距 .06em；正文 16sp / 2.1，跟随 <code>AppSettings</code> 当前值。</li>
+          <li>夜间 / 护眼只换 <code>Ui.Palette</code>，浮层、页脚、系统栏一起换，不允许只换正文。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 03 目录与排版 ================= -->
+  <section id="p3">
+    <div class="sec-head">
+      <span class="no">03</span>
+      <h3>目录与排版</h3>
+      <span class="route">ReaderActivity · showToc / showTypePanel</span>
+      <p class="judge">两个核心浮层仍是 AlertDialog：<b>目录居中遮住正文，排版面板没有预览</b>。</p>
+    </div>
+
+    <div class="block-title"><h4>A · 目录</h4><span>55% 屏高 · 搜索 + 列表</span></div>
+
+    <div class="batch">
+      <!-- 现状目录 -->
+      <div class="ph">
+        <div class="cap before"><span><span class="dot"></span>现状</span><span class="hint">居中对话框 · 无总数 / 无序号</span></div>
+        <div class="phone">
+          <span class="mk warn" style="top:142px;left:calc(50% - 8px)">1</span>
+          <span class="mk warn" style="top:196px;left:calc(50% - 8px)">2</span>
+          <span class="mk warn" style="top:390px;left:26px">3</span>
+
+          <div class="reading" style="opacity:.34">
+            <div class="prose">
+              <p><span class="dlg">“本座的日子也过的很艰苦，麻烦雷蛟道友忍忍吧。”</span></p>
+              <p>陈平脸色不变，淡淡的说道。</p>
+              <p>话一毕，他就掐断了两者的神识联系，并封死了灵兽镯。</p>
+              <p>外界，陈平有规律的敲击着船檐，心底冷笑连连。</p>
+            </div>
+          </div>
+
+          <div class="dialog-wrap">
+            <div class="dialog">
+              <div class="dialog-title">目录</div>
+              <div class="searchbox">搜索章节</div>
+              <div class="dialog-list">
+                <div class="dialog-row">第四百五十八章 旧识</div>
+                <div class="dialog-row">第四百五十九章 雷蛟之怒</div>
+                <div class="dialog-row on">第四百六十章 天兽岛</div>
+                <div class="dialog-row">第四百六十一章 深海集市</div>
+                <div class="dialog-row">第四百六十二章 鲛人泪</div>
+              </div>
+              <div class="dialog-actions">取消</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 建议目录 -->
+      <div class="ph">
+        <div class="cap after"><span><span class="dot"></span>建议</span><span class="hint">底部 sheet 78% · 序号 + 在读</span></div>
+        <div class="phone">
+          <span class="mk acc" style="top:158px;left:20px">1</span>
+          <span class="mk acc" style="top:214px;left:20px">2</span>
+          <span class="mk acc" style="top:322px;left:20px">3</span>
+
+          <div class="reading" style="opacity:.45">
+            <div class="prose">
+              <p><span class="dlg">“本座的日子也过的很艰苦，麻烦雷蛟道友忍忍吧。”</span></p>
+              <p>陈平脸色不变，淡淡的说道。</p>
+              <p>话一毕，他就掐断了两者的神识联系，并封死了灵兽镯。</p>
+            </div>
+          </div>
+
+          <div class="sheet">
+            <div class="grabber"></div>
+            <div class="sheet-head">
+              <span class="sheet-title">目录</span>
+              <span class="sheet-count">141 / 1141</span>
+            </div>
+            <div class="searchbox">搜索章节</div>
+            <div class="toc-list">
+              <div class="toc-row"><span class="no">455</span><span>第四百五十五章 旧识</span></div>
+              <div class="toc-row"><span class="no">456</span><span>第四百五十六章 雷蛟之怒</span></div>
+              <div class="toc-row"><span class="no">457</span><span>第四百五十七章 海市</span></div>
+              <div class="toc-row"><span class="no">458</span><span>第四百五十八章 旧识</span></div>
+              <div class="toc-row"><span class="no">459</span><span>第四百五十九章 雷蛟之怒</span></div>
+              <div class="toc-row on"><span class="no">460</span><span>第四百六十章 天兽岛</span><span class="now">在读</span></div>
+              <div class="toc-row"><span class="no">461</span><span>第四百六十一章 深海集市</span></div>
+              <div class="toc-row"><span class="no">462</span><span>第四百六十二章 鲛人泪</span></div>
+              <div class="toc-row"><span class="no">463</span><span>第四百六十三章 归航</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="before">
+        <h4>现状问题</h4>
+        <ul>
+          <li><span class="n">1</span>AlertDialog 居中，宽约屏宽 80%，遮住正文；标题只有「目录」，没有总章数。</li>
+          <li><span class="n">2</span>搜索框在标题下，键盘弹出后列表只剩 2 行；列表高度固定 55% 屏高。</li>
+          <li><span class="n">3</span>当前章只靠朱砂文字 + 卡片底，没有序号、没有「在读」标记，长目录中很难定位。</li>
+        </ul>
+      </div>
+      <div class="after">
+        <h4>改造建议</h4>
+        <ul>
+          <li><span class="n">1</span>底部 sheet 78% 高、16dp 上圆角、32 × 3 grabber；标题「目录」+「141 / 1141」10.5sp。</li>
+          <li><span class="n">2</span>搜索框 40dp，固定在 sheet 顶部；列表滚动时搜索框不动。</li>
+          <li><span class="n">3</span>行高 48dp：序号 10.5sp monospace、章节名 15sp；当前章左侧 2dp 朱砂线 +「在读」胶囊，打开自动滚到当前章。</li>
+          <li>危险 / 次要动作不放这里；目录只做选择与搜索。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="block-title"><h4>B · 排版</h4><span>字号 / 行距 / 字体 / 主题 / 标点</span></div>
+
+    <div class="batch">
+      <!-- 现状排版 -->
+      <div class="ph">
+        <div class="cap before"><span><span class="dot"></span>现状</span><span class="hint">表单对话框 · 无预览</span></div>
+        <div class="phone">
+          <span class="mk warn" style="top:128px;left:calc(50% - 8px)">1</span>
+          <span class="mk warn" style="top:400px;left:calc(50% - 8px)">2</span>
+          <span class="mk warn" style="top:470px;left:calc(50% - 8px)">3</span>
+
+          <div class="reading" style="opacity:.3">
+            <div class="prose">
+              <p><span class="dlg">“道友客气了。”</span>陈平脚步不停，只在海面上留下一线浅浅的白痕。</p>
+              <p>仅两年未见，自家的荣誉长老竟又提升了一阶。</p>
+            </div>
+          </div>
+
+          <div class="dialog-wrap">
+            <div class="dialog">
+              <div class="dialog-title">排版</div>
+              <div style="margin-top:9px;font:7.5px/1.4 var(--sans);color:var(--ink-2)">字号：16</div>
+              <div class="s-track" style="margin-top:7px"><i style="width:40%"></i><b style="left:40%"></b></div>
+              <div style="margin-top:10px;font:7.5px/1.4 var(--sans);color:var(--ink-2)">行距：2.1</div>
+              <div class="s-track" style="margin-top:7px"><i style="width:50%"></i><b style="left:50%"></b></div>
+              <div class="font-row"><span>字体：内置宋体</span><span class="mini">›</span></div>
+              <div style="margin-top:9px;font:7.5px/1.4 var(--sans);color:var(--ink-2)">主题</div>
+              <div style="display:flex;gap:9px;margin-top:5px;font:7px/1.4 var(--sans);color:var(--muted)">
+                <span>◉ 纸白</span><span>○ 夜间</span><span>○ 护眼</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:5px;margin-top:9px;font:7px/1.4 var(--sans);color:var(--ink-2)">
+                <span class="cb on"></span><span>标点着色</span>
+              </div>
+              <div class="dialog-actions">取消　　完成</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 建议排版 -->
+      <div class="ph">
+        <div class="cap after"><span><span class="dot"></span>建议</span><span class="hint">底部 sheet 64% · 实时预览</span></div>
+        <div class="phone">
+          <span class="mk acc" style="top:258px;left:20px">1</span>
+          <span class="mk acc" style="top:400px;left:20px">2</span>
+          <span class="mk acc" style="top:456px;left:20px">3</span>
+
+          <div class="reading" style="opacity:.45">
+            <div class="prose">
+              <p><span class="dlg">“道友客气了。”</span>陈平脚步不停，只在海面上留下一线浅浅的白痕。</p>
+              <p>仅两年未见，自家的荣誉长老竟又提升了一阶。</p>
+            </div>
+          </div>
+
+          <div class="sheet type-sheet">
+            <div class="grabber"></div>
+            <div class="sheet-head">
+              <span class="sheet-title">排版</span>
+              <span class="sheet-count">即时生效</span>
+            </div>
+            <div class="type-preview">
+              <span class="first">天兽岛外，海雾未散。</span><br>
+              <span class="dlg">“道友客气了。”</span>陈平脚步不停，只在海面上留下一线浅浅的白痕。
+            </div>
+            <div class="slider-row">
+              <span class="lab" style="width:auto">A−</span>
+              <span class="s-track"><i style="width:42%"></i><b style="left:42%"></b></span>
+              <span class="lab" style="width:auto">A+</span>
+              <span class="val">16</span>
+            </div>
+            <div class="slider-row">
+              <span class="lab" style="width:auto">行距</span>
+              <span class="s-track"><i style="width:52%"></i><b style="left:52%"></b></span>
+              <span class="val">2.1</span>
+            </div>
+            <div class="seg">
+              <span class="on">纸白</span><span>夜间</span><span>护眼</span>
+            </div>
+            <div class="font-row"><span>字体：内置宋体</span><span class="mini">导入 ›</span></div>
+            <div style="display:flex;align-items:center;gap:5px;margin-top:9px;font:7px/1.4 var(--sans);color:var(--ink-2)">
+              <span class="switch" style="transform:scale(.9);transform-origin:left center"></span>
+              <span>标点着色</span>
+              <span style="margin-left:auto;color:var(--faint)">对话 · 句号 · 问号 · 叹号</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="before">
+        <h4>现状问题</h4>
+        <ul>
+          <li><span class="n">1</span>排版是 AlertDialog 表单：两条 SeekBar + 字体 + 三个 RadioButton + 标点开关，所有控件挤在对话框里。</li>
+          <li><span class="n">2</span>调字号 / 行距时正文被对话框遮住，看不到效果；完成后才回到阅读页。</li>
+          <li><span class="n">3</span>主题是系统 RadioButton，只有文字，没有纸白 / 夜间 / 护眼的色块预览。</li>
+        </ul>
+      </div>
+      <div class="after">
+        <h4>改造建议</h4>
+        <ul>
+          <li><span class="n">1</span>底部 sheet 64% 高：顶部一条「内页预览」，用当前字号 / 行距 / 字体实时渲染两行正文。</li>
+          <li><span class="n">2</span>字号 / 行距改为 A− / 滑杆 / A+，数值右对齐 10.5sp monospace；滑杆高 44dp 便于拖动。</li>
+          <li><span class="n">3</span>主题改三枚 44dp 色块分段器（纸白 / 夜间 / 护眼），选中态用墨色底 + 纸色字。</li>
+          <li>字体行右侧「导入」；标点着色保留开关；改动即时生效，不再需要「完成」。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 04 搜索 ================= -->
+  <section id="p4">
+    <div class="sec-head">
+      <span class="no">04</span>
+      <h3>在线搜索</h3>
+      <span class="route">SearchActivity.java · 搜索</span>
+      <p class="judge">结果行只有文字，没有「加入」状态；<b>搜索中 / 无书源 / 无结果三种状态共用一句 Toast</b>。</p>
+    </div>
+
+    <div class="batch">
+      <div class="ph">
+        <div class="cap before"><span><span class="dot"></span>现状</span><span class="hint">返回胶囊 · 结果无状态</span></div>
+        <div class="phone">
+          <span class="mk warn" style="top:44px;left:14px">1</span>
+          <span class="mk warn" style="top:190px;right:13px">2</span>
+          <span class="mk warn" style="bottom:26px;left:calc(50% - 8px)">3</span>
+
+          <div class="p-status"><span>19:29</span><span>5G ▮▮ 86%</span></div>
+          <div class="p-body">
+            <div class="p-head">
+              <span class="p-pill sm">‹ 书架</span>
+              <div class="p-page-title" style="padding-left:6px">在线搜索</div>
+            </div>
+
+            <div class="p-searchbar">
+              <span class="p-input">书名或作者</span>
+              <span class="p-btn">搜索</span>
+            </div>
+
+            <div class="p-result">
+              <div class="p-result-info">
+                <div class="p-result-title">皓玉真仙</div>
+                <div class="p-result-meta">小道不讲武德 · 笔趣中文 · 第四百六十章 天兽岛</div>
+              </div>
+            </div>
+            <div class="p-result">
+              <div class="p-result-info">
+                <div class="p-result-title">凡人修仙传</div>
+                <div class="p-result-meta">忘语 · 顶点小说 · 第二百五十六章</div>
+              </div>
+            </div>
+            <div class="p-result">
+              <div class="p-result-info">
+                <div class="p-result-title">玉懒仙</div>
+                <div class="p-result-meta">深深妹儿 · 笔趣中文 · 第一百二十章</div>
+              </div>
+            </div>
+            <div class="p-result">
+              <div class="p-result-info">
+                <div class="p-result-title">夜航船</div>
+                <div class="p-result-meta">张岱 · 顶点小说 · 卷三</div>
+              </div>
+            </div>
+
+            <div style="margin-top:auto;padding-bottom:16px;text-align:center;font:7.5px/1.7 var(--sans);color:var(--faint)">
+              没有搜索到结果时，只有一句 Toast
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ph">
+        <div class="cap after"><span><span class="dot"></span>建议</span><span class="hint">圆形返回 · 结果带加入状态</span></div>
+        <div class="phone">
+          <span class="mk acc" style="top:44px;left:14px">1</span>
+          <span class="mk acc" style="top:112px;left:16px">2</span>
+          <span class="mk acc" style="top:230px;right:13px">3</span>
+
+          <div class="p-status"><span>19:29</span><span>5G ▮▮ 86%</span></div>
+          <div class="p-body">
+            <div class="p-head">
+              <span class="c-back">←</span>
+              <div class="p-page-title" style="padding-left:6px;flex:1">在线搜索</div>
+              <span class="p-count">2 个书源</span>
+            </div>
+
+            <div class="p-searchbar">
+              <span class="p-input pri-border">皓玉</span>
+              <span class="p-btn">搜索</span>
+            </div>
+
+            <div class="p-progress"><i></i></div>
+            <div class="p-progress-note">正在搜索 2 个书源…</div>
+
+            <div class="p-result">
+              <div class="p-thumb">皓玉</div>
+              <div class="p-result-info">
+                <div class="p-result-title">皓玉真仙</div>
+                <div class="p-result-meta">小道不讲武德 · 笔趣中文 · 第 460 章</div>
+              </div>
+              <span class="p-added">已加入</span>
+            </div>
+            <div class="p-result">
+              <div class="p-thumb">凡人</div>
+              <div class="p-result-info">
+                <div class="p-result-title">凡人修仙传</div>
+                <div class="p-result-meta">忘语 · 顶点小说 · 第 256 章</div>
+              </div>
+              <span class="p-add">加入</span>
+            </div>
+            <div class="p-result">
+              <div class="p-thumb">玉懒</div>
+              <div class="p-result-info">
+                <div class="p-result-title">玉懒仙</div>
+                <div class="p-result-meta">深深妹儿 · 笔趣中文 · 第 120 章</div>
+              </div>
+              <span class="p-add">加入</span>
+            </div>
+            <div class="p-result">
+              <div class="p-thumb">夜航</div>
+              <div class="p-result-info">
+                <div class="p-result-title">夜航船</div>
+                <div class="p-result-meta">张岱 · 顶点小说 · 卷三</div>
+              </div>
+              <span class="p-add">加入</span>
+            </div>
+
+            <div style="margin-top:auto;padding-bottom:16px;text-align:center;font:7.5px/1.7 var(--sans);color:var(--faint)">
+              已在书架显示「已加入」，不重复抓目录
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="before">
+        <h4>现状问题</h4>
+        <ul>
+          <li><span class="n">1</span>返回是「‹ 书架」14sp 胶囊，阅读页是「←」22sp 文字，设置 / 书源又用胶囊，三种返回写法。</li>
+          <li><span class="n">2</span>结果行只有书名 16sp + meta 11sp；没有书脊、没有「已加入书架」状态，点一下直接抓目录。</li>
+          <li><span class="n">3</span>搜索中只弹 Toast；无书源、无结果、失败三种情况都没有页面内动作。</li>
+        </ul>
+      </div>
+      <div class="after">
+        <h4>改造建议</h4>
+        <ul>
+          <li><span class="n">1</span>页头：44dp 圆形返回 +「在线搜索」22sp + 右侧「2 个书源」10.5sp；搜索框与按钮同为 44dp。</li>
+          <li><span class="n">2</span>搜索中：标题下 2dp 不确定进度线 +「正在搜索 2 个书源…」10.5sp；结果区给 3 行骨架。</li>
+          <li><span class="n">3</span>结果行：40 × 52dp 书脊 / 首字、书名 16sp、meta 11sp；右侧「加入」次按钮，已在书架显示「已加入」。</li>
+          <li>三种状态各有动作：搜索中可取消；无书源 → 去书源；无结果 → 换关键词 / 去书源。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="states">
+      <div class="state">
+        <div class="state-k">搜索中</div>
+        <div class="p-progress" style="margin-top:10px"><i style="width:38%"></i></div>
+        <div class="state-p">正在搜索 2 个书源…</div>
+        <span class="state-btn">取消</span>
+      </div>
+      <div class="state">
+        <div class="state-k">无书源</div>
+        <div class="state-p">还没有书源，先导入 JSON 再搜。</div>
+        <span class="state-btn">去书源页</span>
+      </div>
+      <div class="state">
+        <div class="state-k">无结果</div>
+        <div class="state-p">没有找到《皓玉真仙》，换个关键词。</div>
+        <span class="state-btn">换关键词</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 05 书源 ================= -->
+  <section id="p5">
+    <div class="sec-head">
+      <span class="no">05</span>
+      <h3>书源</h3>
+      <span class="route">SourcesActivity.java · 书源</span>
+      <p class="judge">一条 12sp 长说明压住列表；<b>书源行只有名称和 URL</b>，没有启用状态，删除只能长按。</p>
+    </div>
+
+    <div class="batch">
+      <div class="ph">
+        <div class="cap before"><span><span class="dot"></span>现状</span><span class="hint">长说明 · 名称 + URL</span></div>
+        <div class="phone">
+          <span class="mk warn" style="top:44px;right:13px">1</span>
+          <span class="mk warn" style="top:120px;left:16px">2</span>
+          <span class="mk warn" style="top:200px;right:13px">3</span>
+
+          <div class="p-status"><span>19:29</span><span>5G ▮▮ 86%</span></div>
+          <div class="p-body">
+            <div class="p-head">
+              <span class="p-pill sm">‹ 书架</span>
+              <div class="p-page-title" style="padding-left:6px;flex:1">书源</div>
+              <span class="p-pill sm pri">导入 JSON</span>
+            </div>
+
+            <div class="p-hint">
+              支持 Legado 3.0 单个书源、数组或 {"bookSources":[...]}；<br>
+              长按书源可删除。
+            </div>
+
+            <div class="src-row">
+              <div class="src-row-info">
+                <div class="src-name">笔趣中文</div>
+                <div class="src-url">https://www.biquge.example.com</div>
+              </div>
+            </div>
+            <div class="src-row">
+              <div class="src-row-info">
+                <div class="src-name">顶点小说</div>
+                <div class="src-url">https://www.23wx.example.com</div>
+              </div>
+            </div>
+            <div class="src-row">
+              <div class="src-row-info">
+                <div class="src-name">旧版书库</div>
+                <div class="src-url">https://old.example.org</div>
+              </div>
+            </div>
+
+            <div style="margin-top:auto;padding-bottom:16px;text-align:center;font:7.5px/1.7 var(--sans);color:var(--faint)">
+              没有计数、状态与更多入口
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ph">
+        <div class="cap after"><span><span class="dot"></span>建议</span><span class="hint">状态点 · 计数 · 操作面板</span></div>
+        <div class="phone">
+          <span class="mk acc" style="top:44px;right:13px">1</span>
+          <span class="mk acc" style="top:120px;left:16px">2</span>
+          <span class="mk acc" style="top:210px;right:13px">3</span>
+          <span class="mk acc" style="bottom:132px;left:calc(50% - 8px)">4</span>
+
+          <div class="p-status"><span>19:29</span><span>5G ▮▮ 86%</span></div>
+          <div class="p-body">
+            <div class="p-head">
+              <span class="c-back">←</span>
+              <div class="p-page-title" style="padding-left:6px;flex:1">书源</div>
+              <span class="p-count">共 3 · 启用 2</span>
+              <span class="p-pill sm pri" style="margin-left:5px">导入 JSON</span>
+            </div>
+
+            <div class="p-hint-line">
+              支持 Legado 3.0 · 长按管理
+              <span class="q">?</span>
+            </div>
+
+            <div class="src-row">
+              <span class="dot"></span>
+              <div class="src-row-info">
+                <div class="src-name">笔趣中文</div>
+                <div class="src-url">biquge.example.com · 默认分组</div>
+              </div>
+              <span class="src-state">启用</span>
+            </div>
+            <div class="src-row">
+              <span class="dot"></span>
+              <div class="src-row-info">
+                <div class="src-name">顶点小说</div>
+                <div class="src-url">23wx.example.com · 默认分组</div>
+              </div>
+              <span class="src-state">启用</span>
+            </div>
+            <div class="src-row">
+              <span class="dot off"></span>
+              <div class="src-row-info">
+                <div class="src-name">旧版书库</div>
+                <div class="src-url">old.example.org · 未分组</div>
+              </div>
+              <span class="src-state off">停用</span>
+            </div>
+
+            <div class="sheet sources-sheet">
+              <div class="grabber"></div>
+              <div class="sheet-head">
+                <span class="sheet-title">笔趣中文</span>
+                <span class="sheet-count">长按书源</span>
+              </div>
+              <div class="sheet-action">校验书源<span class="sub">检查搜索与目录</span></div>
+              <div class="sheet-action">停用<span class="sub">不再参与搜索</span></div>
+              <div class="sheet-action danger">删除书源<span class="sub">需要二次确认</span></div>
+              <div class="sheet-action" style="color:var(--muted)">取消</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="before">
+        <h4>现状问题</h4>
+        <ul>
+          <li><span class="n">1</span>页头下压一整段 12sp 说明（Legado 3.0 单个 / 数组 / 对象 + 长按删除），占掉首屏两行。</li>
+          <li><span class="n">2</span>书源行只有名称 16sp + URL 11sp；没有启用 / 停用、分组、校验状态。</li>
+          <li><span class="n">3</span>删除只能长按，行内没有任何「更多」提示；页头也没有总数 / 启用数。</li>
+        </ul>
+      </div>
+      <div class="after">
+        <h4>改造建议</h4>
+        <ul>
+          <li><span class="n">1</span>说明收成一行「支持 Legado 3.0 · 长按管理」，右侧「?」展开完整说明。</li>
+          <li><span class="n">2</span>页头右侧「共 3 · 启用 2」10.5sp；导入 JSON 仍是唯一朱砂实色动作。</li>
+          <li><span class="n">3</span>行右侧 6dp 状态点 +「启用」10sp；点行打开详情 sheet，长按进入操作面板（校验 / 停用 / 删除）。</li>
+          <li><span class="n">4</span>删除使用赭色文字 + 二次确认，不再用系统 AlertDialog 列表。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 06 设置 ================= -->
+  <section id="p6">
+    <div class="sec-head">
+      <span class="no">06</span>
+      <h3>设置</h3>
+      <span class="route">SettingsActivity.java · 设置</span>
+      <p class="judge">两张「保存」、三处说明、默认 RadioButton；<b>最该被看见的排版预览不存在</b>。</p>
+    </div>
+
+    <div class="batch">
+      <div class="ph">
+        <div class="cap before"><span><span class="dot"></span>现状</span><span class="hint">长表单 · 两个保存入口</span></div>
+        <div class="phone">
+          <span class="mk warn" style="top:250px;right:13px">1</span>
+          <span class="mk warn" style="top:430px;left:16px">2</span>
+          <span class="mk warn" style="top:530px;left:16px">3</span>
+
+          <div class="p-status"><span>19:29</span><span>5G ▮▮ 86%</span></div>
+          <div class="p-body">
+            <div class="p-head">
+              <span class="p-pill sm">‹ 书架</span>
+              <div class="p-page-title" style="padding-left:6px">设置</div>
+            </div>
+
+            <div class="set-card">
+              <div class="set-h"><span class="t">同步（WebDAV）</span></div>
+              <div class="set-check"><span class="cb on"></span><span>启用 WebDAV 同步</span></div>
+              <div class="set-check"><span class="cb on"></span><span>自动同步（打开应用、退出阅读时）</span></div>
+              <div class="set-row"><span class="lab">地址</span><span class="set-input">https://dav.jianguoyun.com/dav/</span></div>
+              <div class="set-row"><span class="lab">账号</span><span class="set-input">reader@example.com</span></div>
+              <div class="set-row"><span class="lab">密码</span><span class="set-input">••••••••••</span></div>
+              <div class="set-row"><span class="lab">目录</span><span class="set-input">yuewei</span></div>
+              <div class="set-note">上次同步 · 今天 19:21</div>
+              <div class="set-btns">
+                <span class="p-pill pri">保存</span>
+                <span class="p-pill">立即同步</span>
+              </div>
+            </div>
+
+            <div class="set-card">
+              <div class="set-h"><span class="t">阅读排版</span><span class="m">仅影响阅读页</span></div>
+              <div style="font:7.5px/1.5 var(--sans);color:var(--ink-2)">字号：16</div>
+              <div class="s-track" style="margin-top:6px"><i style="width:40%"></i><b style="left:40%"></b></div>
+              <div style="font:7.5px/1.5 var(--sans);color:var(--ink-2);margin-top:8px">行距：2.1</div>
+              <div class="s-track" style="margin-top:6px"><i style="width:50%"></i><b style="left:50%"></b></div>
+              <div class="set-row" style="margin-top:7px">
+                <span class="lab">主题</span>
+                <span style="font:7px/1.4 var(--sans);color:var(--muted)">◉ 纸白　○ 夜间　○ 护眼</span>
+              </div>
+              <div class="set-row">
+                <span class="lab">字体</span>
+                <span class="set-input">内置宋体</span>
+                <span class="p-pill sm" style="padding:4px 6px;font-size:7px">导入字体文件</span>
+              </div>
+            </div>
+
+            <div class="set-card">
+              <div class="set-h"><span class="t">标点着色</span></div>
+              <div class="set-check"><span class="cb on"></span><span>启用标点着色</span></div>
+              <div class="set-check"><span class="cb on"></span><span>对话（引号内）</span></div>
+              <div class="set-check"><span class="cb on"></span><span>句号</span></div>
+              <div class="set-check"><span class="cb on"></span><span>问号</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ph">
+        <div class="cap after"><span><span class="dot"></span>建议</span><span class="hint">预览 · 分段器 · 单一保存条</span></div>
+        <div class="phone">
+          <span class="mk acc" style="top:44px;right:13px">1</span>
+          <span class="mk acc" style="top:178px;left:16px">2</span>
+          <span class="mk acc" style="top:330px;left:16px">3</span>
+          <span class="mk acc" style="top:470px;left:16px">4</span>
+          <span class="mk acc" style="bottom:24px;right:14px">5</span>
+
+          <div class="p-status"><span>19:29</span><span>5G ▮▮ 86%</span></div>
+          <div class="p-body">
+            <div class="p-head">
+              <span class="c-back">←</span>
+              <div class="p-page-title" style="padding-left:6px;flex:1">设置</div>
+              <span class="p-count">v0.4</span>
+            </div>
+
+            <div class="set-card">
+              <div class="set-h"><span class="t">阅读排版</span><span class="m">即时生效</span></div>
+              <div class="preview-mini">
+                <span style="font-family:var(--display);letter-spacing:.05em">天兽岛外，海雾未散。</span><br>
+                <span style="color:var(--accent)">“道友客气了。”</span>陈平脚步不停，只在海面上留下一线浅浅的白痕。
+              </div>
+              <div class="slider-row">
+                <span class="lab" style="width:auto">A−</span>
+                <span class="s-track"><i style="width:42%"></i><b style="left:42%"></b></span>
+                <span class="lab" style="width:auto">A+</span>
+                <span class="val">16</span>
+              </div>
+              <div class="slider-row">
+                <span class="lab" style="width:auto">行距</span>
+                <span class="s-track"><i style="width:52%"></i><b style="left:52%"></b></span>
+                <span class="val">2.1</span>
+              </div>
+              <div class="seg3">
+                <span class="on"><span class="sw" style="background:#F4EDDF"></span>纸白</span>
+                <span><span class="sw" style="background:#141519"></span>夜间</span>
+                <span><span class="sw" style="background:#E8F0E3"></span>护眼</span>
+              </div>
+              <div class="set-row" style="margin-top:5px">
+                <span class="lab">字体</span>
+                <span class="set-input">内置宋体</span>
+                <span style="font:7px/1 var(--sans);color:var(--accent)">导入</span>
+              </div>
+            </div>
+
+            <div class="set-card">
+              <div class="set-h"><span class="t">标点着色</span><span class="m">4 / 6 开启</span></div>
+              <div class="punct-grid">
+                <div class="punct-item"><span class="cb on"></span><span class="sw2"></span><span>对话</span></div>
+                <div class="punct-item"><span class="cb on"></span><span class="sw2 blue"></span><span>句号</span></div>
+                <div class="punct-item"><span class="cb on"></span><span class="sw2 brass"></span><span>问号</span></div>
+                <div class="punct-item"><span class="cb on"></span><span class="sw2 grey"></span><span>感叹号</span></div>
+                <div class="punct-item"><span class="cb"></span><span class="sw2 grey"></span><span>省略号</span></div>
+                <div class="punct-item"><span class="cb"></span><span class="sw2 grey"></span><span>括号</span></div>
+              </div>
+            </div>
+
+            <div class="set-card">
+              <div class="set-h"><span class="t">缓存与下载</span><span class="m">占用 76 MB</span></div>
+              <div class="usage"><i style="width:38%"></i></div>
+              <div style="display:flex;justify-content:space-between;font:7px/1.4 var(--sans);color:var(--muted)">
+                <span>已用 76 MB</span><span>上限 200 MB</span>
+              </div>
+              <div class="set-row" style="margin-top:5px">
+                <span class="lab">上限</span>
+                <span class="set-input">200 MB</span>
+                <span style="font:7px/1 var(--sans);color:var(--muted)">清理</span>
+              </div>
+            </div>
+
+            <div class="sticky-save">
+              <span class="txt">已自动保存 · 仅本机生效</span>
+              <span class="p-pill pri">完成</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="before">
+        <h4>现状问题</h4>
+        <ul>
+          <li><span class="n">1</span>同步卡底部「保存」+ 页面底部「保存设置」两个入口；「立即同步」内部也会先 <code>saveAll</code>，语义重复。</li>
+          <li><span class="n">2</span>主题是三个默认 RadioButton，只有文字；字号 / 行距两条 SeekBar 上方只有「字号：16」，没有预览。</li>
+          <li><span class="n">3</span>标点着色 6 条规则竖排 6 个 CheckBox，占 6 行；缓存只有一行文字，没有用量条。</li>
+          <li>页头「‹ 书架」胶囊与标题 22sp 同排，没有版本号或页面说明。</li>
+        </ul>
+      </div>
+      <div class="after">
+        <h4>改造建议</h4>
+        <ul>
+          <li><span class="n">1</span>页头：44dp 返回 +「设置」22sp + 右侧版本 10.5sp；所有卡片 14dp 圆角、16dp 内边距。</li>
+          <li><span class="n">2</span>排版卡顶部加内页预览；字号 / 行距用 A− / A+ 两端，数值右对齐；主题改三色分段器；字体行右侧「导入」。</li>
+          <li><span class="n">3</span>标点改 2 列网格：开关 + 色点 + 样本；缓存卡加 2dp 用量条（已用 / 上限）。</li>
+          <li><span class="n">4</span>底部粘性条：「已自动保存」10.5sp +「完成」主按钮；同步卡保留「保存并同步」，其余即时生效。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="spec">
+      <div><span>卡片圆角</span><b>14dp</b></div>
+      <div><span>控件高度</span><b>40 → 44dp</b></div>
+      <div><span>分段器</span><b>3 × 44dp</b></div>
+      <div><span>底部安全区</span><b>≥ 20 + 6dp</b></div>
+    </div>
+  </section>
+
+  <!-- ================= 07 跨屏规则 ================= -->
+  <section id="rules">
+    <div class="label">Rules</div>
+    <h2>跨屏规则：把「书」的秩序写死</h2>
+    <p class="sub">
+      六屏各自修完之后，还需要同一套规则兜底，否则下一轮又会分叉。
+      以下九条可直接落到 <code>Ui.java</code> 的常量与各页的 build 方法里。
+    </p>
+
+    <div class="rules">
+      <table>
+        <thead><tr><th>组件</th><th>统一规则</th></tr></thead>
+        <tbody>
+          <tr><td>页头</td><td>44dp 返回热区 + 22sp 页面标题 + 右侧最多一个动作；标题下只允许一行 11sp 说明。页面左右统一 20dp，书架页例外地把印章放在标题左侧。</td></tr>
+          <tr><td>主对象</td><td>每屏只允许一个朱砂实色动作：书架 = 导入 TXT，搜索 = 搜索，书源 = 导入 JSON，设置 = 完成。其余全部为「卡片底 + 1px 界线 + 胶囊」。</td></tr>
+          <tr><td>列表行</td><td>行高 ≥ 56dp；左序号 28dp / 主标题 16sp / meta 11sp / 右状态 10.5sp；行间 1px <code>line-soft</code>，左侧缩进 28dp。</td></tr>
+          <tr><td>触控</td><td>所有可点区域 ≥ 44 × 44dp；滑杆 thumb ≥ 12dp + 4dp 光晕；图标统一 20px 线性，不再混用字族符号。</td></tr>
+          <tr><td>浮层</td><td>一律底部 sheet：上圆角 16dp、grabber 32 × 3、最大高 78%；危险动作赭色 + 二次确认，不再使用系统 AlertDialog 列表。</td></tr>
+          <tr><td>安全区</td><td>状态栏 / 开孔 / 手势区全部用窗口级 inset；阅读页底部 ≥ 20dp + 6dp；设置粘性保存条同样避让。</td></tr>
+          <tr><td>字号</td><td>页面 22 / 书名 17 / 行 16 / 分组 12 / 正文 14 / 提示 12 / meta 10.5；标题字距 +.04–.06em，正文不加。</td></tr>
+          <tr><td>主题</td><td>三套 <code>Ui.Palette</code> 必须覆盖对话框、Toast、系统栏；切换主题不得重建 Activity，阅读页现有 <code>applyTheme</code> 已是正确做法。</td></tr>
+          <tr><td>动效</td><td>浮层 380 / 420ms、<code>cubic-bezier(.22,.8,.24,1)</code>，页脚 200ms 淡出；不做缩放、不做重排，系统「减少动画」时直接切换。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ================= 08 落地 ================= -->
+  <section id="priority">
+    <div class="label">Priority</div>
+    <h2>先修第一眼，再统一结构</h2>
+    <p class="sub">
+      P0 决定这套界面能不能被认成「一本书」；P1 决定它有没有「口袋本」的顺手；
+      P2 只做精修，不改变结论。
+    </p>
+
+    <div class="prio">
+      <div class="col p0">
+        <div class="k">P0 · 气质</div>
+        <h4>先做三件</h4>
+        <ol>
+          <li>阅读页顶栏加章节、底栏分两行、页脚加字距；补一次性「轻点中间」提示。</li>
+          <li>书架页头改为「书架」+ 同步状态；动作 4 → 3，设置改 44dp 圆形图标。</li>
+          <li>设置合并保存入口，主题改三色分段器；先做视觉，再改保存逻辑。</li>
+        </ol>
+      </div>
+      <div class="col">
+        <div class="k">P1 · 结构</div>
+        <h4>再统一三处</h4>
+        <ol>
+          <li>目录 / 排版 AlertDialog → 底部 sheet；目录加序号与「在读」。</li>
+          <li>搜索三态（搜索中 / 无书源 / 无结果）+ 结果行「加入 / 已加入」。</li>
+          <li>书源行加状态点与启用、说明收一行；空状态与搜索共用。</li>
+        </ol>
+      </div>
+      <div class="col">
+        <div class="k">P2 · 精修</div>
+        <h4>最后统一</h4>
+        <ol>
+          <li>四个面板图标换 20px 线性；滑杆 / 复选框 / 输入框高度归一。</li>
+          <li>书目行加 2dp 细进度线；空状态印章。</li>
+          <li>三主题对比度校准（夜间 muted 对 bg ≥ 4.5:1），截图验收。</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="rules code" style="margin-top:28px">
+      <table>
+        <thead><tr><th>层</th><th>文件</th><th>落点</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>令牌</td>
+            <td><code>Ui.java</code></td>
+            <td><code>Palette</code> 三主题、<code>SPACE_PAGE / LIST / CARD</code>、<code>TEXT_*</code>、<code>RADIUS_CARD / ROW / INPUT / PILL</code>；新增 sheet 圆角、图标尺寸与触控最小高度常量。</td>
+          </tr>
+          <tr>
+            <td>书架</td>
+            <td><code>MainActivity.java</code></td>
+            <td><code>buildViews</code>（页头 / 动作）、<code>heroCard</code>（竖排书脊）、<code>bookRow</code>（行内 2dp 进度）、<code>emptyHint</code>（空状态）；长按菜单改操作面板。</td>
+          </tr>
+          <tr>
+            <td>阅读</td>
+            <td><code>ReaderActivity.java</code></td>
+            <td><code>buildViews</code>（顶栏 / 底栏 / 页脚）、<code>animateChrome</code>（沿用曲线）、<code>showToc</code> 与 <code>showTypePanel</code>（改 sheet）、<code>styleChapterBar</code>（2dp + 12dp）、<code>applyTheme</code>（保持）。</td>
+          </tr>
+          <tr>
+            <td>搜索</td>
+            <td><code>SearchActivity.java</code></td>
+            <td>页头返回、搜索框与按钮同高、<code>showHits</code> 结果行加书脊 / 加入状态；补搜索中进度线与三态空状态。</td>
+          </tr>
+          <tr>
+            <td>书源</td>
+            <td><code>SourcesActivity.java</code></td>
+            <td>页头计数、说明收一行、<code>refresh</code> 行内状态点与启用；长按改操作面板，删除走二次确认。</td>
+          </tr>
+          <tr>
+            <td>设置</td>
+            <td><code>SettingsActivity.java</code></td>
+            <td>页头版本、卡片分组、排版预览、三色分段器、标点 2 列网格、缓存用量条；<code>saveAll</code> 收敛为单一保存路径。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="page-foot">
+    <span>依据 · docs/视觉升级方案-桌面与移动端.html / docs/审查稿-桌面端视觉对照.html</span>
+    <span>本稿仅做视觉审查，未改动代码 · 2026-11-19</span>
+  </div>
+</div>
+
+<div class="switcher" role="group" aria-label="主题预览">
+  <button type="button" data-set="paper" aria-pressed="true">纸白</button>
+  <button type="button" data-set="night" aria-pressed="false">夜间</button>
+  <button type="button" data-set="green" aria-pressed="false">护眼</button>
+</div>
+
+<script>
+  const root = document.documentElement;
+  const buttons = document.querySelectorAll('.switcher button');
+  buttons.forEach(function (button) {
+    button.addEventListener('click', function () {
+      root.dataset.theme = button.dataset.set;
+      buttons.forEach(function (b) {
+        b.setAttribute('aria-pressed', String(b === button));
+      });
+    });
+  });
+</script>
+</body>
+</html>

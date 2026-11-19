@@ -43,38 +43,26 @@ import javafx.util.Duration;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /** 阅读器：目录侧栏 + 正文滚动区，进度按章节与章内百分比保存。 */
 public class ReaderView implements AppView {
 
-    private static final Map<String, Theme> THEMES = Map.of(
-            "paper", new Theme("纸白", "#f6f1e7", "#2f2a24", "#ece4d4"),
-            "night", new Theme("夜间", "#1b1c20", "#c8c6c0", "#24262c"),
-            "green", new Theme("护眼", "#e6efe4", "#2d3a2b", "#d8e6d5"));
-
-    private static final class Theme {
-        final String label;
-        final String background;
-        final String foreground;
-        final String bar;
-
-        Theme(String label, String background, String foreground, String bar) {
-            this.label = label;
-            this.background = background;
-            this.foreground = foreground;
-            this.bar = bar;
-        }
-    }
-
     private final AppContext ctx;
     private final MainWindow window;
 
+    /** 版心宽度：窗口再宽正文也保持约 620px 的舒适行宽。 */
+    private static final double PAGE_WIDTH = 620;
+    private static final double PAGE_SIDE = 24;
+
     private final BorderPane root = new BorderPane();
     private final HBox toolbar = new HBox(8);
-    private final Label bookLabel = Ui.label("", "reader-book");
-    private final Label chapterLabel = Ui.label("", "reader-chapter");
-    private final Label percentLabel = Ui.label("", "reader-percent");
+    private final HBox runningHeader = new HBox(10);
+    private final HBox runningFoot = new HBox(10);
+    private final Label toolbarTitle = Ui.label("", "reader-toolbar-title");
+    private final Label chapterLabel = Ui.label("", "running-text", "running-chapter");
+    private final Label pageLabel = Ui.label("", "running-page");
+    private final Label footBook = Ui.label("", "running-text", "running-book");
+    private final Label percentLabel = Ui.label("", "running-page");
     private final VBox tocBox = new VBox(6);
     private final ListView<Chapter> toc = new ListView<>();
     private final TextField tocSearch = new TextField();
@@ -83,7 +71,6 @@ public class ReaderView implements AppView {
     private final Region resizeHandle = new Region();
     private final ScrollPane scroll = new ScrollPane();
     private final VBox flow = new VBox();
-    private final Button highlightToggle = Ui.button("着色 开", "ghost-button");
     private final PauseTransition saveTimer = new PauseTransition(Duration.millis(700));
 
     private Book book;
@@ -108,6 +95,8 @@ public class ReaderView implements AppView {
     private final List<List<Node>> pages = new ArrayList<>();
     private int pageIndex;
     private int pendingPage = -1;
+    /** 首个正文自然段下标：不缩进、改用楷体字号，作为内页起手式。 */
+    private int firstParagraphIndex = -1;
     /** 用户是否真的翻页/切章；只打开书或窗口重排不应刷新进度时间。 */
     private boolean progressDirty;
     private boolean fadeNextRender;
@@ -138,33 +127,17 @@ public class ReaderView implements AppView {
             resizeHandle.setManaged(visible);
         });
 
-        Button smaller = Ui.button("A－", "ghost-button");
-        smaller.setOnAction(e -> changeFontSize(-1));
-        Button larger = Ui.button("A＋", "ghost-button");
-        larger.setOnAction(e -> changeFontSize(1));
-        Button typesetting = Ui.button("排版", "ghost-button");
-        typesetting.setOnAction(e -> openTypesetting());
-        Button theme = Ui.button("主题", "ghost-button");
-        theme.setOnAction(e -> cycleTheme());
-        highlightToggle.setOnAction(e -> toggleHighlight());
-
-        Button prev = Ui.button("上一章", "ghost-button");
-        prev.setOnAction(e -> previousChapter());
-        Button next = Ui.button("下一章", "ghost-button");
-        next.setOnAction(e -> nextChapter());
+        Button panel = Ui.button("Aa", "ghost-button");
+        panel.setOnAction(e -> openReaderPanel());
 
         toolbar.getStyleClass().add("reader-toolbar");
         toolbar.setAlignment(Pos.CENTER_LEFT);
         toolbar.setPadding(new Insets(8, 14, 8, 14));
-        toolbar.getChildren().addAll(back, bookLabel, chapterLabel, spacer, prev, next,
-                tocToggle, smaller, larger, typesetting, highlightToggle, theme, percentLabel);
+        toolbar.getChildren().addAll(back, toolbarTitle, spacer, tocToggle, panel);
 
         Label tocTitle = Ui.label("目录", "toc-title");
         Region tocSpacer = new Region();
         HBox.setHgrow(tocSpacer, Priority.ALWAYS);
-        HBox tocHeader = new HBox(8, tocTitle, tocCount, tocSpacer, Ui.label("读", "toc-seal"));
-        tocHeader.setAlignment(Pos.CENTER_LEFT);
-        tocHeader.getStyleClass().add("toc-header");
 
         tocSearch.setPromptText("搜索章节");
         tocSearch.getStyleClass().add("toc-search");
@@ -172,6 +145,22 @@ public class ReaderView implements AppView {
         HBox tocSearchWrap = new HBox(tocSearch);
         HBox.setHgrow(tocSearch, Priority.ALWAYS);
         tocSearchWrap.getStyleClass().add("toc-search-wrap");
+        tocSearchWrap.setVisible(false);
+        tocSearchWrap.setManaged(false);
+
+        Button tocSearchToggle = Ui.button("搜", "toc-search-toggle");
+        tocSearchToggle.setOnAction(e -> {
+            boolean visible = !tocSearchWrap.isVisible();
+            tocSearchWrap.setVisible(visible);
+            tocSearchWrap.setManaged(visible);
+            if (visible) {
+                tocSearch.requestFocus();
+            }
+        });
+
+        HBox tocHeader = new HBox(8, tocTitle, tocCount, tocSpacer, tocSearchToggle);
+        tocHeader.setAlignment(Pos.CENTER_LEFT);
+        tocHeader.getStyleClass().add("toc-header");
 
         toc.getStyleClass().add("toc-list");
         toc.setFixedCellSize(36);
@@ -195,11 +184,6 @@ public class ReaderView implements AppView {
                     Region dot = new Region();
                     dot.getStyleClass().add("toc-dot");
                     row.getChildren().add(dot);
-                }
-                if (item == currentChapter) {
-                    Label reading = new Label("在读");
-                    reading.getStyleClass().add("toc-reading");
-                    row.getChildren().add(reading);
                 }
                 setGraphic(row);
             }
@@ -225,7 +209,7 @@ public class ReaderView implements AppView {
 
         tocBox.getStyleClass().add("toc-box");
         tocBox.setPadding(new Insets(0));
-        tocWidth = Math.max(180, Math.min(460, ctx.settings.getInt(SettingsService.TOC_WIDTH, 270)));
+        tocWidth = Math.max(180, Math.min(460, ctx.settings.getInt(SettingsService.TOC_WIDTH, 236)));
         tocBox.setPrefWidth(tocWidth);
         tocBox.setMinWidth(180);
         tocBox.setMaxWidth(460);
@@ -252,7 +236,8 @@ public class ReaderView implements AppView {
 
         flow.getStyleClass().add("reader-flow");
         flow.setFillWidth(true);
-        flow.setPadding(new Insets(18, 36, 20, 36));
+        flow.setPadding(new Insets(12, PAGE_SIDE, 16, PAGE_SIDE));
+        scroll.getStyleClass().add("reader-scroll");
         scroll.setFitToWidth(true);
         scroll.setContent(flow);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
@@ -273,11 +258,30 @@ public class ReaderView implements AppView {
         saveTimer.setOnFinished(e -> saveIfDirty());
         HBox main = new HBox(tocBox, resizeHandle);
         main.setFillHeight(true);
+
+        Region headSpacer = new Region();
+        HBox.setHgrow(headSpacer, Priority.ALWAYS);
+        runningHeader.setAlignment(Pos.CENTER_LEFT);
+        runningHeader.getStyleClass().add("running-header");
+        runningHeader.setPadding(new Insets(14, PAGE_SIDE, 6, PAGE_SIDE));
+        runningHeader.getChildren().addAll(chapterLabel, headSpacer, pageLabel);
+
+        Region footSpacer = new Region();
+        HBox.setHgrow(footSpacer, Priority.ALWAYS);
+        runningFoot.setAlignment(Pos.CENTER_LEFT);
+        runningFoot.getStyleClass().add("running-foot");
+        runningFoot.setPadding(new Insets(2, PAGE_SIDE, 12, PAGE_SIDE));
+        runningFoot.getChildren().addAll(footBook, footSpacer, percentLabel);
+
+        VBox pageArea = new VBox(runningHeader, scroll, runningFoot);
+        VBox.setVgrow(scroll, Priority.ALWAYS);
+
         root.setFocusTraversable(true);
+        root.getStyleClass().add("reader-root");
         root.addEventFilter(KeyEvent.KEY_PRESSED, this::handleKey);
         root.setTop(toolbar);
         root.setLeft(main);
-        root.setCenter(scroll);
+        root.setCenter(pageArea);
     }
 
     public void open(Book book, int chapterIndex, int charOffset) {
@@ -293,7 +297,9 @@ public class ReaderView implements AppView {
         blocks.clear();
         pages.clear();
         pageIndex = 0;
-        bookLabel.setText(book.title);
+        String author = book.author == null || book.author.isBlank() ? "未知作者" : book.author;
+        footBook.setText(book.title + " · " + author);
+        toolbarTitle.setText(book.title);
         tocSearch.clear();
         refreshTocList(false);
         applyStyle();
@@ -352,13 +358,32 @@ public class ReaderView implements AppView {
         for (String paragraph : content.split("\n", -1)) {
             blocks.add(paragraph.isBlank() ? "" : paragraph);
         }
+        firstParagraphIndex = findFirstParagraph();
         flow.getChildren().clear();
         if (loading) {
-            for (String block : blocks) {
-                flow.getChildren().add(block.isEmpty() ? blankSpacer() : paragraphNode(ReaderStyles.indent(block)));
+            for (int i = 0; i < blocks.size(); i++) {
+                String block = blocks.get(i);
+                boolean first = i == firstParagraphIndex;
+                flow.getChildren().add(block.isEmpty() ? blankSpacer()
+                        : paragraphNode(first ? block.stripLeading() : ReaderStyles.indent(block), first));
             }
             flow.setOpacity(1);
         }
+    }
+
+    /** 第一个非空、且不是章节标题的自然段，作为内页起手段。 */
+    private int findFirstParagraph() {
+        for (int i = 0; i < blocks.size(); i++) {
+            String block = blocks.get(i);
+            if (block.isEmpty()) {
+                continue;
+            }
+            if (ReaderStyles.isChapterTitle(block.stripLeading())) {
+                continue;
+            }
+            return i;
+        }
+        return -1;
     }
 
     private double lineGap() {
@@ -375,15 +400,21 @@ public class ReaderView implements AppView {
     }
 
     /** 单个自然段 → 着色 TextFlow；text 传入的是已缩进文本，切页续段不会重复缩进。 */
-    private TextFlow paragraphNode(String text) {
+    private TextFlow paragraphNode(String text, boolean first) {
         TextFlow line = new TextFlow();
         line.getStyleClass().add("reader-paragraph");
+        if (first) {
+            line.getStyleClass().add("reader-first");
+        }
         line.setLineSpacing(lineGap());
         line.setMaxWidth(Double.MAX_VALUE);
-        ReaderStyles.fillRaw(line, text, readerFont, ctx.settings.punctEnabled(),
+        Font font = first
+                ? Font.font("KaiTi", Math.min(32, ctx.settings.fontSize() + 1))
+                : readerFont;
+        ReaderStyles.fillRaw(line, text, font, ctx.settings.punctEnabled(),
                 ReaderStyles.rules(ctx.settings),
                 ReaderStyles.colors(ctx.settings, ctx.settings.theme()),
-                Color.web(theme().foreground));
+                Color.web(theme().ink));
         return line;
     }
 
@@ -477,6 +508,18 @@ public class ReaderView implements AppView {
         showPage(target, animate);
     }
 
+    /** 版心随窗口收窄：优先保证正文 620px，边距不足时先压缩留白，最小 24px。 */
+    private void applyPageWidth() {
+        double viewportWidth = scroll.getViewportBounds().getWidth();
+        double side = PAGE_SIDE;
+        if (viewportWidth > PAGE_WIDTH + PAGE_SIDE * 2) {
+            side = Math.floor((viewportWidth - PAGE_WIDTH) / 2);
+        }
+        flow.setPadding(new Insets(12, side, 16, side));
+        runningHeader.setPadding(new Insets(14, side, 6, side));
+        runningFoot.setPadding(new Insets(2, side, 12, side));
+    }
+
     /** 把整章切分成若干页：每页只保存该页的节点，页末不留半截段落，超长段落才按字符续页。 */
     private void paginate() {
         pages.clear();
@@ -485,6 +528,7 @@ public class ReaderView implements AppView {
             updatePercent();
             return;
         }
+        applyPageWidth();
         double width = scroll.getViewportBounds().getWidth();
         Insets padding = flow.getInsets();
         double usable = scroll.getViewportBounds().getHeight() - padding.getTop() - padding.getBottom();
@@ -499,7 +543,9 @@ public class ReaderView implements AppView {
         double blankLine = readerFont.getSize() * 1.2;
         List<Node> page = new ArrayList<>();
         double used = 0;
-        for (String block : blocks) {
+        for (int blockIndex = 0; blockIndex < blocks.size(); blockIndex++) {
+            String block = blocks.get(blockIndex);
+            boolean first = blockIndex == firstParagraphIndex;
             if (block.isEmpty()) {
                 double total = (page.isEmpty() ? 0 : gap) + blankLine;
                 if (!page.isEmpty() && used + total > usable) {
@@ -512,11 +558,11 @@ public class ReaderView implements AppView {
                 used += total;
                 continue;
             }
-            String text = ReaderStyles.indent(block);
+            String text = first ? block.stripLeading() : ReaderStyles.indent(block);
             int offset = 0;
             while (offset < text.length()) {
                 String rest = text.substring(offset);
-                TextFlow node = paragraphNode(rest);
+                TextFlow node = paragraphNode(rest, first);
                 double height = node.prefHeight(contentWidth);
                 double total = (page.isEmpty() ? 0 : gap) + height;
                 if (used + total <= usable) {
@@ -532,8 +578,8 @@ public class ReaderView implements AppView {
                     continue;
                 }
                 // 空页也放不下：按能容纳的字数切开，剩余部分留给下一页
-                int take = fittingCount(rest, contentWidth, usable);
-                page.add(paragraphNode(rest.substring(0, take)));
+                int take = fittingCount(rest, contentWidth, usable, first);
+                page.add(paragraphNode(rest.substring(0, take), first));
                 pages.add(page);
                 page = new ArrayList<>();
                 used = 0;
@@ -550,13 +596,13 @@ public class ReaderView implements AppView {
     }
 
     /** 二分查找在给定高度内最多能排下的字符数，至少取一个字符避免死循环。 */
-    private int fittingCount(String text, double width, double maxHeight) {
+    private int fittingCount(String text, double width, double maxHeight, boolean first) {
         int low = 1;
         int high = text.length();
         int best = 1;
         while (low <= high) {
             int mid = (low + high) >>> 1;
-            if (paragraphNode(text.substring(0, mid)).prefHeight(width) <= maxHeight) {
+            if (paragraphNode(text.substring(0, mid), first).prefHeight(width) <= maxHeight) {
                 best = mid;
                 low = mid + 1;
             } else {
@@ -568,8 +614,11 @@ public class ReaderView implements AppView {
 
     private List<Node> loadingNodes() {
         List<Node> nodes = new ArrayList<>();
-        for (String block : blocks) {
-            nodes.add(block.isEmpty() ? blankSpacer() : paragraphNode(ReaderStyles.indent(block)));
+        for (int i = 0; i < blocks.size(); i++) {
+            String block = blocks.get(i);
+            boolean first = i == firstParagraphIndex;
+            nodes.add(block.isEmpty() ? blankSpacer()
+                    : paragraphNode(first ? block.stripLeading() : ReaderStyles.indent(block), first));
         }
         return nodes;
     }
@@ -577,8 +626,8 @@ public class ReaderView implements AppView {
     /** 整页替换：只把本页节点放进容器，因此不会出现上一页末尾残留在本页顶部。 */
     private void showPage(int index, boolean animate) {
         if (pages.isEmpty()) {
-            percentLabel.setText("0/0");
-            updateTocFooter();
+            pageLabel.setText("0 / 0");
+            updatePercent();
             return;
         }
         int previous = pageIndex;
@@ -651,21 +700,22 @@ public class ReaderView implements AppView {
         }
     }
 
-    private Theme theme() {
-        return THEMES.getOrDefault(ctx.settings.theme(), THEMES.get("paper"));
-    }
-
-    private void toggleHighlight() {
-        boolean enabled = !ctx.settings.punctEnabled();
-        ctx.settings.put(SettingsService.PUNCT_ENABLED, String.valueOf(enabled));
-        applyStyle();
+    private Ui.Theme theme() {
+        return Ui.theme(ctx.settings.theme());
     }
 
     private void updatePercent() {
         if (pages.isEmpty()) {
-            percentLabel.setText("0/0");
+            pageLabel.setText("0 / 0");
         } else {
-            percentLabel.setText((pageIndex + 1) + "/" + pages.size());
+            pageLabel.setText((pageIndex + 1) + " / " + pages.size());
+        }
+        if (book == null || chapters.isEmpty()) {
+            percentLabel.setText("0.0%");
+        } else {
+            double inChapter = pages.isEmpty() ? 0 : (double) (pageIndex + 1) / pages.size();
+            double overall = Math.min(1, (index + inChapter) / chapters.size());
+            percentLabel.setText(String.format(java.util.Locale.ROOT, "%.1f%%", overall * 100));
         }
         updateTocFooter();
     }
@@ -700,7 +750,12 @@ public class ReaderView implements AppView {
             }
         }
         selecting = false;
-        tocCount.setText("共 " + chapters.size() + " 章");
+        if (chapters.isEmpty()) {
+            tocCount.setText("");
+        } else {
+            int chapterNo = index < 0 ? 1 : index + 1;
+            tocCount.setText("第 " + chapterNo + " / " + chapters.size() + " 章");
+        }
         updateTocFooter();
     }
 
@@ -709,17 +764,7 @@ public class ReaderView implements AppView {
             tocFooter.setText("");
             return;
         }
-        int chapterNo = index < 0 ? 0 : index + 1;
-        String page = pages.isEmpty() ? "0/0" : (pageIndex + 1) + "/" + pages.size();
-        tocFooter.setText("已缓存 " + cachedCount + " 章 · 第 " + chapterNo + " 章 · " + page + " 页");
-    }
-
-    private static String rgba(Color color, double opacity) {
-        return String.format("rgba(%d,%d,%d,%.2f)",
-                (int) Math.round(color.getRed() * 255),
-                (int) Math.round(color.getGreen() * 255),
-                (int) Math.round(color.getBlue() * 255),
-                opacity);
+        tocFooter.setText("已缓存 " + cachedCount + " 章");
     }
 
     /** 关闭窗口前立即落库，避免退出时丢失当前页。 */
@@ -743,21 +788,20 @@ public class ReaderView implements AppView {
         progressDirty = false;
     }
 
-    private void changeFontSize(int delta) {
-        int size = Math.max(12, Math.min(32, ctx.settings.fontSize() + delta));
-        ctx.settings.put(SettingsService.FONT_SIZE, String.valueOf(size));
-        applyStyle();
-    }
-
-    /** 阅读中排版面板：字体取系统已安装字体，调整即时生效并持久化。 */
-    private void openTypesetting() {
+    /** 阅读面板：字号、行距、字体、主题与着色，调整即时生效并持久化。 */
+    private void openReaderPanel() {
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.initOwner(window.stage());
-        dialog.setTitle("排版设置");
+        dialog.setTitle("阅读设置");
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
-        if (root.getScene() != null) {
-            dialog.getDialogPane().getStylesheets().addAll(root.getScene().getStylesheets());
-        }
+        Ui.styleDialog(dialog, window.stage());
+
+        Button prev = Ui.button("上一章", "ghost-button");
+        prev.setOnAction(e -> previousChapter());
+        Button next = Ui.button("下一章", "ghost-button");
+        next.setOnAction(e -> nextChapter());
+        HBox chapterRow = new HBox(8, prev, next);
+        chapterRow.setAlignment(Pos.CENTER_LEFT);
 
         ComboBox<String> families = new ComboBox<>();
         families.getItems().setAll(Ui.fontFamilies());
@@ -769,30 +813,50 @@ public class ReaderView implements AppView {
         size.setEditable(true);
         spacing.setEditable(true);
 
+        ComboBox<String> themeChoice = new ComboBox<>();
+        themeChoice.getItems().addAll("纸白", "夜间", "护眼");
+        themeChoice.setValue(themeLabel(ctx.settings.theme()));
+        themeChoice.setPrefWidth(260);
+
         CheckBox highlight = new CheckBox("标点着色");
         highlight.setSelected(ctx.settings.punctEnabled());
         highlight.selectedProperty().addListener((observable, oldValue, newValue) -> {
             ctx.settings.put(SettingsService.PUNCT_ENABLED, String.valueOf(newValue));
             applyStyle();
         });
+        themeChoice.valueProperty().addListener((observable, oldValue, newValue) -> {
+            if (newValue == null) {
+                return;
+            }
+            String key = themeKeyOf(newValue);
+            ctx.settings.put(SettingsService.THEME, key);
+            dialog.getDialogPane().setStyle(Ui.themeTokens(Ui.theme(key)));
+            applyStyle();
+            window.applyTheme();
+        });
 
         GridPane grid = new GridPane();
         grid.setHgap(12);
         grid.setVgap(10);
-        grid.add(new Label("字体"), 0, 0);
-        grid.add(families, 1, 0);
-        grid.add(new Label("字号"), 0, 1);
-        grid.add(size, 1, 1);
-        grid.add(new Label("行距（倍）"), 0, 2);
-        grid.add(spacing, 1, 2);
-        grid.add(new Label("标点着色"), 0, 3);
-        grid.add(highlight, 1, 3);
+        grid.add(new Label("章节"), 0, 0);
+        grid.add(chapterRow, 1, 0);
+        grid.add(new Label("字体"), 0, 1);
+        grid.add(families, 1, 1);
+        grid.add(new Label("字号"), 0, 2);
+        grid.add(size, 1, 2);
+        grid.add(new Label("行距（倍）"), 0, 3);
+        grid.add(spacing, 1, 3);
+        grid.add(new Label("主题"), 0, 4);
+        grid.add(themeChoice, 1, 4);
+        grid.add(new Label("标点着色"), 0, 5);
+        grid.add(highlight, 1, 5);
 
         Button reset = Ui.button("恢复默认", "ghost-button");
         reset.setOnAction(e -> {
             families.setValue(SettingsService.DEFAULT_FONT_FAMILY);
             size.getValueFactory().setValue(18);
-            spacing.getValueFactory().setValue(1.8);
+            spacing.getValueFactory().setValue(2.0);
+            themeChoice.setValue("纸白");
         });
 
         families.valueProperty().addListener((observable, oldValue, newValue) -> {
@@ -817,74 +881,43 @@ public class ReaderView implements AppView {
         VBox content = new VBox(12, grid, reset,
                 Ui.label("调整会立即应用到正文并自动保存；关闭窗口即可。", "muted"));
         content.setPadding(new Insets(16, 20, 8, 20));
-        content.setPrefWidth(380);
+        content.setPrefWidth(400);
         dialog.getDialogPane().setContent(content);
         dialog.showAndWait();
     }
 
-    private void cycleTheme() {
-        String current = ctx.settings.theme();
-        String next = switch (current) {
-            case "night" -> "green";
-            case "green" -> "paper";
-            default -> "night";
+    private static String themeLabel(String key) {
+        return switch (key == null ? "" : key) {
+            case "night" -> "夜间";
+            case "green" -> "护眼";
+            default -> "纸白";
         };
-        ctx.settings.put(SettingsService.THEME, next);
-        applyStyle();
+    }
+
+    private static String themeKeyOf(String label) {
+        return switch (label == null ? "" : label) {
+            case "夜间" -> "night";
+            case "护眼" -> "green";
+            default -> "paper";
+        };
     }
 
     private void applyStyle() {
         int size = ctx.settings.fontSize();
         String family = Fonts.resolve(ctx.settings.fontFamily());
-        Theme theme = theme();
+        Ui.Theme theme = theme();
 
         readerFont = family == null ? Font.font(size) : Font.font(family, size);
         // 段落被拆成独立 TextFlow，段间距也要跟随行距设置，否则只在段内换行时生效
         flow.setSpacing(lineGap());
-        highlightToggle.setText(ctx.settings.punctEnabled() ? "着色 开" : "着色 关");
         // 重新排版会重建分页，用当前页比例保住阅读位置
         pendingPage = -1;
         if (!pages.isEmpty()) {
             pendingFraction = pages.size() <= 1 ? 0 : (double) pageIndex / (pages.size() - 1);
         }
-        flow.setStyle("-fx-background-color:" + theme.background + ";");
-        scroll.setStyle("-fx-background:" + theme.background + "; -fx-background-color:" + theme.background + ";");
-        toolbar.setStyle("-fx-background-color:" + theme.bar + ";");
-        applyTocStyle(theme);
-        root.setStyle("-fx-background-color:" + theme.background + ";");
+        // 一处覆盖主题令牌，正文、工具栏、目录、书眉与页脚都由 CSS 统一切换
+        root.setStyle(Ui.themeTokens(theme));
         setContent(content);
-    }
-
-    /** 目录配色跟随主题：通过 looked-up color 让 CSS 与代码共用一套颜色。 */
-    private void applyTocStyle(Theme theme) {
-        String key = ctx.settings.theme();
-        Color ink = Color.web(theme.foreground);
-        String accent = "night".equals(key) ? "#e08b7d" : "#a63d32";
-        String selected = switch (key) {
-            case "night" -> "rgba(224,139,125,0.20)";
-            case "green" -> "rgba(166,61,50,0.12)";
-            default -> "rgba(166,61,50,0.10)";
-        };
-        String hover = switch (key) {
-            case "night" -> "rgba(255,255,255,0.05)";
-            case "green" -> "rgba(166,61,50,0.06)";
-            default -> "rgba(166,61,50,0.05)";
-        };
-        String field = switch (key) {
-            case "night" -> "rgba(255,255,255,0.06)";
-            case "green" -> "rgba(255,255,255,0.45)";
-            default -> "rgba(255,253,249,0.65)";
-        };
-        tocBox.setStyle("-fx-background-color:" + theme.bar + ";"
-                + "-toc-ink:" + theme.foreground + ";"
-                + "-toc-muted:" + rgba(ink, 0.62) + ";"
-                + "-toc-line:" + rgba(ink, 0.14) + ";"
-                + "-toc-accent:" + accent + ";"
-                + "-toc-selected:" + selected + ";"
-                + "-toc-hover:" + hover + ";"
-                + "-toc-field:" + field + ";");
-        resizeHandle.setStyle("-fx-border-color: transparent transparent transparent " + rgba(ink, 0.18)
-                + "; -fx-border-width: 0 0 0 1;");
     }
 
     /** 设置页保存后调用，让已打开的阅读界面立即套用新样式。 */

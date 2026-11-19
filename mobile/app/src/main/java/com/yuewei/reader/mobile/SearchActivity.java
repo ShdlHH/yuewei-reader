@@ -8,6 +8,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -26,6 +27,11 @@ public class SearchActivity extends Activity {
     private EditText keyword;
     private LinearLayout results;
     private TextView searchButton;
+    private TextView sourceCount;
+    private LinearLayout progressBox;
+    private TextView progressNote;
+    private List<OnlineService.Hit> lastHits;
+    private boolean fetching;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,58 +47,106 @@ public class SearchActivity extends Activity {
         setContentView(root);
         Ui.systemBars(this, palette);
 
-        LinearLayout header = new LinearLayout(this);
-        header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(dp(18), dp(14), dp(18), dp(8));
+        sourceCount = new TextView(this);
+        sourceCount.setTextSize(10.5f);
+        sourceCount.setTextColor(palette.muted);
+        sourceCount.setLetterSpacing(0.04f);
 
-        TextView back = Ui.pill(this, "‹ 书架", false, palette);
-        back.setOnClickListener(v -> finish());
-        header.addView(back);
-
-        TextView title = new TextView(this);
-        title.setText("在线搜索");
-        title.setTextSize(20);
-        title.setTypeface(Ui.SERIF_BOLD);
-        title.setTextColor(palette.ink);
-        title.setPadding(dp(14), 0, 0, 0);
-        header.addView(title, new LinearLayout.LayoutParams(0,
-                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout header = Ui.pageHeader(this, palette, "在线搜索", null,
+                sourceCount, this::finish);
         root.addView(header);
 
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(18), dp(4), dp(18), dp(8));
+        bar.setPadding(dp(Ui.SPACE_PAGE), dp(2), dp(Ui.SPACE_PAGE), dp(6));
 
-        keyword = new EditText(this);
-        keyword.setHint("书名或作者");
-        keyword.setHintTextColor(palette.muted);
-        keyword.setTextSize(14);
-        keyword.setTextColor(palette.ink);
-        keyword.setInputType(InputType.TYPE_CLASS_TEXT);
-        keyword.setSingleLine(true);
-        keyword.setPadding(dp(12), dp(9), dp(12), dp(9));
-        keyword.setBackground(Ui.roundStroke(this, palette.card, palette.line, 10));
+        keyword = Ui.input(this, palette, "书名或作者", InputType.TYPE_CLASS_TEXT);
         bar.addView(keyword, new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
         searchButton = Ui.pill(this, "搜索", true, palette);
         LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        buttonParams.setMargins(dp(10), 0, 0, 0);
+        buttonParams.setMargins(dp(8), 0, 0, 0);
         searchButton.setOnClickListener(v -> doSearch());
         bar.addView(searchButton, buttonParams);
         root.addView(bar);
+
+        progressBox = new LinearLayout(this);
+        progressBox.setOrientation(LinearLayout.VERTICAL);
+        progressBox.setPadding(dp(Ui.SPACE_PAGE), 0, dp(Ui.SPACE_PAGE), dp(6));
+        progressBox.setVisibility(View.GONE);
+
+        ProgressBar progress = new ProgressBar(this, null,
+                android.R.attr.progressBarStyleHorizontal);
+        progress.setIndeterminate(true);
+        progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(palette.accent));
+        progressBox.addView(progress, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(2)));
+
+        progressNote = new TextView(this);
+        progressNote.setTextSize(10.5f);
+        progressNote.setTextColor(palette.muted);
+        progressNote.setPadding(0, dp(5), 0, 0);
+        progressBox.addView(progressNote);
+        root.addView(progressBox);
 
         ScrollView scroll = new ScrollView(this);
         scroll.setClipToPadding(false);
         results = new LinearLayout(this);
         results.setOrientation(LinearLayout.VERTICAL);
-        results.setPadding(dp(16), dp(4), dp(16), dp(24));
+        results.setPadding(dp(Ui.SPACE_PAGE), dp(4), dp(Ui.SPACE_PAGE), dp(24));
         scroll.addView(results);
         root.addView(scroll, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        keyword.setOnEditorActionListener((v, actionId, event) -> {
+            doSearch();
+            return true;
+        });
+        updateSourceCount();
+        showInitialHint();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        sources.reload();
+        updateSourceCount();
+        if (lastHits != null) {
+            showHits(lastHits);
+        }
+    }
+
+    private void updateSourceCount() {
+        if (sourceCount != null) {
+            sourceCount.setText(sources.sources.size() + " 个书源");
+        }
+    }
+
+    private void showInitialHint() {
+        results.removeAllViews();
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER_HORIZONTAL);
+        box.setPadding(0, dp(48), 0, 0);
+
+        TextView title = new TextView(this);
+        title.setText("输入书名或作者");
+        title.setTextSize(Ui.TEXT_BOOK);
+        title.setTypeface(Ui.SERIF_BOLD);
+        title.setTextColor(palette.ink);
+        box.addView(title);
+
+        TextView hint = new TextView(this);
+        hint.setText("从已导入的书源里搜索，选中后加入书架。");
+        hint.setTextSize(Ui.TEXT_HINT);
+        hint.setTextColor(palette.muted);
+        hint.setGravity(Gravity.CENTER);
+        hint.setPadding(0, dp(8), 0, 0);
+        box.addView(hint);
+        results.addView(box);
     }
 
     private void doSearch() {
@@ -101,24 +155,35 @@ public class SearchActivity extends Activity {
             Toast.makeText(this, "请输入书名或作者", Toast.LENGTH_SHORT).show();
             return;
         }
+        sources.reload();
+        updateSourceCount();
         if (sources.sources.isEmpty()) {
-            Toast.makeText(this, "请先在「书源」里导入 JSON", Toast.LENGTH_LONG).show();
+            showEmpty("还没有书源", "导入 JSON 后即可开始搜索。", "去书源页",
+                    () -> startActivity(new Intent(this, SourcesActivity.class)));
             return;
         }
         searchButton.setEnabled(false);
+        searchButton.setText("搜索中");
         results.removeAllViews();
-        Toast.makeText(this, "正在搜索…", Toast.LENGTH_SHORT).show();
+        progressBox.setVisibility(View.VISIBLE);
+        progressNote.setText("正在搜索 " + sources.sources.size() + " 个书源…");
         new Thread(() -> {
             try {
                 List<OnlineService.Hit> hits = online.search(sources.sources, text);
                 runOnUiThread(() -> {
                     searchButton.setEnabled(true);
+                    searchButton.setText("搜索");
+                    progressBox.setVisibility(View.GONE);
+                    lastHits = hits;
                     showHits(hits);
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> {
                     searchButton.setEnabled(true);
-                    Toast.makeText(this, "搜索失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+                    searchButton.setText("搜索");
+                    progressBox.setVisibility(View.GONE);
+                    lastHits = null;
+                    showEmpty("搜索失败", e.getMessage(), "重试", this::doSearch);
                 });
             }
         }, "yuewei-search").start();
@@ -127,61 +192,143 @@ public class SearchActivity extends Activity {
     private void showHits(List<OnlineService.Hit> hits) {
         results.removeAllViews();
         if (hits.isEmpty()) {
-            TextView empty = new TextView(this);
-            empty.setText("没有搜索到结果，换一个关键词或书源试试。");
-            empty.setTextSize(14);
-            empty.setTextColor(palette.muted);
-            empty.setPadding(dp(8), dp(28), dp(8), dp(20));
-            results.addView(empty);
+            String book = keyword.getText().toString().trim();
+            showEmpty("没有找到《" + book + "》", "换一个关键词，或确认书源可用。",
+                    "换关键词", () -> {
+                        keyword.setText("");
+                        keyword.requestFocus();
+                        showInitialHint();
+                    });
             return;
         }
         for (OnlineService.Hit hit : hits) {
+            Library.Book existing = findExisting(hit);
             LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.VERTICAL);
-            row.setPadding(dp(16), dp(12), dp(16), dp(12));
-            row.setBackground(Ui.ripple(this, Ui.round(this, palette.card, 12), 0x14000000));
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            params.setMargins(0, dp(5), 0, dp(5));
-            row.setLayoutParams(params);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(0, dp(10), 0, dp(10));
+
+            TextView spine = Ui.coverBadge(this, palette, hit.result.title, 30, 42);
+            LinearLayout.LayoutParams spineParams = new LinearLayout.LayoutParams(dp(30), dp(42));
+            spineParams.setMargins(0, 0, dp(9), 0);
+            row.addView(spine, spineParams);
+
+            LinearLayout info = new LinearLayout(this);
+            info.setOrientation(LinearLayout.VERTICAL);
 
             TextView name = new TextView(this);
             name.setText(hit.result.title);
-            name.setTextSize(16);
+            name.setTextSize(Ui.TEXT_ROW);
             name.setTextColor(palette.ink);
-            row.addView(name);
+            name.setSingleLine(true);
+            name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            info.addView(name);
 
             TextView meta = new TextView(this);
             meta.setText((hit.result.author == null ? "未知" : hit.result.author)
-                    + " · " + hit.source.name
+                    + " · " + Ui.clean(hit.source.name)
                     + (hit.result.lastChapter == null ? "" : " · " + hit.result.lastChapter));
-            meta.setTextSize(11);
+            meta.setTextSize(Ui.TEXT_META);
             meta.setTextColor(palette.muted);
-            row.addView(meta);
+            meta.setPadding(0, dp(2), 0, 0);
+            meta.setSingleLine(true);
+            meta.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            info.addView(meta);
 
-            row.setOnClickListener(v -> openHit(hit));
+            row.addView(info, new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+            if (existing != null) {
+                TextView added = new TextView(this);
+                added.setText("已加入");
+                added.setTextSize(10.5f);
+                added.setTextColor(Ui.blend(palette.muted, palette.line, 0.4f));
+                added.setPadding(dp(8), 0, 0, 0);
+                row.addView(added);
+                row.setOnClickListener(v -> openReader(existing.id));
+            } else {
+                TextView add = Ui.pillCompact(this, "加入", false, palette);
+                add.setOnClickListener(v -> openHit(hit, add));
+                row.addView(add);
+                row.setOnClickListener(v -> openHit(hit, add));
+            }
+
             results.addView(row);
+            View divider = new View(this);
+            divider.setBackgroundColor(palette.line);
+            LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dp(1));
+            dividerParams.setMargins(dp(39), 0, 0, 0);
+            divider.setLayoutParams(dividerParams);
+            results.addView(divider);
         }
     }
 
-    private void openHit(OnlineService.Hit hit) {
+    private void showEmpty(String titleText, String hintText, String actionText, Runnable action) {
+        results.removeAllViews();
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER_HORIZONTAL);
+        box.setPadding(dp(10), dp(52), dp(10), dp(20));
+
+        TextView title = new TextView(this);
+        title.setText(titleText);
+        title.setTextSize(Ui.TEXT_BOOK);
+        title.setTypeface(Ui.SERIF_BOLD);
+        title.setTextColor(palette.ink);
+        title.setGravity(Gravity.CENTER);
+        box.addView(title);
+
+        TextView hint = new TextView(this);
+        hint.setText(hintText == null ? "" : hintText);
+        hint.setTextSize(Ui.TEXT_HINT);
+        hint.setTextColor(palette.muted);
+        hint.setGravity(Gravity.CENTER);
+        hint.setLineSpacing(dp(4), 1f);
+        hint.setPadding(0, dp(8), 0, 0);
+        box.addView(hint);
+
+        if (action != null && actionText != null) {
+            TextView button = Ui.pill(this, actionText, false, palette);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            params.setMargins(0, dp(16), 0, 0);
+            button.setOnClickListener(v -> action.run());
+            box.addView(button, params);
+        }
+        results.addView(box);
+    }
+
+    private void openHit(OnlineService.Hit hit, TextView actionView) {
+        if (fetching) {
+            return;
+        }
         Library.Book existing = findExisting(hit);
         if (existing != null) {
             openReader(existing.id);
             return;
         }
+        fetching = true;
+        actionView.setEnabled(false);
+        actionView.setText("获取中…");
         Toast.makeText(this, "正在获取目录…", Toast.LENGTH_SHORT).show();
         new Thread(() -> {
             try {
                 BookDetail detail = online.detail(hit.source, hit.result);
                 Library.Book book = library.addOnline(hit.source, detail);
                 runOnUiThread(() -> {
+                    fetching = false;
                     Toast.makeText(this, "已加入书架", Toast.LENGTH_SHORT).show();
                     openReader(book.id);
                 });
             } catch (Exception e) {
-                runOnUiThread(() -> Toast.makeText(this,
-                        "获取目录失败：" + e.getMessage(), Toast.LENGTH_LONG).show());
+                runOnUiThread(() -> {
+                    fetching = false;
+                    actionView.setEnabled(true);
+                    actionView.setText("加入");
+                    Toast.makeText(this,
+                            "获取目录失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
             }
         }, "yuewei-detail").start();
     }

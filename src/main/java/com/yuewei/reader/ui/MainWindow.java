@@ -5,6 +5,7 @@ import com.yuewei.reader.application.AppContext;
 import com.yuewei.reader.domain.Book;
 import com.yuewei.reader.domain.ReadingProgress;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
@@ -36,7 +37,9 @@ public class MainWindow {
     private final StackPane content = new StackPane();
     private final Label status = Ui.label("就绪", "status-text");
     private final Map<String, ToggleButton> navButtons = new LinkedHashMap<>();
+    private final Map<String, Label> navHints = new LinkedHashMap<>();
     private final Map<String, AppView> views = new LinkedHashMap<>();
+    private Label syncCardValue;
 
     private final ShelfView shelfView;
     private final SearchView searchView;
@@ -71,6 +74,7 @@ public class MainWindow {
         content.getStyleClass().add("content-area");
 
         root.addEventFilter(KeyEvent.KEY_PRESSED, this::handleShortcut);
+        applyTheme();
         show("shelf");
         pullOnStartup();
     }
@@ -93,10 +97,19 @@ public class MainWindow {
 
     public void refreshShelf() {
         shelfView.refresh();
+        refreshSidebarHints();
     }
 
-    /** 设置页保存阅读样式后，立即刷新已打开的阅读界面。 */
+    /** 主题令牌写在主窗口根节点，侧栏、状态栏与内容区一起换色。 */
+    public void applyTheme() {
+        String key = ctx.settings.theme();
+        root.setStyle(Ui.themeTokens(Ui.theme(key)));
+        Ui.setThemeKey(key);
+    }
+
+    /** 设置页保存阅读样式后，立即刷新外壳主题与已打开的阅读界面。 */
     public void applyReaderStyle() {
+        applyTheme();
         readerView.refreshStyle();
     }
 
@@ -109,6 +122,7 @@ public class MainWindow {
         switching = true;
         navButtons.forEach((k, button) -> button.setSelected(k.equals(key)));
         switching = false;
+        refreshSidebarHints();
         view.onShow();
     }
 
@@ -143,6 +157,7 @@ public class MainWindow {
                         refreshShelf();
                         settingsView.refreshSyncHint();
                         readerView.refreshStyle();
+                        refreshSyncCard();
                         status(result.message());
                     }
                 },
@@ -162,6 +177,7 @@ public class MainWindow {
                 message -> {
                     refreshShelf();
                     settingsView.refreshSyncHint();
+                    refreshSyncCard();
                     status(message);
                     readerView.refreshStyle();
                     if (verbose) {
@@ -207,13 +223,20 @@ public class MainWindow {
         VBox sidebar = new VBox(4);
         sidebar.getStyleClass().add("sidebar");
         sidebar.setPadding(new Insets(18, 12, 18, 12));
-        sidebar.setPrefWidth(184);
-        sidebar.setMinWidth(184);
+        sidebar.setPrefWidth(224);
+        sidebar.setMinWidth(224);
+
+        Label seal = Ui.label("阅微", "mini-seal");
+        seal.setMinSize(38, 38);
+        seal.setPrefSize(38, 38);
+        seal.setMaxSize(38, 38);
+        seal.setAlignment(Pos.CENTER);
 
         Label brand = Ui.label("阅微", "brand");
         Label subtitle = Ui.label("小说阅读器", "brand-sub");
-        VBox header = new VBox(2, brand, subtitle);
-        header.setPadding(new Insets(0, 8, 12, 8));
+        HBox header = new HBox(12, seal, new VBox(2, brand, subtitle));
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.setPadding(new Insets(0, 6, 14, 6));
         sidebar.getChildren().addAll(header, new Separator());
 
         ToggleGroup group = new ToggleGroup();
@@ -222,19 +245,50 @@ public class MainWindow {
                 oldValue.setSelected(true);
             }
         });
-        addNav(sidebar, group, "shelf", "书架");
-        addNav(sidebar, group, "search", "搜索");
-        addNav(sidebar, group, "sources", "书源");
-        addNav(sidebar, group, "downloads", "下载");
-        addNav(sidebar, group, "settings", "设置");
+        addNav(sidebar, group, "shelf", "书架", "");
+        addNav(sidebar, group, "search", "搜索", "SEARCH");
+        addNav(sidebar, group, "sources", "书源", "");
+        addNav(sidebar, group, "downloads", "下载", "");
+        addNav(sidebar, group, "settings", "设置", "Aa");
 
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
+
+        Label syncTitle = Ui.label("上次同步", "sync-card-title");
+        syncCardValue = Ui.label(ctx.settings.lastSyncText(), "sync-card-value");
+        syncCardValue.setWrapText(true);
+        VBox syncCard = new VBox(6, syncTitle, syncCardValue);
+        syncCard.getStyleClass().add("sync-card");
+        syncCard.setOnMouseClicked(e -> syncNow(true));
+
         Button about = Ui.button("关于", "ghost-button");
         about.setMaxWidth(Double.MAX_VALUE);
         about.setOnAction(e -> showAbout());
-        sidebar.getChildren().addAll(spacer, new Separator(), about);
+        sidebar.getChildren().addAll(spacer, syncCard, new Separator(), about);
+        refreshSidebarHints();
         return sidebar;
+    }
+
+    /** 侧栏提示：书架与书源数量随数据刷新，其余为固定快捷键语义。 */
+    private void refreshSidebarHints() {
+        setNavHint("shelf", String.valueOf(ctx.bookService.shelf("", null, "recent").size()));
+        setNavHint("search", "SEARCH");
+        setNavHint("sources", String.valueOf(ctx.sourceService.findAll().size()));
+        setNavHint("downloads", "");
+        setNavHint("settings", "Aa");
+    }
+
+    private void setNavHint(String key, String text) {
+        Label hint = navHints.get(key);
+        if (hint != null) {
+            hint.setText(text);
+        }
+    }
+
+    private void refreshSyncCard() {
+        if (syncCardValue != null) {
+            syncCardValue.setText(ctx.settings.lastSyncText());
+        }
     }
 
     /** 关于：版本、开源地址与免责声明。 */
@@ -243,9 +297,7 @@ public class MainWindow {
         dialog.initOwner(stage);
         dialog.setTitle("关于阅微");
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
-        if (root.getScene() != null) {
-            dialog.getDialogPane().getStylesheets().addAll(root.getScene().getStylesheets());
-        }
+        Ui.styleDialog(dialog, stage);
 
         Label name = Ui.label("阅微 · 小说阅读器", "about-name");
         Label version = Ui.label("版本 " + ReaderApp.VERSION + " · JavaFX 17 · SQLite", "muted");
@@ -275,17 +327,28 @@ public class MainWindow {
         }
     }
 
-    private void addNav(VBox sidebar, ToggleGroup group, String key, String text) {
-        ToggleButton button = new ToggleButton(text);
+    private void addNav(VBox sidebar, ToggleGroup group, String key, String text, String hint) {
+        Label name = Ui.label(text, "nav-label");
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        Label hintLabel = Ui.label(hint, "nav-hint");
+        HBox row = new HBox(6, name, spacer, hintLabel);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setPadding(new Insets(10, 12, 10, 12));
+
+        ToggleButton button = new ToggleButton();
+        button.setGraphic(row);
         button.getStyleClass().add("nav-button");
         button.setMaxWidth(Double.MAX_VALUE);
         button.setToggleGroup(group);
+        row.prefWidthProperty().bind(button.widthProperty());
         button.setOnAction(e -> {
             if (!switching) {
                 show(key);
             }
         });
         navButtons.put(key, button);
+        navHints.put(key, hintLabel);
         sidebar.getChildren().add(button);
     }
 

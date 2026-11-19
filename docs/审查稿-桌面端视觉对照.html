@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="paper">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>阅微 · 桌面端视觉审查稿｜改造前 / 改造后</title>
+<style>
+  :root {
+    --paper: #F4EDDF;
+    --paper-2: #EAE0CB;
+    --card: #FBF6EA;
+    --card-2: #F7F0E1;
+    --ink: #221D18;
+    --ink-2: #4B4238;
+    --muted: #8B7F6C;
+    --faint: #B7AB96;
+    --accent: #A63B2C;
+    --accent-2: #C76A53;
+    --brass: #A9834D;
+    --warn: #8C5A32;
+    --line: #DED1B8;
+    --line-soft: rgba(94, 78, 54, .14);
+    --serif: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", "STSong", "SimSun", serif;
+    --sans: "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+    --display: "STKaiti", "Kaiti SC", "KaiTi", var(--serif);
+  }
+
+  :root[data-theme="night"] {
+    --paper: #141519;
+    --paper-2: #1B1D23;
+    --card: #191B21;
+    --card-2: #1E2027;
+    --ink: #D2CEC4;
+    --ink-2: #A9A399;
+    --muted: #8B877D;
+    --faint: #5E5B54;
+    --accent: #D07A66;
+    --accent-2: #E29A86;
+    --brass: #B99A68;
+    --warn: #C08A5E;
+    --line: #2D3038;
+    --line-soft: rgba(210, 206, 196, .10);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    -webkit-font-smoothing: antialiased;
+    transition: background .45s ease, color .45s ease;
+    position: relative;
+  }
+
+  /* 纸纹：颗粒 + 极浅横纹 */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: .5;
+    background-image:
+      radial-gradient(circle at 18% 8%, rgba(255,255,255,.5), transparent 56%),
+      radial-gradient(circle at 86% 92%, rgba(120,95,60,.1), transparent 60%),
+      repeating-linear-gradient(0deg, rgba(80,60,35,.018) 0 1px, transparent 1px 4px);
+    mix-blend-mode: multiply;
+  }
+  :root[data-theme="night"] body::before { mix-blend-mode: screen; opacity: .3; }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 60px 40px 120px;
+  }
+
+  /* ---------------- 封面 ---------------- */
+  .cover { position: relative; padding: 20px 0 46px; border-bottom: 1px solid var(--line); }
+  .cover .seal {
+    position: absolute; right: 6px; top: 4px;
+    width: 60px; height: 60px;
+    background: var(--accent); color: #FFF6EA;
+    font: 700 22px/1 var(--serif);
+    letter-spacing: .1em;
+    display: grid; place-items: center;
+    border-radius: 6px;
+    transform: rotate(-2.5deg);
+    box-shadow: inset 0 0 0 2px rgba(255,246,234,.35), 0 10px 30px -14px rgba(120,40,28,.6);
+    user-select: none;
+  }
+  .eyebrow {
+    margin: 0 0 22px;
+    font: 500 10.5px/1 var(--sans);
+    letter-spacing: .32em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .cover h1 {
+    margin: 0;
+    font-family: var(--display);
+    font-size: clamp(48px, 7vw, 78px);
+    line-height: 1.04;
+    letter-spacing: .05em;
+    font-weight: 500;
+  }
+  .cover h1 em { font-style: normal; color: var(--accent); }
+  .cover .lede {
+    margin: 24px 0 0;
+    max-width: 760px;
+    font-size: 16.5px;
+    line-height: 2;
+    color: var(--ink-2);
+  }
+  .cover .meta {
+    margin-top: 30px;
+    display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center;
+  }
+  .tag {
+    padding: 7px 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font: 11px/1.5 var(--sans);
+    color: var(--muted);
+    letter-spacing: .06em;
+  }
+  .tag.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 32%, var(--line)); }
+
+  .toc-strip { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 30px; }
+  .toc-strip a {
+    font: 11.5px/1 var(--sans);
+    letter-spacing: .05em;
+    color: var(--ink-2);
+    text-decoration: none;
+    padding: 9px 13px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--card) 60%, transparent);
+    transition: color .2s, border-color .2s, background .2s;
+  }
+  .toc-strip a:hover { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+  .toc-strip a i { font-style: normal; color: var(--faint); margin-right: 7px; font-size: 10px; letter-spacing: .1em; }
+
+  /* ---------------- 章节 ---------------- */
+  section { margin-top: 74px; }
+
+  .label {
+    display: flex; align-items: center; gap: 14px;
+    font: 500 10.5px/1 var(--sans);
+    letter-spacing: .3em; color: var(--muted);
+    text-transform: uppercase;
+  }
+  .label::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+  h2 {
+    margin: 22px 0 10px;
+    font-family: var(--display);
+    font-weight: 500;
+    font-size: clamp(28px, 3.4vw, 40px);
+    line-height: 1.34;
+    letter-spacing: .03em;
+  }
+  .sub { margin: 0 0 32px; max-width: 780px; color: var(--ink-2); font-size: 15px; line-height: 1.95; }
+
+  .principles {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 1px; background: var(--line);
+    border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+  }
+  .principle { background: var(--card); padding: 24px 22px 28px; }
+  .principle .no { font: 500 11px/1 var(--sans); letter-spacing: .2em; color: var(--accent); }
+  .principle h3 { margin: 16px 0 10px; font-size: 19px; font-weight: 500; letter-spacing: .04em; }
+  .principle p { margin: 0; color: var(--ink-2); font-size: 13.5px; line-height: 1.9; }
+  .principle p b { font-weight: 500; color: var(--ink); }
+
+  /* ---------------- 页面小节 ---------------- */
+  .sec-head {
+    display: flex; gap: 16px; align-items: baseline;
+    padding-top: 20px; border-top: 1px solid var(--line);
+  }
+  .sec-head .no { font: 500 11px/1 var(--sans); letter-spacing: .18em; color: var(--accent); flex: none; }
+  .sec-head h3 {
+    margin: 0; font-family: var(--display);
+    font-size: 27px; font-weight: 500; letter-spacing: .06em;
+  }
+  .sec-head .judge {
+    margin-left: auto; max-width: 400px; text-align: right;
+    font: 11.5px/1.7 var(--sans); color: var(--muted);
+  }
+  .sec-head .judge b { color: var(--warn); font-weight: 500; }
+
+  .pair {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 22px; margin-top: 22px; align-items: start;
+  }
+  .cap {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
+    font: 10.5px/1 var(--sans); letter-spacing: .16em; color: var(--muted);
+  }
+  .cap .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+  .cap.before .dot { background: var(--faint); }
+  .cap.after .dot { background: var(--accent); }
+  .cap .hint { letter-spacing: .06em; color: var(--faint); }
+
+  /* ---------------- 窗口框 ---------------- */
+  .win {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    overflow: hidden;
+    box-shadow: 0 20px 44px -32px rgba(52,40,24,.5);
+    font-size: 9px;
+  }
+  :root[data-theme="night"] .win { box-shadow: 0 20px 44px -30px rgba(0,0,0,.85); }
+
+  .win-top {
+    height: 26px; display: flex; align-items: center; gap: 6px;
+    padding: 0 11px; background: var(--paper-2);
+    border-bottom: 1px solid var(--line);
+  }
+  .win-top i { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); opacity: .55; }
+  .win-top .url { margin-left: 8px; font: 9px/1 var(--sans); letter-spacing: .1em; color: var(--muted); }
+
+  .win-body { display: grid; grid-template-columns: 82px 1fr; min-height: 246px; }
+
+  .rail {
+    border-right: 1px solid var(--line);
+    background: color-mix(in srgb, var(--paper) 62%, var(--card));
+    padding: 10px 8px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .brand-s { display: flex; align-items: center; gap: 6px; }
+  .seal-s {
+    width: 21px; height: 21px; border-radius: 3px; flex: none;
+    background: var(--accent); color: #FFF6EA;
+    display: grid; place-items: center;
+    font: 700 9px/1 var(--serif);
+    box-shadow: inset 0 0 0 1px rgba(255,246,234,.4);
+  }
+  .brand-s .name { font: 11px/1 var(--display); letter-spacing: .1em; }
+  .navi { display: grid; gap: 2px; }
+  .navi span { font: 9px/1 var(--sans); color: var(--ink-2); padding: 4px 5px; border-radius: 4px; letter-spacing: .04em; }
+  .navi span.on { background: var(--card); box-shadow: inset 2px 0 0 var(--accent); color: var(--ink); }
+  .rail .foot {
+    margin-top: auto; font: 8px/1.5 var(--sans); color: var(--faint);
+    border-top: 1px solid var(--line-soft); padding-top: 7px;
+  }
+
+  .pane { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+  .eyebrow-s { font: 8px/1 var(--sans); letter-spacing: .2em; color: var(--muted); text-transform: uppercase; }
+  .ptitle { font: 15px/1.1 var(--serif); letter-spacing: .07em; }
+  .ptitle.lg { font-size: 19px; }
+
+  .head-row { display: flex; align-items: flex-end; gap: 8px; }
+  .head-row .meta-s { font: 8px/1.4 var(--sans); color: var(--muted); letter-spacing: .05em; }
+  .head-row .acts { margin-left: auto; display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+
+  .btn {
+    font: 8.5px/1 var(--sans);
+    padding: 4px 7px; border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--card); color: var(--ink-2);
+    white-space: nowrap;
+  }
+  .btn.ghost { border-color: transparent; background: transparent; color: var(--muted); padding: 4px 4px; }
+  .btn.pri { background: var(--accent); border-color: transparent; color: #FFF6EA; }
+  .btn.softpri { background: color-mix(in srgb, var(--accent) 34%, var(--card)); border-color: transparent; color: #FFF6EA; }
+  .btn.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 34%, var(--line)); background: transparent; }
+  .btn.sm { font-size: 8px; padding: 3px 6px; }
+
+  .toolrow { display: flex; gap: 4px; align-items: center; }
+  .inp {
+    flex: 1; height: 18px; display: flex; align-items: center;
+    border: 1px solid var(--line); border-radius: 4px;
+    background: var(--card); color: var(--faint);
+    font: 8px/1 var(--sans); padding: 0 6px;
+  }
+  .combo {
+    height: 18px; display: flex; align-items: center; gap: 5px;
+    border: 1px solid var(--line); border-radius: 4px;
+    background: var(--card); color: var(--ink-2);
+    font: 8px/1 var(--sans); padding: 0 6px; white-space: nowrap;
+  }
+
+  /* 书架 */
+  .hero-bad {
+    display: flex; align-items: center; gap: 10px;
+    border: 1px solid var(--line); border-radius: 9px;
+    background: var(--card); padding: 11px 12px;
+  }
+  .hero-bad .big { font: 20px/1 var(--serif); letter-spacing: .14em; }
+  .hero-bad .sub2 { font: 8px/1.5 var(--sans); color: var(--muted); }
+  .hero-bad .go { margin-left: auto; font: 8.5px/1 var(--sans); color: var(--accent); }
+
+  .hero-good { display: flex; gap: 10px; align-items: stretch; }
+  .spine {
+    width: 30px; min-height: 74px; flex: none;
+    border-radius: 3px 5px 5px 3px;
+    background: linear-gradient(155deg, color-mix(in srgb, var(--accent) 72%, #000 28%), var(--accent) 46%, var(--accent-2));
+    color: #FFF6EA;
+    writing-mode: vertical-rl;
+    display: grid; place-items: center;
+    font: 500 12px/1 var(--serif); letter-spacing: .26em;
+    padding-top: 6px;
+    box-shadow: inset -3px 0 0 rgba(0,0,0,.18), inset 1px 0 0 rgba(255,246,234,.25);
+  }
+  .hero-good .info { display: flex; flex-direction: column; gap: 4px; justify-content: center; }
+  .hero-good .info .t { font: 13px/1.2 var(--serif); letter-spacing: .08em; }
+  .hero-good .info .m { font: 8px/1.5 var(--sans); color: var(--muted); }
+  .hero-good .info .link { font: 8.5px/1 var(--sans); color: var(--accent); letter-spacing: .06em; }
+
+  .row {
+    display: grid; grid-template-columns: 1fr 62px; gap: 6px;
+    padding: 7px 0; border-top: 1px solid var(--line-soft);
+    align-items: center;
+  }
+  .row .t { font: 10px/1.3 var(--serif); letter-spacing: .05em; }
+  .row .m { font: 7.5px/1.5 var(--sans); color: var(--muted); }
+  .row .m .emoji { color: var(--faint); }
+  .bar { height: 2px; background: var(--line); border-radius: 2px; width: 100%; overflow: hidden; }
+  .bar i { display: block; height: 2px; background: var(--accent); }
+  .bar.thick, .bar.thick i { height: 6px; }
+  .pct { font: 7.5px/1 var(--sans); color: var(--muted); text-align: right; margin-top: 4px; }
+
+  /* 阅读页 */
+  .reader-top {
+    display: flex; align-items: center; gap: 4px; flex-wrap: wrap; row-gap: 3px;
+    padding-bottom: 7px; border-bottom: 1px solid var(--line-soft);
+  }
+  .reader-top .book { font: 9.5px/1 var(--serif); color: var(--ink-2); letter-spacing: .05em; white-space: nowrap; }
+  .reader-top .gap { flex: 1; }
+  .reader-top .ttl { font: 12px/1 var(--serif); letter-spacing: .1em; }
+
+  .reader-body { display: grid; grid-template-columns: 1fr 60px; gap: 10px; padding-top: 2px; }
+  .prose { font: 10px/1.95 var(--serif); color: var(--ink); text-indent: 2em; }
+  .prose.big { font-size: 14px; line-height: 1.5; color: var(--ink); }
+  .prose p { margin: 0 0 6px; }
+  .prose .first {
+    text-indent: 0; font-family: var(--display);
+    font-size: 11.5px; line-height: 1.85; letter-spacing: .06em;
+  }
+  .toc-s {
+    border-left: 1px solid var(--line-soft); padding-left: 7px;
+    font: 8.5px/2 var(--serif); color: var(--muted);
+    display: flex; flex-direction: column;
+  }
+  .toc-s .hd { font: 7.5px/1 var(--sans); letter-spacing: .18em; color: var(--faint); margin-bottom: 4px; }
+  .toc-s .cur { color: var(--accent); box-shadow: inset 2px 0 0 var(--accent); padding-left: 5px; margin-left: -7px; }
+  .pill { font: 6.5px/1 var(--sans); border: 1px solid var(--line); border-radius: 999px; padding: 1px 3px; color: var(--faint); margin-left: 3px; }
+  .reader-foot {
+    margin-top: auto; padding-top: 7px; border-top: 1px solid var(--line-soft);
+    display: flex; justify-content: space-between;
+    font: 7.5px/1 var(--sans); letter-spacing: .2em; color: var(--faint);
+  }
+
+  /* 卡片 / 表格 */
+  .card-s {
+    border: 1px solid var(--line); border-radius: 9px;
+    background: var(--card); padding: 8px 9px;
+    display: flex; flex-direction: column; gap: 5px; min-width: 0;
+  }
+  .card-s .hd { display: flex; align-items: center; gap: 6px; }
+  .card-s .hd .t { font: 9px/1 var(--sans); color: var(--ink-2); letter-spacing: .06em; }
+  .card-s .hd .more { margin-left: auto; font: 7.5px/1 var(--sans); color: var(--faint); }
+
+  .empty-s {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; padding: 12px 4px; text-align: center;
+  }
+  .empty-s .e1 { font: 9px/1.4 var(--serif); color: var(--ink-2); }
+  .empty-s .e2 { font: 7.5px/1.5 var(--sans); color: var(--faint); }
+
+  .grid-s { display: grid; gap: 6px; }
+
+  .tbl { width: 100%; border-collapse: collapse; font: 8px/1.2 var(--sans); table-layout: fixed; }
+  .tbl th {
+    text-align: left; font: 500 7px/1 var(--sans); letter-spacing: .1em;
+    color: var(--muted); padding: 4px 5px; border-bottom: 1px solid var(--line);
+  }
+  .tbl td { padding: 5px; border-bottom: 1px solid var(--line-soft); color: var(--ink-2); overflow: hidden; }
+  .tbl tr.hov td { background: var(--card-2); }
+  .tbl tr.sel td { background: var(--card); }
+  .tbl tr.sel td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+  .tbl .nm { color: var(--ink); font-family: var(--serif); font-size: 8.5px; letter-spacing: .04em; }
+  .tbl .fail { color: var(--warn); }
+  .tbl .ok { color: color-mix(in srgb, var(--brass) 78%, var(--ink)); }
+  .tbl .idle { color: var(--faint); }
+  .tbl .up { font: 500 8.5px/1 var(--sans); letter-spacing: .1em; color: var(--muted); }
+  .tbl .up.good { font-size: 9px; letter-spacing: .08em; color: var(--muted); }
+
+  /* 设置 */
+  .srow { display: flex; align-items: center; gap: 7px; font: 8px/1 var(--sans); }
+  .srow .sl { width: 54px; color: var(--ink-2); flex: none; }
+  .ctl {
+    height: 16px; display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    border: 1px solid var(--line); border-radius: 4px; background: var(--card);
+    font: 8px/1 var(--sans); color: var(--ink-2); padding: 0 6px;
+  }
+  .ctl .caret { color: var(--faint); font-size: 7px; }
+  .ctl.w48 { width: 48px; } .ctl.w72 { width: 72px; } .ctl.w96 { width: 96px; } .ctl.w120 { width: 120px; }
+
+  .preview-s {
+    border: 1px solid var(--line-soft); border-radius: 8px;
+    background: var(--paper-2); padding: 10px;
+    font: 9.5px/2 var(--serif); color: var(--ink-2);
+  }
+  .preview-s .dlg { color: var(--accent); }
+  .preview-s .stop { color: var(--brass); }
+
+  .sw { width: 15px; height: 9px; border-radius: 999px; background: var(--accent); position: relative; flex: none; }
+  .sw i { position: absolute; right: 1px; top: 1px; width: 7px; height: 7px; border-radius: 50%; background: #FFF6EA; }
+  .sw.off { background: var(--line); }
+  .sw.off i { right: auto; left: 1px; background: var(--card); }
+  .swatch-s { width: 14px; height: 10px; border-radius: 2px; border: 1px solid var(--line-soft); }
+
+  .rule-row { display: grid; grid-template-columns: 15px 62px 16px 1fr; gap: 6px; align-items: center; font: 7.5px/1 var(--sans); color: var(--ink-2); }
+
+  /* ---------------- 说明列表 ---------------- */
+  .notes { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 20px; }
+  .notes h4 {
+    margin: 0 0 10px; font: 500 10px/1 var(--sans);
+    letter-spacing: .22em; color: var(--muted); text-transform: uppercase;
+  }
+  .notes .after h4 { color: var(--accent); }
+  .notes ul { margin: 0; padding: 0; list-style: none; }
+  .notes li {
+    position: relative; padding-left: 15px;
+    font-size: 13px; line-height: 1.85; color: var(--ink-2);
+    margin-bottom: 7px;
+  }
+  .notes li::before {
+    content: ""; position: absolute; left: 0; top: 10px;
+    width: 7px; height: 1px; background: var(--faint);
+  }
+  .notes .after li::before { background: var(--accent); width: 9px; }
+  .notes li b { font-weight: 500; color: var(--ink); }
+
+  /* ---------------- 规则表 ---------------- */
+  .rules { margin-top: 26px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .rules table { width: 100%; border-collapse: collapse; }
+  .rules th {
+    text-align: left; padding: 13px 18px;
+    font: 500 10px/1 var(--sans); letter-spacing: .2em; text-transform: uppercase;
+    color: var(--muted); background: var(--card-2);
+    border-bottom: 1px solid var(--line);
+  }
+  .rules td {
+    padding: 13px 18px; font-size: 13px; line-height: 1.8; color: var(--ink-2);
+    border-bottom: 1px solid var(--line-soft); vertical-align: top;
+  }
+  .rules tr:last-child td { border-bottom: 0; }
+  .rules td:first-child { color: var(--ink); font-weight: 500; width: 150px; }
+
+  /* ---------------- 优先级 ---------------- */
+  .prio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 26px; }
+  .prio .col {
+    border: 1px solid var(--line); border-radius: 14px;
+    background: var(--card); padding: 20px 20px 22px;
+  }
+  .prio .col.p0 { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+  .prio .k { font: 500 10px/1 var(--sans); letter-spacing: .22em; color: var(--muted); }
+  .prio .col.p0 .k { color: var(--accent); }
+  .prio h4 { margin: 12px 0 12px; font-size: 16px; font-weight: 500; letter-spacing: .05em; }
+  .prio ol { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 13px; line-height: 1.9; }
+  .prio ol li { margin-bottom: 6px; }
+
+  .page-foot {
+    margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--line);
+    display: flex; justify-content: space-between; gap: 20px;
+    font: 11px/1.8 var(--sans); color: var(--faint);
+  }
+
+  .switcher {
+    position: fixed; right: 26px; bottom: 26px; z-index: 40;
+    display: flex; gap: 4px; padding: 5px;
+    background: color-mix(in srgb, var(--card) 88%, transparent);
+    border: 1px solid var(--line); border-radius: 999px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 12px 30px -18px rgba(0,0,0,.45);
+  }
+  .switcher button {
+    border: 0; background: transparent; color: var(--muted);
+    font: 11.5px/1 var(--sans); padding: 8px 13px; border-radius: 999px;
+    cursor: pointer; letter-spacing: .06em;
+    transition: background .25s, color .25s;
+  }
+  .switcher button:hover { color: var(--ink); }
+  .switcher button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+
+  @media (max-width: 980px) {
+    .wrap { padding: 40px 20px 100px; }
+    .pair, .notes, .prio, .principles { grid-template-columns: 1fr; }
+    .sec-head { flex-wrap: wrap; }
+    .sec-head .judge { margin-left: 0; text-align: left; max-width: none; }
+    .cover .seal { width: 48px; height: 48px; font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ================= 封面 ================= -->
+  <header class="cover">
+    <div class="seal">审</div>
+    <p class="eyebrow">Desktop audit · before / after</p>
+    <h1>桌面端视觉<em>审查</em></h1>
+    <p class="lede">
+      令牌和配色已经与《视觉升级方案》一致，六页界面却还没有形成同一套气质：
+      夜间只照亮阅读区、阅读页工具栏过密、设置页缺少页头与分组、搜索 / 下载 / 书源仍是“功能页”。
+      本稿把六页的现状与建议并排画出来，只做对照，不含代码改动。
+    </p>
+    <div class="meta">
+      <span class="tag">范围 · 书架 / 阅读 / 搜索 / 下载 / 书源 / 设置</span>
+      <span class="tag">依据 · 纸本 · 朱印</span>
+      <span class="tag warn">结论 · 令牌统一，层级与密度未统一</span>
+    </div>
+
+    <nav class="toc-strip">
+      <a href="#verdict"><i>00</i>总体判断</a>
+      <a href="#p1"><i>01</i>书架</a>
+      <a href="#p2"><i>02</i>阅读</a>
+      <a href="#p3"><i>03</i>搜索</a>
+      <a href="#p4"><i>04</i>下载</a>
+      <a href="#p5"><i>05</i>书源</a>
+      <a href="#p6"><i>06</i>设置</a>
+      <a href="#rules"><i>07</i>跨页规则</a>
+      <a href="#priority"><i>08</i>优先级</a>
+    </nav>
+  </header>
+
+  <!-- ================= 总体判断 ================= -->
+  <section id="verdict">
+    <div class="label">Verdict</div>
+    <h2>一套配色，两种性格</h2>
+    <p class="sub">
+      已经对齐的是“材料”：纸本朱印的色值、224px 侧栏、980px 内容宽、620px 版心，以及书脊卡片、书眉页脚、目录朱砂竖线。
+      没对齐的是“结构”：标题层级、动作权重、空状态、表格密度，各页仍按功能自发生长。
+    </p>
+
+    <div class="principles">
+      <div class="principle">
+        <div class="no">01 · 已对齐</div>
+        <h3>材料统一</h3>
+        <p>纸 / 墨 / 灰褐 / 朱砂 / 铜五组令牌，加上 224 侧栏与 620 版心，六页看起来是同一本书的纸。<b>控件也不再回落到 JavaFX 默认外观。</b></p>
+      </div>
+      <div class="principle">
+        <div class="no">02 · 仍偏离</div>
+        <h3>结构未统一</h3>
+        <p>夜间只作用于阅读区；阅读工具栏 8 个同级文字按钮；设置页没有页头与分组卡；搜索 / 下载 / 书源三页动作同权重、空状态重复。<b>字号阶梯 34 / 21 / 17 / 15 / 12 / 10.5 基本没落地。</b></p>
+      </div>
+      <div class="principle">
+        <div class="no">03 · 判断</div>
+        <h3>还差一层气质</h3>
+        <p>当前更像“功能页 + 一套阅读皮肤”。提案要的是“书案 / 内页”：页头安静、动作分组、留白大于分隔线。<b>差的不是颜色，是每一页的第一眼焦点。</b></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 01 书架 ================= -->
+  <section id="p1">
+    <div class="sec-head">
+      <span class="no">01</span>
+      <h3>书架</h3>
+      <p class="judge">首屏被页头与工具行占满，<b>在读书脊被压到第二屏</b>，且书脊是横排而非竖排。</p>
+    </div>
+
+    <div class="pair">
+      <!-- 现状 -->
+      <figure style="margin:0">
+        <div class="cap before"><span><span class="dot"></span>现状</span><span class="hint">5 个页头动作 + 一条工具行</span></div>
+        <div class="win">
+          <div class="win-top"><i></i><i></i><i></i><span class="url">悦读 · 书架</span></div>
+          <div class="win-body">
+            <div class="rail">
+              <div class="brand-s"><span class="seal-s">阅</span><span class="name">阅微</span></div>
+              <div class="navi">
+                <span class="on">书架</span><span>搜索</span><span>书源</span><span>下载</span><span>设置</span>
+              </div>
+              <div class="foot">共 1 本<br>缓存 19.7 KB</div>
+            </div>
+            <div class="pane">
+              <div class="eyebrow-s">晚上好 · 夜读</div>
+              <div class="head-row">
+                <div class="ptitle lg">书架</div>
+                <div class="meta-s">共 1 本 · 缓存 19.7 KB</div>
+                <div class="acts">
+                  <span class="btn ghost">导入 TXT</span>
+                  <span class="btn ghost">搜索</span>
+                  <span class="btn ghost">书源</span>
+                  <span class="btn ghost">同步</span>
+                  <span class="btn ghost">刷新</span>
+                </div>
+              </div>
+              <div class="toolrow">
+                <div class="inp">搜索书名 / 作者</div>
+                <div class="combo">全部书源 <span class="caret">▾</span></div>
+                <div class="combo">最近阅读 <span class="caret">▾</span></div>
+                <div class="btn sm">筛选</div>
+              </div>
+              <div class="hero-bad">
+                <div>
+                  <div class="big">皓玉</div>
+                  <div class="sub2">在读 · 第 2 章 · 2%</div>
+                </div>
+                <div class="go">继续阅读 →</div>
+              </div>
+              <div class="row">
+                <div>
+                  <div class="t">皓玉</div>
+                  <div class="m">青衫落拓 · 第 2 / 1141 章 · <span class="emoji">✈</span> 笔趣中文</div>
+                </div>
+                <div>
+                  <div class="bar"><i style="width:2%"></i></div>
+                  <div class="pct">2%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </figure>
+
+      <!-- 建议 -->
+      <figure style="margin:0">
+        <div class="cap after"><span><span class="dot"></span>建议</span><span class="hint">4 个动作 + 一条轻工具行</span></div>
+        <div class="win">
+          <div class="win-top"><i></i><i></i><i></i><span class="url">悦读 · 书架</span></div>
+          <div class="win-body">
+            <div class="rail">
+              <div class="brand-s"><span class="seal-s">阅</span><span class="name">阅微</span></div>
+              <div class="navi">
+                <span class="on">书架</span><span>搜索</span><span>书源</span><span>下载</span><span>设置</span>
+              </div>
+              <div class="foot">共 1 本<br>已缓存 19.7 KB</div>
+            </div>
+            <div class="pane">
+              <div class="eyebrow-s">晚上好</div>
+              <div class="head-row">
+                <div class="ptitle lg">书架</div>
+                <div class="meta-s">共 1 本 · 已缓存</div>
+                <div class="acts">
+                  <span class="btn">导入 TXT</span>
+                  <span class="btn">搜索</span>
+                  <span class="btn">书源</span>
+                  <span class="btn">同步</span>
+                </div>
+              </div>
+              <div class="toolrow">
+                <div class="inp">搜索书名 / 作者</div>
+                <div class="btn sm">筛选</div>
+              </div>
+              <div class="hero-good">
+                <div class="spine">皓玉</div>
+                <div class="info">
+                  <div class="m">在读 · 第 2 章 · 2%</div>
+                  <div class="t">皓玉</div>
+                  <div class="link">继续阅读</div>
+                </div>
+              </div>
+              <div class="row">
+                <div>
+                  <div class="t">皓玉</div>
+                  <div class="m">青衫落拓 · 第 2 章 · 在线阅读</div>
+                </div>
+                <div>
+                  <div class="bar"><i style="width:2%"></i></div>
+                  <div class="pct">2%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </figure>
+    </div>
+
+    <div class="notes">
+      <div class="before">
+        <h4>现状问题</h4>
+        <ul>
+          <li>页头五个动作，<b>“刷新”与“同步”语义重叠</b>，和「书架」标题争抢第一眼。</li>
+          <li>页头下再压一条搜索 / 筛选 / 排序，<b>在读书脊被推到第二屏</b>。</li>
+          <li>书脊是横排「皓玉」二字，缺少提案里竖排 + 朱砂渐变的实体感。</li>
+          <li>书目 meta 直接透出「✈ 笔趣中文」与「第 2 / 1141 章」，符号噪声压过书名。</li>
+        </ul>
+      </div>
+      <div class="after">
+        <h4>改造建议</h4>
+        <ul>
+          <li>页头收敛为问候 + 21px「书架」+ 4 个动作，<b>刷新并入同步或状态栏</b>。</li>
+          <li>工具行压到 32px、只留搜索与「筛选」气泡，<b>首屏还给书脊</b>。</li>
+          <li>书脊改竖排、44–48px 宽、朱砂渐变；「继续阅读」改纯文字链接，不带箭头。</li>
+          <li>meta 统一为「作者 · 当前章节名 · 在线阅读 / 已缓存 N 章」，清掉 emoji 与项目符号。</li>
+          <li>内容区左内边距 20 → 32px，书脊与首行间距 ≥ 24px。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 02 阅读 ================= -->
+  <section id="p2">
+    <div class="sec-head">
+      <span class="no">02</span>
+      <h3>阅读</h3>
+      <p class="judge">最需要重做：<b>工具栏 8 个同级按钮</b>，正文 28px 像“大字模式”，首段样式未实现。</p>
+    </div>
+
+    <div class="pair">
+      <figure style="margin:0">
+        <div class="cap before"><span><span class="dot"></span>现状</span><span class="hint">书名 / 章节 / 页码 / 8 个按钮同排</span></div>
+        <div class="win">
+          <div class="win-top"><i></i><i></i><i></i><span class="url">悦读 · 阅读</span></div>
+          <div class="win-body">
+            <div class="rail">
+              <div class="brand-s"><span class="seal-s">阅</span><span class="name">阅微</span></div>
+              <div class="navi">
+                <span class="on">书架</span><span>搜索</span><span>书源</span><span>下载</span><span>设置</span>
+              </div>
+              <div class="foot">正在阅读</div>
+            </div>
+            <div class="pane">
+              <div class="reader-top">
+                <span class="btn ghost">← 书架</span>
+                <span class="book">《皓玉》</span>
+                <span class="book">第 2 章</span>
+                <span class="book">2 / 1141</span>
+                <span class="gap"></span>
+                <span class="btn ghost">上一章</span>
+                <span class="btn ghost">下一章</span>
+                <span class="btn ghost">目录</span>
+                <span class="btn ghost">字号</span>
+                <span class="btn ghost">排版</span>
+                <span class="btn ghost">着色</span>
+                <span class="btn ghost">主题</span>
+              </div>
+              <div class="reader-body">
+                <div class="prose big">
+                  <p>&nbsp;&nbsp;&nbsp;&nbsp;山道上起了雾，他把书合上，听见远处有人唤他的名字。</p>
+                  <p>&nbsp;&nbsp;&nbsp;&nbsp;“你终于来了。”那人说。</p>
+                  <p>&nbsp;&nbsp;&nbsp;&nbsp;他没有回答，只是把书往怀里按了按。</p>
+                </div>
+                <div class="toc-s">
+                  <div class="hd">目录 <span class="pill">在读</span></div>
+                  <div class="cur">第 2 章 雾中</div>
+                  <div>第 3 章 旧信</div>
+                  <div>第 4 章 山雨</div>
+                  <div>第 5 章 归途</div>
+                </div>
+              </div>
+              <div class="reader-foot"><span>皓玉</span><span>2%</span></div>
+            </div>
+          </div>
+        </div>
+      </figure>
+
+      <figure style="margin:0">
+        <div class="cap after"><span><span class="dot"></span>建议</span><span class="hint">返回 / 书名 / 目录 / Aa</span></div>
+        <div class="win">
+          <div class="win-top"><i></i><i></i><i></i><span class="url">悦读 · 阅读</span></div>
+          <div class="win-body">
+            <div class="rail">
+              <div class="brand-s"><span class="seal-s">阅</span><span class="name">阅微</span></div>
+              <div class="navi">
+                <span class="on">书架</span><span>搜索</span><span>书源</span><span>下载</span><span>设置</span>
+              </div>
+              <div class="foot">正在阅读</div>
+            </div>
+            <div class="pane">
+              <div class="reader-top">
+                <span class="btn ghost">←</span>
+                <span class="btn ghost">书架</span>
+                <span class="ttl">皓玉</span>
+                <span class="gap"></span>
+                <span class="btn ghost">目录</span>
+                <span class="btn ghost">Aa</span>
+              </div>
+              <div class="reader-body">
+                <div class="prose">
+                  <p class="first">山道上起了雾，他把书合上，听见远处有人唤他的名字。</p>
+                  <p>“你终于来了。”那人说。</p>
+                  <p>他没有回答，只是把书往怀里按了按。</p>
+                  <p>雾更浓了，脚下的石阶只剩下三级。</p>
+                </div>
+                <div class="toc-s">
+                  <div class="hd">目录</div>
+                  <div class="cur">第 2 章 雾中</div>
+                  <div>第 3 章 旧信</div>
+                  <div>第 4 章 山雨</div>
+                  <div>第 5 章 归途</div>
+                </div>
+              </div>
+              <div class="reader-foot"><span>皓玉 · 第 2 章</span><span>2%</span></div>
+            </div>
+          </div>
+        </div>
+      </figure>
+    </div>
+
+    <div class="notes">
+      <div class="before">
+        <h4>现状问题</h4>
+        <ul>
+          <li>工具栏 8 个同级文字按钮，<b>书名、章节、页码挤在同一行</b>，安静页被破坏。</li>
+          <li>目录 270px，带搜索框、缓存页脚和「在读」胶囊，信息多于提案。</li>
+          <li>正文默认 28px / 行距 1.8，提案是 15.5px / 2.15，<b>像大字模式</b>。</li>
+          <li>所有段落同字号同缩进，提案的首段（无缩进 + 19px 展示字体）没有实现。</li>
+        </ul>
+      </div>
+      <div class="after">
+        <h4>改造建议</h4>
+        <ul>
+          <li>顶部只留 <b>← 书架 · 书名（14px 宋体）· 目录 · Aa</b>；上一章 / 下一章 / 着色 / 主题全部收进 Aa 面板。</li>
+          <li>目录收窄到 236px，去掉「在读」胶囊，当前章只留朱砂文字 + 2px 竖线。</li>
+          <li>默认改 18px / 2.0（或对齐提案 16px / 2.1），仅对“未自定义”的用户迁移。</li>
+          <li>首段不缩进、楷体 19px、字距 +0.08em；书眉页脚降到 10.5px、字距 0.12–0.14em。</li>
+          <li><b>P0：夜间必须扩展到外壳</b>，否则阅读区黑、侧栏亮，永远半张脸。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 03 搜索 ================= -->
+  <section id="p3">
+    <div class="sec-head">
+      <span class="no">03</span>
+      <h3>搜索</h3>
+      <p class="judge">三块同权卡片 + 三处重复空状态，<b>「加入书架」常态像禁用</b>。</p>
+    </div>
+
+    <div class="pair">
+      <figure style="margin:0">
+        <div class="cap before"><span><span class="dot"></span>现状</span><span class="hint">三卡同权 · 提示重复</span></div>
+        <div class="win">
+          <div class="win-top"><i></i><i></i><i></i><span class="url">悦读 · 搜索</span></div>
+          <div class="win-body">
+            <div class="rail">
+              <div class="brand-s"><span class="seal-s">阅</span><span class="name">阅微</span></div>
+              <div class="navi">
+                <span>书架</span><span class="on">搜索</span><span>书源</span><span>下载</span><span>设置</span>
+              </div>
+              <div class="foot">共 2 个书源</div>
+            </div>
+            <div class="pane">
+              <div class="head-row">
+                <div class="ptitle">搜索</div>
+                <div class="meta-s">输入书名或作者，回车开始搜索</div>
+              </div>
+              <div class="toolrow">
+                <div class="inp" style="height:24px">输入书名或作者，回车开始搜索</div>
+                <div class="combo" style="height:20px">全部书源 <span class="caret">▾</span></div>
+                <span class="btn pri" style="padding:6px 10px">搜索</span>
+              </div>
+              <div style="display:grid;grid-template-columns:96px 1fr;gap:6px">
+                <div class="card-s">
+                  <div class="hd"><span class="t">书源进度</span></div>
+                  <div class="bar thick"><i style="width:40%"></i></div>
+                  <div class="empty-s" style="padding:6px 0">
+                    <div class="e2">尚未开始</div>
+                  </div>
+                </div>
+                <div class="card-s">
+                  <div class="hd"><span class="t">搜索结果</span><span class="more">0 条</span></div>
+                  <div class="empty-s">
+                    <div class="e1">还没有结果</div>
+                    <div class="e2">输入关键词后按回车开始搜索</div>
+                  </div>
+                </div>
+              </div>
+              <div class="card-s">
+                <div class="hd"><span class="t">详情</span></div>
+                <div class="empty-s" style="padding:8px 4px">
+                  <div class="e2">请选择一条结果查看详情</div>
+                </div>
+                <div class="btn softpri" style="text-align:center;padding:6px">加入书架</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </figure>
+
+      <figure style="margin:0">
+        <div class="cap after"><span><span class="dot"></span>建议</span><span class="hint">一张主卡 · 一条空状态</span></div>
+        <div class="win">
+          <div class="win-top"><i></i><i></i><i></i><span class="url">悦读 · 搜索</span></div>
+          <div class="win-body">
+            <div class="rail">
+              <div class="brand-s"><span class="seal-s">阅</span><span class="name">阅微</span></div>
+              <div class="navi">
+                <span>书架</span><span class="on">搜索</span><span>书源</span><span>下载</span><span>设置</span>
+              </div>
+              <div class="foot">共 2 个书源</div>
+            </div>
+            <div class="pane">
+              <div class="head-row">
+                <div class="ptitle">搜索</div>
+                <div class="meta-s">2 个书源 · 可搜索</div>
+              </div>
+              <div class="toolrow">
+                <div class="inp" style="height:22px">书名或作者</div>
+                <span class="btn pri" style="padding:5px 10px">搜索</span>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 88px;gap:6px">
+                <div class="card-s">
+                  <div class="hd"><span class="t">搜索结果</span><span class="more">0 条</span></div>
+                  <div class="empty-s" style="padding:16px 4px">
+                    <div class="e1">还没有结果</div>
+                    <div class="e2">换个关键词，或确认书源可用</div>
+                    <div class="btn sm" style="margin-top:3px">去书源页</div>
+                  </div>
+                </div>
+                <div class="card-s">
+                  <div class="hd"><span class="t">书源</span></div>
+                  <div class="e2" style="font:7.5px/1.6 var(--sans);color:var(--muted)">选择书源 ›</div>
+                  <div class="bar" style="margin-top:auto"><i style="width:0"></i></div>
+                </div>
+              </div>
+              <div class="card-s" style="flex-direction:row;align-items:center;gap:8px">
+                <div class="e2" style="flex:1">选中一条结果后可加入书架</div>
+                <div class="btn">加入书架</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </figure>
+    </div>
+
+    <div class="notes">
+      <div class="before">
+        <h4>现状问题</h4>
+        <ul>
+          <li>书源进度、结果、详情三块卡片都是 14px 圆角，<b>视觉权重完全相同</b>。</li>
+          <li>空状态在三处重复提示，用户读完仍然不知道下一步该点哪。</li>
+          <li>搜索框 / 下拉 / 按钮高度不一致；右上角说明与 placeholder 文案重复。</li>
+          <li>「加入书架」用低对比朱砂实色，<b>无选中时像禁用态故障</b>。</li>
+        </ul>
+      </div>
+      <div class="after">
+        <h4>改造建议</h4>
+        <ul>
+          <li>主次明确：搜索框 + 搜索按钮为主，<b>书源进度缩为 200px 轻量侧卡</b>，空时折叠成一行。</li>
+          <li>空状态只留中间一条：一句提示 + 一个动作（去书源页）。</li>
+          <li>删掉右上角说明文案；所有控件统一 32px 高。</li>
+          <li>「加入书架」无选中时为普通次按钮，有选中才转朱砂实色。</li>
+          <li>表头 10 → 11px，行高 36 → 40。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 04 下载 ================= -->
+  <section id="p4">
+    <div class="sec-head">
+      <span class="no">04</span>
+      <h3>下载</h3>
+      <p class="judge">1 主 + 8 同权次按钮，<b>「取消」与「刷新」无差别</b>；进度仍是文字。</p>
+    </div>
+
+    <div class="pair">
+      <figure style="margin:0">
+        <div class="cap before"><span><span class="dot"></span>现状</span><span class="hint">9 个按钮同排 · 静态报表</span></div>
+        <div class="win">
+          <div class="win-top"><i></i><i></i><i></i><span class="url">悦读 · 下载</span></div>
+          <div class="win-body">
+            <div class="rail">
+              <div class="brand-s"><span class="seal-s">阅</span><span class="name">阅微</span></div>
+              <div class="navi">
+                <span>书架</span><span>搜索</span><span>书源</span><span class="on">下载</span><span>设置</span>
+              </div>
+              <div class="foot">2 个任务</div>
+            </div>
+            <div class="pane">
+              <div class="head-row">
+                <div class="ptitle">下载</div>
+                <div class="meta-s">共 2 个任务</div>
+              </div>
+              <div class="toolrow" style="flex-wrap:wrap">
+                <span class="btn pri">新建下载</span>
+                <span class="btn">暂停</span><span class="btn">继续</span><span class="btn">取消</span>
+                <span class="btn">重试</span><span class="btn">刷新</span><span class="btn">打开目录</span>
+                <span class="btn">导出</span><span class="btn">清空</span>
+              </div>
+              <table class="tbl">
+                <thead><tr><th style="width:38%">书名</th><th style="width:26%">进度</th><th style="width:20%">状态</th><th>更新</th></tr></thead>
+                <tbody>
+                  <tr><td class="nm">皓玉</td><td>成功 693 · 失败 0</td><td>下载中</td><td>11-19 21:04</td></tr>
+                  <tr><td class="nm">山月记</td><td>成功 128 · 失败 3</td><td>已完成</td><td>11-19 20:12</td></tr>
+                  <tr><td class="nm">夜航西飞</td><td>成功 0 · 失败 0</td><td>等待中</td><td>11-19 19:58</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </figure>
+
+      <figure style="margin:0">
+        <div class="cap after"><span><span class="dot"></span>建议</span><span class="hint">动作分组 · 2px 细进度</span></div>
+        <div class="win">
+          <div class="win-top"><i></i><i></i><i></i><span class="url">悦读 · 下载</span></div>
+          <div class="win-body">
+            <div class="rail">
+              <div class="brand-s"><span class="seal-s">阅</span><span class="name">阅微</span></div>
+              <div class="navi">
+                <span>书架</span><span>搜索</span><span>书源</span><span class="on">下载</span><span>设置</span>
+              </div>
+              <div class="foot">2 个任务</div>
+            </div>
+            <div class="pane">
+              <div class="head-row">
+                <div class="ptitle">下载</div>
+                <div class="meta-s">共 2 个任务 · 1 进行中</div>
+              </div>
+              <div class="toolrow">
+                <span class="btn pri">新建下载</span>
+                <span class="btn">暂停</span><span class="btn">继续</span>
+                <span class="btn warn">取消</span>
+                <span class="gap" style="flex:1"></span>
+                <span class="btn">刷新</span>
+              </div>
+              <table class="tbl">
+                <thead><tr><th style="width:40%">书名</th><th style="width:30%">进度</th><th style="width:18%">状态</th><th>更新</th></tr></thead>
+                <tbody>
+                  <tr class="sel">
+                    <td class="nm">皓玉</td>
+                    <td><div class="bar"><i style="width:61%"></i></div><div class="pct" style="text-align:left">693 / 1141 · 失败 0</div></td>
+                    <td>下载中</td><td>11-19 21:04</td>
+                  </tr>
+                  <tr class="hov">
+                    <td class="nm">山月记</td>
+                    <td><div class="bar"><i style="width:100%"></i></div><div class="pct" style="text-align:left">128 章 · <span class="fail">失败 3</span></div></td>
+                    <td class="ok">已完成</td><td>11-19 20:12</td>
+                  </tr>
+                  <tr>
+                    <td class="nm">夜航西飞</td>
+                    <td><div class="bar"><i style="width:0"></i></div><div class="pct" style="text-align:left">等待队列</div></td>
+                    <td class="idle">等待中</td><td>11-19 19:58</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </figure>
+    </div>
+
+    <div class="notes">
+      <div class="before">
+        <h4>现状问题</h4>
+        <ul>
+          <li>工具栏 1 主 + 8 次按钮，<b>「取消」等危险动作与「刷新」无视觉差别</b>。</li>
+          <li>「进度」列是文字「成功 693 · 失败 0」，<b>没有用提案的 2px 细进度线</b>。</li>
+          <li>行没有 hover / selected 态，整张表像静态报表。</li>
+        </ul>
+      </div>
+      <div class="after">
+        <h4>改造建议</h4>
+        <ul>
+          <li>动作分组：左「新建下载」主按钮；中「暂停 / 继续 / 取消（低饱和警示）」；右「刷新」。</li>
+          <li>进度列改 2px 细线 + 朱砂填充，数字降为第二行；失败数用赭色小字。</li>
+          <li>行 hover 用 <code>-card-2</code>，选中用 <code>-card</code> + 左侧 2px 朱砂线。</li>
+          <li>表头 11px，行高 40。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 05 书源 ================= -->
+  <section id="p5">
+    <div class="sec-head">
+      <span class="no">05</span>
+      <h3>书源</h3>
+      <p class="judge">9 个等高同权按钮，名称里带 <b>✈ 等来源符号</b>，状态列没有颜色语义。</p>
+    </div>
+
+    <div class="pair">
+      <figure style="margin:0">
+        <div class="cap before"><span><span class="dot"></span>现状</span><span class="hint">9 动作平铺</span></div>
+        <div class="win">
+          <div class="win-top"><i></i><i></i><i></i><span class="url">悦读 · 书源</span></div>
+          <div class="win-body">
+            <div class="rail">
+              <div class="brand-s"><span class="seal-s">阅</span><span class="name">阅微</span></div>
+              <div class="navi">
+                <span>书架</span><span>搜索</span><span class="on">书源</span><span>下载</span><span>设置</span>
+              </div>
+              <div class="foot">共 2 · 启用 1</div>
+            </div>
+            <div class="pane">
+              <div class="head-row">
+                <div class="ptitle">书源</div>
+                <div class="meta-s">共 2 · 启用 1 · 异常 1</div>
+              </div>
+              <div class="toolrow" style="flex-wrap:wrap">
+                <span class="btn">导入</span><span class="btn">粘贴</span><span class="btn">新建</span>
+                <span class="btn">编辑</span><span class="btn">校验</span><span class="btn">删除</span>
+                <span class="btn">全部启用</span><span class="btn">全部停用</span><span class="btn">导出</span>
+              </div>
+              <table class="tbl">
+                <thead><tr><th style="width:34%">名称</th><th style="width:22%">分组</th><th style="width:18%">状态</th><th>兼容</th></tr></thead>
+                <tbody>
+                  <tr><td class="nm"><span class="emoji" style="color:var(--faint)">✈</span> 笔趣中文</td><td>默认</td><td>正常</td><td>是</td></tr>
+                  <tr><td class="nm"><span class="emoji" style="color:var(--faint)">✈</span> 顶点小说</td><td>默认</td><td>异常</td><td>—</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </figure>
+
+      <figure style="margin:0">
+        <div class="cap after"><span><span class="dot"></span>建议</span><span class="hint">三组动作 · 语义状态</span></div>
+        <div class="win">
+          <div class="win-top"><i></i><i></i><i></i><span class="url">悦读 · 书源</span></div>
+          <div class="win-body">
+            <div class="rail">
+              <div class="brand-s"><span class="seal-s">阅</span><span class="name">阅微</span></div>
+              <div class="navi">
+                <span>书架</span><span>搜索</span><span class="on">书源</span><span>下载</span><span>设置</span>
+              </div>
+              <div class="foot">共 2 · 启用 1</div>
+            </div>
+            <div class="pane">
+              <div class="head-row">
+                <div class="ptitle">书源</div>
+                <div class="meta-s">共 2 · 启用 1 · 异常 1</div>
+              </div>
+              <div class="toolrow">
+                <span class="btn pri">导入</span>
+                <span class="btn">粘贴</span>
+                <span class="btn">新建</span>
+                <span class="gap" style="flex:1"></span>
+                <span class="btn">编辑</span>
+                <span class="btn">校验</span>
+                <span class="btn">更多 <span class="caret" style="color:var(--faint)">▾</span></span>
+              </div>
+              <table class="tbl">
+                <thead><tr><th style="width:36%">名称</th><th style="width:26%">分组 / 兼容</th><th style="width:18%">状态</th><th>更新</th></tr></thead>
+                <tbody>
+                  <tr class="hov"><td class="nm">笔趣中文</td><td>默认 · 兼容</td><td class="ok">正常</td><td>11-19</td></tr>
+                  <tr class="sel"><td class="nm">顶点小说</td><td>默认 · 兼容</td><td class="fail">异常</td><td>11-19</td></tr>
+                  <tr><td class="nm">旧版书库</td><td>未分组</td><td class="idle">未校验</td><td>—</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </figure>
+    </div>
+
+    <div class="notes">
+      <div class="before">
+        <h4>现状问题</h4>
+        <ul>
+          <li>9 个按钮等高同权（导入 / 粘贴 / 新建 / 编辑 / 校验 / 删除 / 全部启用 / 全部停用 / 导出），<b>认知负担高</b>。</li>
+          <li>书源名称保留「✈」等来源符号，破坏文字干净度。</li>
+          <li>没有按状态 / 分组筛选；表头 10px；状态列缺少颜色语义。</li>
+        </ul>
+      </div>
+      <div class="after">
+        <h4>改造建议</h4>
+        <ul>
+          <li>工具栏分三组：导入（导入 / 粘贴 / 新建）｜维护（编辑 / 校验 / 导出）｜危险（删除、全部停用收进「更多」）。</li>
+          <li>名称列去掉 emoji 与前后缀，只留纯文本；分组与兼容性合并成一个 tag。</li>
+          <li>状态语义色：正常 = 墨绿 / 铜，异常 = 赭，未校验 = 灰褐；表头 11px。</li>
+          <li>右上统计改为「共 2 · 启用 1 · 异常 1」并支持点击筛选。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 06 设置 ================= -->
+  <section id="p6">
+    <div class="sec-head">
+      <span class="no">06</span>
+      <h3>设置</h3>
+      <p class="judge">没有页头与分组卡，<b>整页是一条长表单</b>，最该被突出的预览区反而最不显眼。</p>
+    </div>
+
+    <div class="pair">
+      <figure style="margin:0">
+        <div class="cap before"><span><span class="dot"></span>现状</span><span class="hint">长表单 · 控件宽度不一</span></div>
+        <div class="win">
+          <div class="win-top"><i></i><i></i><i></i><span class="url">悦读 · 设置</span></div>
+          <div class="win-body">
+            <div class="rail">
+              <div class="brand-s"><span class="seal-s">阅</span><span class="name">阅微</span></div>
+              <div class="navi">
+                <span>书架</span><span>搜索</span><span>书源</span><span>下载</span><span class="on">设置</span>
+              </div>
+              <div class="foot">版本 0.4</div>
+            </div>
+            <div class="pane">
+              <div class="srow"><span class="sl">正文字号</span><span class="ctl w48">28</span></div>
+              <div class="srow"><span class="sl">行距（倍）</span><span class="ctl w48">1.8</span></div>
+              <div class="srow"><span class="sl">字体</span><span class="ctl w96">系统默认 <span class="caret">▾</span></span><span class="btn sm">导入字体文件</span></div>
+              <div class="srow"><span class="sl">主题</span><span class="ctl w72">纸白 <span class="caret">▾</span></span></div>
+              <div class="srow"><span class="sl">标点着色</span><span class="sw"><i></i></span><span style="color:var(--muted)">开启</span></div>
+              <div class="srow"><span class="sl">对话</span><span class="sw"><i></i></span><span class="swatch-s" style="background:#a63b2c"></span><span style="color:var(--muted)">“你来了。”</span></div>
+              <div class="srow"><span class="sl">句号</span><span class="sw"><i></i></span><span class="swatch-s" style="background:#a9834d"></span><span style="color:var(--muted)">他合上书。</span></div>
+              <div class="srow"><span class="sl">问号</span><span class="sw"><i></i></span><span class="swatch-s" style="background:#a63b2c"></span><span style="color:var(--muted)">下雨了吗？</span></div>
+              <div class="preview-s">
+                <span class="dlg">“你终于来了。”</span>他放下书，抬头问道：<span class="dlg">“外面下雨了吗？”</span><br>
+                她笑了一下<span class="stop">——</span>没有回答<span class="stop">（也许是不必回答）</span>。
+              </div>
+              <div class="srow"><span class="sl">请求超时</span><span class="ctl w48">20</span></div>
+              <div class="srow" style="opacity:.5"><span class="sl">User-Agent</span><span class="ctl w120">Mozilla/5.0 …</span></div>
+            </div>
+          </div>
+        </div>
+      </figure>
+
+      <figure style="margin:0">
+        <div class="cap after"><span><span class="dot"></span>建议</span><span class="hint">页头 + 三张分组卡</span></div>
+        <div class="win">
+          <div class="win-top"><i></i><i></i><i></i><span class="url">悦读 · 设置</span></div>
+          <div class="win-body">
+            <div class="rail">
+              <div class="brand-s"><span class="seal-s">阅</span><span class="name">阅微</span></div>
+              <div class="navi">
+                <span>书架</span><span>搜索</span><span>书源</span><span>下载</span><span class="on">设置</span>
+              </div>
+              <div class="foot">版本 0.4</div>
+            </div>
+            <div class="pane">
+              <div class="head-row">
+                <div>
+                  <div class="ptitle">设置</div>
+                  <div class="meta-s">阅读、标点与网络偏好</div>
+                </div>
+                <div class="acts"><span class="btn">恢复默认</span></div>
+              </div>
+
+              <div class="card-s">
+                <div class="hd"><span class="t">阅读</span><span class="more">仅影响阅读页</span></div>
+                <div class="srow"><span class="sl">字号 / 行距</span><span class="ctl w48">18</span><span class="ctl w48">2.0</span></div>
+                <div class="srow"><span class="sl">字体</span><span class="ctl w96">系统默认 <span class="caret">▾</span></span><span class="btn sm">导入</span></div>
+                <div class="srow"><span class="sl">主题</span><span class="ctl w72">纸白 <span class="caret">▾</span></span></div>
+              </div>
+
+              <div class="card-s">
+                <div class="hd"><span class="t">标点着色</span><span class="more">4 / 6 开启</span></div>
+                <div class="rule-row"><span class="sw"><i></i></span><span>对话</span><span class="swatch-s" style="background:#a63b2c"></span><span class="dlg" style="color:var(--accent)">“你来了。”</span></div>
+                <div class="rule-row"><span class="sw"><i></i></span><span>句号</span><span class="swatch-s" style="background:#a9834d"></span><span>他合上书。</span></div>
+                <div class="rule-row"><span class="sw off"><i></i></span><span>省略号</span><span class="swatch-s" style="background:#8b7f6c"></span><span>等一下……</span></div>
+              </div>
+
+              <div class="card-s">
+                <div class="hd"><span class="t">预览</span></div>
+                <div class="preview-s" style="background:var(--card)">
+                  <span class="dlg">“你终于来了。”</span>他放下书，抬头问道：<span class="dlg">“外面下雨了吗？”</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </figure>
+    </div>
+
+    <div class="notes">
+      <div class="before">
+        <h4>现状问题</h4>
+        <ul>
+          <li>没有页面标题与说明，直接从「阅读」表单开始，第一眼不知道这是什么页。</li>
+          <li>整页一条长表单，<b>没有分组卡片，也没有视觉节奏</b>。</li>
+          <li>字号 spinner、字体 combo、主题 combo、颜色选择器宽度各不相同。</li>
+          <li>预览区与页面同底色，没有“一张内页”的容器感；开关、色块、样本横向不齐。</li>
+        </ul>
+      </div>
+      <div class="after">
+        <h4>改造建议</h4>
+        <ul>
+          <li>页头：21px「设置」+ 一句「阅读、标点与网络偏好」；右侧「恢复默认」次按钮。</li>
+          <li>三张 14px 圆角、1px 界线的分组卡：阅读 / 标点着色 / 网络。</li>
+          <li>控件统一栅格：标签 96、控件 220、辅助按钮 120，行高统一 32。</li>
+          <li>预览改为独立卡片（1px 界线 + 24 内边距，背景跟随预览主题），标题放卡片外。</li>
+          <li>标点规则行固定四列：开关 24 / 名称 110 / 色块 120 / 样本自适应。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 07 跨页规则 ================= -->
+  <section id="rules">
+    <div class="label">Rules</div>
+    <h2>跨页组件规则</h2>
+    <p class="sub">六页各自修完之后，仍需要同一套规则兜底，否则下一轮又会分叉。以下八条建议直接写进 <code>style.css</code>。</p>
+
+    <div class="rules">
+      <table>
+        <thead><tr><th>组件</th><th>统一规则</th></tr></thead>
+        <tbody>
+          <tr><td>次按钮</td><td>「卡片底 + 1px 界线 + 胶囊」三者齐全。书架与阅读页的纯文字按钮要并入这套语言，不再单独存在。</td></tr>
+          <tr><td>焦点态</td><td>保留朱砂 1px 边框，补一层 2px、20% 透明度朱砂外圈，避免只在输入时看到一条细边。</td></tr>
+          <tr><td>表格表头</td><td>10 → 11px，字距 0.08em，颜色 <code>-muted</code>；行高 36 → 40。</td></tr>
+          <tr><td>进度</td><td>所有进度统一 2px 细线：书架、下载、阅读页页脚共用同一条规则，禁止出现粗条。</td></tr>
+          <tr><td>空状态</td><td>「一句主文案 + 一句次文案 + 一个动作」，左右面板不得重复提示。</td></tr>
+          <tr><td>符号</td><td>清理书名、书源名中的 emoji；导航提示统一 10px、字距 0.14em。</td></tr>
+          <tr><td>标题层级</td><td>落实 34 / 21 / 17 / 15 / 12 / 10.5：页面标题 21、卡片标题 15、表头 11、辅助 10.5。</td></tr>
+          <tr><td>夜间</td><td>主题令牌必须注入主窗口根节点，覆盖侧栏、状态栏、对话框；不允许只覆盖阅读区。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ================= 08 优先级 ================= -->
+  <section id="priority">
+    <div class="label">Priority</div>
+    <h2>按气质排序，不按工作量排序</h2>
+    <p class="sub">P0 决定这套界面能不能被认成「一本书」；P1 决定它有没有「书案」感；P2 只做精修，不改变结论。</p>
+
+    <div class="prio">
+      <div class="col p0">
+        <div class="k">P0 · 气质</div>
+        <h4>先做三件</h4>
+        <ol>
+          <li>夜间令牌扩展到主窗口外壳，侧栏与状态栏同步变深。</li>
+          <li>阅读页工具栏精简为「返回 / 书名 / 目录 / Aa」，其余收进 Aa 面板。</li>
+          <li>阅读默认字号、行距、首段样式对齐提案，仅迁移未自定义的用户。</li>
+        </ol>
+      </div>
+      <div class="col">
+        <div class="k">P1 · 书案</div>
+        <h4>再做三页</h4>
+        <ol>
+          <li>设置页加页头与三张分组卡，预览独立成卡。</li>
+          <li>书架页头收 4 个动作、工具行降噪、书脊竖排。</li>
+          <li>搜索 / 下载 / 书源：动作分组、空状态合并、表头字号。</li>
+        </ol>
+      </div>
+      <div class="col">
+        <div class="k">P2 · 精修</div>
+        <h4>最后统一</h4>
+        <ol>
+          <li>表格 hover / selected 令牌化。</li>
+          <li>进度线统一为 2px。</li>
+          <li>emoji 清理、焦点外圈、字距归位。</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <div class="page-foot">
+    <span>依据 · docs/视觉升级方案-桌面与移动端.html（令牌一致）</span>
+    <span>本稿仅做视觉对照，未改动代码</span>
+  </div>
+</div>
+
+<div class="switcher">
+  <button type="button" data-set="paper" aria-pressed="true">纸白</button>
+  <button type="button" data-set="night" aria-pressed="false">夜间</button>
+</div>
+
+<script>
+  const root = document.documentElement;
+  const buttons = document.querySelectorAll('.switcher button');
+  buttons.forEach(function (button) {
+    button.addEventListener('click', function () {
+      root.setAttribute('data-theme', button.dataset.set);
+      buttons.forEach(function (item) {
+        item.setAttribute('aria-pressed', String(item === button));
+      });
+    });
+  });
+</script>
+
+</body>
+</html>

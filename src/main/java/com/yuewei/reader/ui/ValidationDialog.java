@@ -30,6 +30,7 @@ public final class ValidationDialog {
         dialog.setTitle("书源校验 · " + report.sourceName);
         dialog.initOwner(owner);
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        Ui.styleDialog(dialog, owner);
         dialog.getDialogPane().setPrefWidth(880);
         dialog.getDialogPane().setPrefHeight(620);
 
@@ -73,7 +74,7 @@ public final class ValidationDialog {
 
         VBox content = new VBox(8, header, split);
         VBox.setVgrow(split, Priority.ALWAYS);
-        content.setPadding(new Insets(10));
+        content.setPadding(new Insets(Ui.SPACE_FORM));
         dialog.getDialogPane().setContent(content);
         dialog.show();
     }

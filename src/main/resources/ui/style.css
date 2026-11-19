@@ -1,91 +1,276 @@
-/* 阅微 · 小说阅读器 —— 纸感暖色主题 */
+/* 阅微 · 小说阅读器 —— 纸本 · 朱印
+   颜色令牌：纸 / 墨 / 灰褐 / 朱砂 / 铜 / 界线
+   字号阶梯：34 / 21 / 17 / 15 / 13 / 12 / 11
+   间距：页面 20、列表 16、卡片 8；圆角统一 14
+*/
 
 .root {
+    -paper: #f4eddf;
+    -paper-2: #eae0cb;
+    -card: #fbf6ea;
+    -card-2: #f7f0e1;
+    -ink: #221d18;
+    -ink-2: #4b4238;
+    -muted: #8b7f6c;
+    -faint: #b7ab96;
+    -accent: #a63b2c;
+    -accent-2: #c76a53;
+    -brass: #a9834d;
+    -line: #ded1b8;
+    -line-soft: rgba(94, 78, 54, 0.12);
+
     -fx-font-family: "Microsoft YaHei UI", "PingFang SC", "Segoe UI", sans-serif;
     -fx-font-size: 13px;
+    -fx-background-color: -paper;
+    -fx-focus-color: -accent;
+    -fx-faint-focus-color: transparent;
 }
 
-.app-root {
-    -fx-background-color: #faf8f3;
-}
-
+.app-root,
 .content-area {
-    -fx-background-color: #faf8f3;
+    -fx-background-color: -paper;
 }
 
 /* ---------------- 左侧导航 ---------------- */
 
 .sidebar {
-    -fx-background-color: #f1ebe0;
-    -fx-border-color: transparent #e6dfd1 transparent transparent;
+    -fx-background-color: -paper-2;
+    -fx-border-color: transparent -line transparent transparent;
     -fx-border-width: 0 1 0 0;
 }
 
 .brand {
-    -fx-font-size: 24px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #3b3a36;
+    -fx-font-family: "KaiTi", "STKaiti", "SimSun", serif;
+    -fx-font-size: 21px;
+    -fx-text-fill: -ink;
 }
 
 .brand-sub {
-    -fx-font-size: 11.5px;
-    -fx-text-fill: #9b9486;
+    -fx-font-size: 11px;
+    -fx-text-fill: -muted;
+}
+
+.mini-seal {
+    -fx-background-color: linear-gradient(to bottom right, -accent, -accent-2);
+    -fx-background-radius: 5;
+    -fx-text-fill: #fff6ea;
+    -fx-font-family: "KaiTi", "STKaiti", "SimSun", serif;
+    -fx-font-size: 14px;
+    -fx-border-color: rgba(255, 246, 234, 0.38);
+    -fx-border-radius: 5;
+    -fx-border-width: 2;
+    -fx-rotate: -2.5;
 }
 
 .nav-button {
     -fx-background-color: transparent;
-    -fx-background-radius: 6;
+    -fx-background-radius: 9;
+    -fx-border-radius: 9;
     -fx-alignment: center-left;
-    -fx-padding: 9 12 9 12;
-    -fx-text-fill: #4a4740;
-    -fx-font-size: 14px;
+    -fx-padding: 0;
     -fx-cursor: hand;
 }
 
+.nav-label {
+    -fx-font-size: 14px;
+    -fx-text-fill: -ink-2;
+}
+
+.nav-hint {
+    -fx-font-size: 10px;
+    -fx-text-fill: -faint;
+}
+
 .nav-button:hover {
-    -fx-background-color: #e7dfd0;
+    -fx-background-color: rgba(166, 59, 44, 0.06);
 }
 
 .nav-button:selected {
-    -fx-background-color: #3f5c48;
-    -fx-text-fill: #ffffff;
+    -fx-background-color: -accent, -card;
+    -fx-background-insets: 0, 0 0 0 2;
+    -fx-background-radius: 9, 9;
+}
+
+.nav-button:selected .nav-label {
+    -fx-text-fill: -ink;
+}
+
+.sync-card {
+    -fx-background-color: -card;
+    -fx-background-radius: 12;
+    -fx-border-color: -line;
+    -fx-border-radius: 12;
+    -fx-padding: 12;
+    -fx-cursor: hand;
+}
+
+.sync-card-title {
+    -fx-font-size: 10.5px;
+    -fx-text-fill: -muted;
+}
+
+.sync-card-value {
+    -fx-font-size: 12px;
+    -fx-text-fill: -ink;
+}
+
+/* ---------------- 页面头部 ---------------- */
+
+.page-header {
+    -fx-padding: 18 20 8 20;
+}
+
+.page-title {
+    -fx-font-family: "KaiTi", "STKaiti", "SimSun", serif;
+    -fx-font-size: 21px;
+    -fx-text-fill: -ink;
+}
+
+.page-sub {
+    -fx-font-size: 11px;
+    -fx-text-fill: -muted;
+}
+
+.page-toolbar {
+    -fx-padding: 0 20 12 20;
+}
+
+.card-title {
+    -fx-font-size: 13px;
+    -fx-text-fill: -ink-2;
+}
+
+.search-side,
+.search-detail {
+    -fx-background-color: -card;
+    -fx-border-color: -line;
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-padding: 14;
 }
 
 /* ---------------- 工具栏与按钮 ---------------- */
 
-.toolbar {
-    -fx-background-color: #fffdf9;
-    -fx-border-color: transparent transparent #ece5d8 transparent;
-    -fx-border-width: 0 0 1 0;
-}
-
 .primary-button {
-    -fx-background-color: #3f5c48;
-    -fx-text-fill: #ffffff;
-    -fx-background-radius: 6;
-    -fx-padding: 7 14 7 14;
+    -fx-background-color: -accent;
+    -fx-text-fill: #fff6ea;
+    -fx-background-radius: 999;
+    -fx-padding: 0 16 0 16;
+    -fx-min-height: 32;
+    -fx-pref-height: 32;
+    -fx-font-size: 12.5px;
     -fx-cursor: hand;
 }
 
 .primary-button:hover {
-    -fx-background-color: #4d7058;
+    -fx-background-color: -accent-2;
 }
 
 .ghost-button {
-    -fx-background-color: transparent;
-    -fx-border-color: #d8d0c0;
-    -fx-border-radius: 6;
-    -fx-background-radius: 6;
-    -fx-text-fill: #4a4740;
-    -fx-padding: 6 12 6 12;
+    -fx-background-color: -card;
+    -fx-border-color: -line;
+    -fx-border-radius: 999;
+    -fx-background-radius: 999;
+    -fx-text-fill: -ink-2;
+    -fx-padding: 0 14 0 14;
+    -fx-min-height: 32;
+    -fx-pref-height: 32;
+    -fx-font-size: 12.5px;
     -fx-cursor: hand;
 }
 
 .ghost-button:hover {
-    -fx-background-color: #f1ebe0;
+    -fx-border-color: -accent;
+    -fx-text-fill: -accent;
 }
 
-/* ---------------- 书架 ---------------- */
+.danger-button {
+    -fx-background-color: transparent;
+    -fx-border-color: -accent;
+    -fx-border-radius: 999;
+    -fx-background-radius: 999;
+    -fx-text-fill: -accent;
+    -fx-padding: 0 14 0 14;
+    -fx-min-height: 32;
+    -fx-pref-height: 32;
+    -fx-font-size: 12.5px;
+    -fx-cursor: hand;
+}
+
+.danger-button:hover {
+    -fx-background-color: -card-2;
+}
+
+/* ---------------- 书架页头 ---------------- */
+
+.shelf-header {
+    -fx-background-color: -paper;
+    -fx-padding: 18 20 8 20;
+}
+
+.shelf-greeting {
+    -fx-font-size: 11px;
+    -fx-text-fill: -muted;
+}
+
+.shelf-title {
+    -fx-font-family: "KaiTi", "STKaiti", "SimSun", serif;
+    -fx-font-size: 21px;
+    -fx-text-fill: -ink;
+}
+
+.shelf-tools {
+    -fx-padding: 0 20 10 20;
+}
+
+/* ---------------- 继续阅读 ---------------- */
+
+.hero-book {
+    -fx-background-color: -card;
+    -fx-background-radius: 14;
+    -fx-border-color: -line;
+    -fx-border-radius: 14;
+    -fx-padding: 16 18 16 18;
+    -fx-cursor: hand;
+}
+
+.hero-book:hover {
+    -fx-border-color: -accent;
+}
+
+.hero-spine {
+    -fx-background-color: linear-gradient(to bottom right, -accent, -accent-2);
+    -fx-background-radius: 4;
+    -fx-min-width: 44;
+    -fx-pref-width: 44;
+    -fx-max-width: 44;
+    -fx-min-height: 96;
+    -fx-pref-height: 96;
+}
+
+.hero-spine .label {
+    -fx-text-fill: #fff6ea;
+    -fx-font-family: "KaiTi", "STKaiti", "SimSun", serif;
+    -fx-font-size: 14px;
+}
+
+.hero-title {
+    -fx-font-family: "KaiTi", "STKaiti", "SimSun", serif;
+    -fx-font-size: 20px;
+    -fx-text-fill: -ink;
+}
+
+.hero-meta {
+    -fx-font-size: 11.5px;
+    -fx-text-fill: -muted;
+}
+
+.hero-continue {
+    -fx-font-size: 12px;
+    -fx-text-fill: -accent;
+}
+
+/* ---------------- 书架网格 ---------------- */
 
 .shelf-scroll {
     -fx-background-color: transparent;
@@ -95,183 +280,221 @@
     -fx-background-color: transparent;
 }
 
-.book-card {
-    -fx-background-color: #fffdf9;
-    -fx-background-radius: 8;
-    -fx-border-color: #ece5d8;
-    -fx-border-radius: 8;
-    -fx-padding: 10;
+.shelf-row {
+    -fx-padding: 14 8 14 8;
+    -fx-border-color: transparent transparent -line transparent;
+    -fx-border-width: 0 0 1 0;
     -fx-cursor: hand;
 }
 
-.book-card:hover {
-    -fx-border-color: #c9c0ad;
-    -fx-effect: dropshadow(gaussian, rgba(60, 48, 28, 0.12), 10, 0, 0, 3);
+.shelf-row:hover {
+    -fx-background-color: -card;
+    -fx-border-color: transparent transparent -line -accent;
+    -fx-border-width: 0 0 1 2;
+    -fx-padding: 14 8 14 10;
 }
 
-.book-cover {
-    -fx-text-fill: #ffffff;
-    -fx-font-size: 26px;
-    -fx-font-weight: bold;
-    -fx-background-radius: 6;
+.shelf-index {
+    -fx-font-family: "Consolas", "Courier New", monospace;
+    -fx-font-size: 11px;
+    -fx-text-fill: -faint;
 }
 
-.book-title {
-    -fx-font-size: 13.5px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #33312c;
+.shelf-row-title {
+    -fx-font-size: 15px;
+    -fx-text-fill: -ink;
 }
 
-.book-meta {
+.shelf-row-meta {
     -fx-font-size: 11.5px;
-    -fx-text-fill: #8b8578;
+    -fx-text-fill: -muted;
 }
 
-.badge-offline {
-    -fx-background-color: #e2efe0;
-    -fx-text-fill: #3f6b45;
-    -fx-background-radius: 4;
-    -fx-padding: 1 6 1 6;
-    -fx-font-size: 10.5px;
-}
-
-.badge-warn {
-    -fx-background-color: #f6e2d7;
-    -fx-text-fill: #a0522d;
-    -fx-background-radius: 4;
-    -fx-padding: 1 6 1 6;
-    -fx-font-size: 10.5px;
+.shelf-row-pct {
+    -fx-font-family: "Consolas", "Courier New", monospace;
+    -fx-font-size: 12px;
+    -fx-text-fill: -accent;
 }
 
 .empty-title {
+    -fx-font-family: "KaiTi", "STKaiti", "SimSun", serif;
     -fx-font-size: 18px;
-    -fx-text-fill: #6a655a;
+    -fx-text-fill: -ink-2;
 }
 
 /* ---------------- 通用文字 ---------------- */
 
 .muted {
-    -fx-text-fill: #8b8578;
+    -fx-text-fill: -muted;
     -fx-font-size: 12px;
 }
 
 .ok {
-    -fx-text-fill: #3f7a4f;
+    -fx-text-fill: -brass;
     -fx-font-size: 12px;
 }
 
 .warn {
-    -fx-text-fill: #b4582f;
+    -fx-text-fill: -accent;
     -fx-font-size: 12px;
+}
+
+.status-ok {
+    -fx-text-fill: -brass;
+}
+
+.status-bad {
+    -fx-text-fill: -accent;
+}
+
+.status-idle {
+    -fx-text-fill: -faint;
 }
 
 .panel-title {
     -fx-font-size: 13px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #4a4740;
-}
-
-.section-title {
-    -fx-font-size: 15px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #3b3a36;
+    -fx-text-fill: -ink-2;
 }
 
 /* ---------------- 阅读器 ---------------- */
 
 .reader-toolbar {
-    -fx-background-color: #ece4d4;
-    -fx-border-color: transparent transparent #ddd3c0 transparent;
+    -fx-background-color: -paper-2;
+    -fx-border-color: transparent transparent -line transparent;
 }
 
-.reader-book {
+.reader-toolbar-title {
+    -fx-font-family: "Songti SC", "SimSun", serif;
     -fx-font-size: 14px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #3b3a36;
+    -fx-text-fill: -ink;
+    -fx-padding: 0 6 0 4;
 }
 
-.reader-chapter {
-    -fx-font-size: 12.5px;
-    -fx-text-fill: #7d776a;
+.running-text {
+    -fx-font-family: "KaiTi", "STKaiti", "SimSun", serif;
+    -fx-font-size: 10.5px;
 }
 
-.reader-percent {
+.running-chapter {
+    -fx-text-fill: -ink;
+    -fx-opacity: 0.74;
+}
+
+.running-book {
+    -fx-text-fill: -ink;
+    -fx-opacity: 0.46;
+}
+
+.running-page {
+    -fx-font-family: "Consolas", "Courier New", monospace;
+    -fx-font-size: 10px;
+    -fx-text-fill: -ink;
+    -fx-opacity: 0.54;
+}
+
+.running-header,
+.running-foot {
+    -fx-background-color: -paper;
+}
+
+.reader-root {
+    -fx-background-color: -paper;
+}
+
+.reader-scroll.scroll-pane {
+    -fx-background: -paper;
+    -fx-background-color: -paper;
+}
+
+.reader-scroll.scroll-pane > .viewport {
+    -fx-background-color: -paper;
+}
+
+.monospace {
+    -fx-font-family: "Consolas", "Courier New", monospace;
     -fx-font-size: 12px;
-    -fx-text-fill: #7d776a;
 }
 
 .reader-flow {
-    -fx-background-color: #f6f1e7;
+    -fx-background-color: -paper;
+}
+
+.reader-paragraph {
+    -fx-background-color: transparent;
+}
+
+/* 首段：不缩进，字体由阅读器按楷体略大一号设置 */
+.reader-first {
+    -fx-background-color: transparent;
 }
 
 .toc-box {
-    -fx-background-color: #ece4d4;
-    -fx-border-color: transparent #ddd3c0 transparent transparent;
-    -toc-ink: #2f2a24;
-    -toc-muted: #8a8175;
-    -toc-line: #ddd3c0;
-    -toc-accent: #a63d32;
-    -toc-selected: rgba(166,61,50,0.10);
-    -toc-hover: rgba(166,61,50,0.05);
-    -toc-field: rgba(255,253,249,0.65);
+    -fx-background-color: -paper-2;
+    -fx-border-color: transparent -line transparent transparent;
 }
 
 .reader-resize {
     -fx-background-color: transparent;
+    -fx-border-color: transparent transparent transparent -line;
+    -fx-border-width: 0 0 0 1;
     -fx-cursor: h-resize;
 }
 
 .reader-resize:hover {
-    -fx-background-color: rgba(166,61,50,0.16);
+    -fx-background-color: -card-2;
 }
 
 .toc-header {
-    -fx-padding: 14 14 10 16;
+    -fx-padding: 16 14 10 20;
     -fx-alignment: center-left;
 }
 
 .toc-title {
     -fx-font-size: 14px;
-    -fx-font-weight: bold;
-    -fx-text-fill: -toc-ink;
+    -fx-text-fill: -ink;
 }
 
 .toc-count {
     -fx-font-size: 11px;
-    -fx-text-fill: -toc-muted;
+    -fx-text-fill: -muted;
 }
 
-.toc-seal {
-    -fx-background-color: #a63d32;
-    -fx-background-radius: 4;
-    -fx-text-fill: #fdf6ec;
+.toc-search-toggle {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-text-fill: -muted;
     -fx-font-size: 11px;
-    -fx-padding: 1 5 1 5;
+    -fx-padding: 2 6 2 6;
+    -fx-cursor: hand;
+}
+
+.toc-search-toggle:hover {
+    -fx-text-fill: -accent;
 }
 
 .toc-search-wrap {
-    -fx-padding: 0 12 10 12;
+    -fx-padding: 0 12 10 16;
 }
 
 .toc-search {
-    -fx-background-color: -toc-field;
-    -fx-text-fill: -toc-ink;
-    -fx-prompt-text-fill: -toc-muted;
-    -fx-border-color: -toc-line;
-    -fx-border-radius: 7;
-    -fx-background-radius: 7;
-    -fx-padding: 6 10 6 10;
+    -fx-background-color: -card;
+    -fx-text-fill: -ink;
+    -fx-prompt-text-fill: -muted;
+    -fx-border-color: -line;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 7 10 7 10;
     -fx-font-size: 12px;
 }
 
 .toc-search:focused {
-    -fx-border-color: -toc-accent;
+    -fx-border-color: -accent;
 }
 
 .toc-box .toc-list {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
-    -fx-padding: 2 6 4 6;
+    -fx-padding: 2 8 4 8;
 }
 
 .toc-box .toc-list .list-cell {
@@ -280,16 +503,16 @@
 }
 
 .toc-box .toc-list .list-cell:filled:hover {
-    -fx-background-color: -toc-hover;
+    -fx-background-color: -card-2;
     -fx-background-insets: 3 0 3 0;
     -fx-background-radius: 6;
 }
 
 .toc-box .toc-list .list-cell:filled:selected {
-    -fx-background-color: -toc-selected;
+    -fx-background-color: -card;
     -fx-background-insets: 3 0 3 0;
     -fx-background-radius: 6;
-    -fx-border-color: -toc-accent;
+    -fx-border-color: -accent;
     -fx-border-width: 0 0 0 2;
     -fx-border-insets: 3 0 3 0;
 }
@@ -299,7 +522,7 @@
 }
 
 .toc-name {
-    -fx-text-fill: -toc-ink;
+    -fx-text-fill: -ink;
     -fx-font-size: 13px;
 }
 
@@ -308,7 +531,7 @@
 }
 
 .toc-dot {
-    -fx-background-color: #8aa887;
+    -fx-background-color: -muted;
     -fx-background-radius: 2;
     -fx-min-width: 4;
     -fx-min-height: 4;
@@ -318,63 +541,189 @@
     -fx-max-height: 4;
 }
 
-.toc-reading {
-    -fx-text-fill: -toc-accent;
-    -fx-border-color: -toc-accent;
-    -fx-border-width: 1;
-    -fx-border-radius: 20;
-    -fx-background-radius: 20;
-    -fx-padding: 0 6 1 6;
-    -fx-font-size: 10px;
-}
-
 .toc-footer-wrap {
-    -fx-padding: 9 16 11 16;
-    -fx-border-color: -toc-line transparent transparent transparent;
+    -fx-padding: 10 16 12 20;
+    -fx-border-color: -line transparent transparent transparent;
     -fx-border-width: 1 0 0 0;
 }
 
 .toc-footer {
-    -fx-text-fill: -toc-muted;
+    -fx-text-fill: -muted;
     -fx-font-size: 11px;
+}
+
+/* ---------------- 表单控件 ---------------- */
+
+.text-field,
+.text-area,
+.combo-box,
+.spinner,
+.choice-box,
+.color-picker {
+    -fx-background-color: -card;
+    -fx-border-color: -line;
+    -fx-background-radius: 8;
+    -fx-border-radius: 8;
+    -fx-text-fill: -ink;
+    -fx-prompt-text-fill: -muted;
+}
+
+.text-field:focused,
+.text-area:focused,
+.combo-box:focused,
+.spinner:focused,
+.choice-box:focused {
+    -fx-border-color: -accent;
+    -fx-effect: dropshadow(gaussian, derive(-accent, 55%), 6, 0.0, 0, 0);
+}
+
+.text-area .content {
+    -fx-background-color: -card;
+}
+
+.combo-box .list-cell,
+.choice-box .label {
+    -fx-background-color: transparent;
+    -fx-text-fill: -ink;
+}
+
+.combo-box .arrow-button,
+.color-picker .arrow-button {
+    -fx-background-color: transparent;
+}
+
+.combo-box .arrow,
+.color-picker .arrow {
+    -fx-background-color: -muted;
+}
+
+.combo-box-popup .list-view {
+    -fx-background-color: -card;
+    -fx-border-color: -line;
+}
+
+.combo-box-popup .list-cell:filled:hover {
+    -fx-background-color: -card-2;
+}
+
+.spinner .increment-arrow-button,
+.spinner .decrement-arrow-button {
+    -fx-background-color: -card-2;
+    -fx-border-color: -line;
+}
+
+.spinner .increment-arrow,
+.spinner .decrement-arrow {
+    -fx-background-color: -muted;
+}
+
+.check-box .box,
+.radio-button .radio {
+    -fx-background-color: -card;
+    -fx-border-color: -line;
+    -fx-border-radius: 3;
+}
+
+.check-box:selected .mark,
+.radio-button:selected .dot {
+    -fx-background-color: -accent;
+}
+
+.check-box .text,
+.radio-button .text {
+    -fx-fill: -ink;
+}
+
+.dialog-pane .button {
+    -fx-background-color: -card-2;
+    -fx-border-color: -line;
+    -fx-text-fill: -ink;
+    -fx-background-radius: 999;
+    -fx-border-radius: 999;
+}
+
+.dialog-pane .button:default {
+    -fx-background-color: -accent;
+    -fx-border-color: transparent;
+    -fx-text-fill: #fff6ea;
 }
 
 /* ---------------- 表格与列表 ---------------- */
 
 .table-view {
-    -fx-background-color: #fffdf9;
-    -fx-border-color: #ece5d8;
-    -fx-border-radius: 6;
-    -fx-background-radius: 6;
+    -fx-background-color: -card;
+    -fx-border-color: -line;
+    -fx-border-radius: 14;
+    -fx-background-radius: 14;
+    -fx-table-cell-border-color: transparent;
+}
+
+.table-view .table-row-cell:empty {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.table-view .table-row-cell:empty .table-cell {
+    -fx-border-color: transparent;
 }
 
 .table-view .column-header-background {
-    -fx-background-color: #f4efe4;
+    -fx-background-color: -card-2;
 }
 
 .table-view .column-header,
 .table-view .filler {
     -fx-background-color: transparent;
-    -fx-border-color: transparent #ece5d8 transparent transparent;
+    -fx-border-color: transparent -line transparent transparent;
+}
+
+.table-view .column-header .label {
+    -fx-font-size: 11px;
+    -fx-text-fill: -muted;
+}
+
+.table-view .table-row-cell:hover {
+    -fx-background-color: -card-2;
 }
 
 .table-view .table-row-cell:selected {
-    -fx-background-color: #dfe8dd;
+    -fx-background-color: -card;
+    -fx-border-color: transparent transparent transparent -accent;
+    -fx-border-width: 0 0 0 2;
 }
 
 .table-view .table-row-cell:selected .text {
-    -fx-fill: #2f3a2e;
+    -fx-fill: -ink;
+}
+
+/* 下载进度：2px 细线 */
+.thin-progress {
+    -fx-pref-height: 2;
+    -fx-min-height: 2;
+    -fx-max-height: 2;
+}
+
+.thin-progress > .track {
+    -fx-background-color: -line;
+    -fx-background-radius: 2;
+    -fx-background-insets: 0;
+}
+
+.thin-progress > .bar {
+    -fx-background-color: -accent;
+    -fx-background-radius: 2;
+    -fx-background-insets: 0;
 }
 
 .list-view {
-    -fx-background-color: #fffdf9;
-    -fx-border-color: #ece5d8;
-    -fx-background-radius: 6;
-    -fx-border-radius: 6;
+    -fx-background-color: -card;
+    -fx-border-color: -line;
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
 }
 
 .list-cell:selected {
-    -fx-background-color: #dfe8dd;
+    -fx-background-color: -card;
 }
 
 .split-pane {
@@ -383,7 +732,7 @@
 }
 
 .split-pane > .split-pane-divider {
-    -fx-background-color: #ece5d8;
+    -fx-background-color: -line;
     -fx-padding: 0 0 0 1;
 }
 
@@ -398,36 +747,149 @@
 /* ---------------- 状态栏 ---------------- */
 
 .status-bar {
-    -fx-background-color: #f1ebe0;
-    -fx-border-color: #e6dfd1 transparent transparent transparent;
+    -fx-background-color: -paper-2;
+    -fx-border-color: -line transparent transparent transparent;
     -fx-border-width: 1 0 0 0;
 }
 
 .status-text {
-    -fx-text-fill: #5a564c;
+    -fx-text-fill: -ink-2;
     -fx-font-size: 12px;
 }
 
 .status-muted {
-    -fx-text-fill: #9b9486;
+    -fx-text-fill: -muted;
     -fx-font-size: 11px;
 }
 
 /* ---------------- 关于 ---------------- */
 
 .about-name {
-    -fx-font-size: 20px;
-    -fx-font-weight: bold;
-    -fx-text-fill: #33493c;
+    -fx-font-family: "KaiTi", "STKaiti", "SimSun", serif;
+    -fx-font-size: 21px;
+    -fx-text-fill: -ink;
 }
 
 .about-text {
     -fx-font-size: 13px;
-    -fx-text-fill: #4a4740;
+    -fx-text-fill: -ink-2;
 }
 
-.dialog-pane .hyperlink {
-    -fx-text-fill: #3f5c48;
+/* 滚动条统一：透明轨道 + 发丝色滑块，跟随主题令牌 */
+.scroll-bar,
+.scroll-bar:vertical,
+.scroll-bar:horizontal {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.scroll-bar:vertical {
+    -fx-pref-width: 8;
+}
+
+.scroll-bar:horizontal {
+    -fx-pref-height: 8;
+}
+
+.scroll-bar .track,
+.scroll-bar .track-background,
+.scroll-bar:vertical .track,
+.scroll-bar:vertical .track-background,
+.scroll-bar:horizontal .track,
+.scroll-bar:horizontal .track-background {
+    -fx-background-color: transparent;
     -fx-border-color: transparent;
 }
 
+.scroll-bar .thumb,
+.scroll-bar:vertical .thumb,
+.scroll-bar:horizontal .thumb {
+    -fx-background-color: -line;
+    -fx-background-insets: 2;
+    -fx-background-radius: 4;
+}
+
+.scroll-bar .thumb:hover,
+.scroll-bar:vertical .thumb:hover,
+.scroll-bar:horizontal .thumb:hover {
+    -fx-background-color: -faint;
+}
+
+.scroll-bar .increment-button,
+.scroll-bar .decrement-button,
+.scroll-bar:vertical .increment-button,
+.scroll-bar:vertical .decrement-button,
+.scroll-bar:horizontal .increment-button,
+.scroll-bar:horizontal .decrement-button {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.scroll-bar .increment-arrow,
+.scroll-bar .decrement-arrow,
+.scroll-bar:vertical .increment-arrow,
+.scroll-bar:vertical .decrement-arrow,
+.scroll-bar:horizontal .increment-arrow,
+.scroll-bar:horizontal .decrement-arrow {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.dialog-pane .hyperlink {
+    -fx-text-fill: -accent;
+    -fx-border-color: transparent;
+}
+
+.dialog-pane {
+    -fx-background-color: -paper;
+}
+
+.dialog-pane .label {
+    -fx-text-fill: -ink;
+}
+
+.dialog-pane .content.label {
+    -fx-text-fill: -ink-2;
+}
+
+.preview-page {
+    -fx-background-radius: 0;
+}
+
+/* ---------------- 设置页 ---------------- */
+
+.settings-header {
+    -fx-padding: 4 0 0 0;
+}
+
+.settings-page-title {
+    -fx-font-family: "KaiTi", "STKaiti", "SimSun", serif;
+    -fx-font-size: 21px;
+    -fx-text-fill: -ink;
+}
+
+.settings-page-sub {
+    -fx-font-size: 12px;
+    -fx-text-fill: -muted;
+}
+
+.settings-card {
+    -fx-background-color: -card;
+    -fx-border-color: -line;
+    -fx-background-radius: 14;
+    -fx-border-radius: 14;
+    -fx-padding: 16;
+}
+
+.settings-card-title {
+    -fx-font-size: 15px;
+    -fx-text-fill: -ink-2;
+}
+
+.preview-card {
+    -fx-background-color: -paper-2;
+    -fx-border-color: -line;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-padding: 18;
+}

@@ -125,9 +125,70 @@ public class UiSmokeTest {
         ReaderActivity activity = Robolectric.buildActivity(ReaderActivity.class, intent).setup().get();
 
         assertNotNull(findText(activity, "第一章 开始", false));
-        assertNotNull(findTextContaining(activity, "/2 章"));
+        assertNotNull(findText(activity, "上一章", false));
+        assertNotNull(findText(activity, "下一章", false));
+        assertNotNull(findText(activity, "Aa", false));
+        assertNotNull(findTextContaining(activity, "1/1"));
         PageView pageView = findView(activity.getWindow().getDecorView(), PageView.class);
         assertNotNull(pageView);
+    }
+
+    @Test
+    public void settingsShowsFontPunctuationAndCacheControls() {
+        SettingsActivity activity = Robolectric.buildActivity(SettingsActivity.class).setup().get();
+
+        assertNotNull(findTextContaining(activity, "字体："));
+        assertNotNull(findText(activity, "导入字体文件", false));
+        assertNotNull(findText(activity, "标点着色", false));
+        assertNotNull(findTextContaining(activity, "在线书缓存"));
+        assertNotNull(findText(activity, "清理在线书缓存", false));
+    }
+
+    /** 沉浸阅读时页脚常驻，底部工具栏默认隐藏。 */
+    @Test
+    public void readerKeepsFooterVisibleWhenChromeHidden() throws Exception {
+        Library library = new Library(context);
+        Library.Book book = new Library.Book();
+        book.id = "b6";
+        book.title = "页脚测试";
+        book.author = "作者己";
+        book.chapterTitles.add("第一章 开始");
+        book.chapterLengths.add(8);
+        library.books.add(book);
+        library.writeChapter(book.id, 0, "第一章正文");
+        library.save();
+
+        Intent intent = new Intent(context, ReaderActivity.class)
+                .putExtra(ReaderActivity.EXTRA_BOOK_ID, book.id);
+        ReaderActivity activity = Robolectric.buildActivity(ReaderActivity.class, intent).setup().get();
+
+        TextView pageInfo = findTextContaining(activity, "1/1");
+        assertNotNull("沉浸阅读时应显示页码", pageInfo);
+        assertEquals(View.VISIBLE, ((View) pageInfo.getParent()).getVisibility());
+
+        TextView nextChapter = findText(activity, "下一章", false);
+        assertNotNull(nextChapter);
+        View panel = ancestorWithTag(nextChapter, "panel");
+        assertNotNull("底部面板应带 panel 标记", panel);
+        assertEquals("默认应隐藏底部面板", View.GONE, panel.getVisibility());
+    }
+
+    private static View ancestorWithTag(View view, String tag) {
+        View current = view;
+        while (current != null) {
+            if (tag.equals(current.getTag())) {
+                return current;
+            }
+            current = current.getParent() instanceof View
+                    ? (View) current.getParent() : null;
+        }
+        return null;
+    }
+
+    @Test
+    public void searchAndSourcesScreensCreate() {
+        assertNotNull(Robolectric.buildActivity(SearchActivity.class).setup().get());
+        assertNotNull(Robolectric.buildActivity(SourcesActivity.class).setup().get());
     }
 
     @Test

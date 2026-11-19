@@ -16,8 +16,10 @@ import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.Spinner;
+import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.ToggleGroup;
@@ -26,6 +28,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,7 +43,7 @@ public class DownloadsView implements AppView {
     private final Label summary = Ui.label("", "muted");
     private final Button pauseButton = Ui.button("暂停", "ghost-button");
     private final Button resumeButton = Ui.button("继续", "ghost-button");
-    private final Button cancelButton = Ui.button("取消", "ghost-button");
+    private final Button cancelButton = Ui.button("取消", "danger-button");
 
     public DownloadsView(AppContext ctx, MainWindow window) {
         this.ctx = ctx;
@@ -59,14 +62,14 @@ public class DownloadsView implements AppView {
         TableColumn<DownloadTask, String> rangeCol = column("范围", 120, task -> rangeText(task));
         TableColumn<DownloadTask, String> stateCol = column("状态", 100,
                 task -> task.state.label);
-        TableColumn<DownloadTask, String> progressCol = column("进度", 140,
-                task -> "成功 " + task.successCount + " · 失败 " + task.failCount);
+        TableColumn<DownloadTask, String> progressCol = progressColumn();
         TableColumn<DownloadTask, String> failedCol = column("失败章节", 180,
                 task -> task.failedIndexes.isEmpty() ? "" : joinIndexes(task.failedIndexes));
         TableColumn<DownloadTask, String> updatedCol = column("更新时间", 120,
                 task -> Ui.formatTime(task.updatedAt == null ? task.createdAt : task.updatedAt));
 
         table.getColumns().addAll(titleCol, rangeCol, stateCol, progressCol, failedCol, updatedCol);
+        table.setFixedCellSize(40);
         table.setPlaceholder(Ui.label("暂无下载任务。可在书架右键「全部下载」，或点击左上角「新建下载」。", "muted"));
         table.getSelectionModel().selectedItemProperty().addListener(
                 (observable, oldValue, newValue) -> updateButtons());
@@ -81,14 +84,17 @@ public class DownloadsView implements AppView {
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox toolbar = new HBox(8, create, pauseButton, resumeButton, cancelButton, refresh, spacer, summary);
-        toolbar.getStyleClass().add("toolbar");
+        HBox toolbar = new HBox(8, create, pauseButton, resumeButton, cancelButton,
+                spacer, refresh);
         toolbar.setAlignment(Pos.CENTER_LEFT);
-        toolbar.setPadding(new Insets(12, 16, 12, 16));
+        toolbar.getStyleClass().add("page-toolbar");
 
-        root.setTop(toolbar);
+        VBox head = new VBox(4, Ui.label("下载", "page-title"), summary);
+        head.getStyleClass().add("page-header");
+
+        root.setTop(new VBox(head, toolbar));
         root.setCenter(table);
-        BorderPane.setMargin(table, new Insets(0, 16, 16, 16));
+        BorderPane.setMargin(table, new Insets(0, Ui.SPACE_LIST, Ui.SPACE_LIST, Ui.SPACE_LIST));
         updateButtons();
         refresh();
     }
@@ -100,6 +106,44 @@ public class DownloadsView implements AppView {
         column.setCellValueFactory(cell -> {
             String value = getter.apply(cell.getValue());
             return new ReadOnlyStringWrapper(value == null ? "" : value);
+        });
+        return column;
+    }
+
+    /** 进度列：2px 细线 + 成功 / 失败两段数字。 */
+    private TableColumn<DownloadTask, String> progressColumn() {
+        TableColumn<DownloadTask, String> column = new TableColumn<>("进度");
+        column.setPrefWidth(170);
+        column.setCellValueFactory(cell -> new ReadOnlyStringWrapper(""));
+        column.setCellFactory(col -> new TableCell<>() {
+            private final ProgressBar bar = new ProgressBar();
+            private final Label success = new Label();
+            private final Label failed = new Label();
+            private final HBox counts = new HBox(4, success, failed);
+            private final VBox box = new VBox(4, bar, counts);
+
+            {
+                bar.getStyleClass().add("thin-progress");
+                bar.setMaxWidth(Double.MAX_VALUE);
+                success.getStyleClass().add("muted");
+                failed.getStyleClass().add("warn");
+                box.setPadding(new Insets(2, 8, 2, 0));
+            }
+
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                DownloadTask task = getTableRow() == null ? null : getTableRow().getItem();
+                if (empty || task == null) {
+                    setGraphic(null);
+                    return;
+                }
+                int done = task.successCount + task.failCount;
+                bar.setProgress(done == 0 ? 0 : task.successCount / (double) done);
+                success.setText("成功 " + task.successCount);
+                failed.setText("· 失败 " + task.failCount);
+                setGraphic(box);
+            }
         });
         return column;
     }
@@ -203,6 +247,7 @@ public class DownloadsView implements AppView {
         choice.setHeaderText(null);
         choice.setContentText("选择书籍");
         choice.initOwner(window.stage());
+        Ui.styleDialog(choice, window.stage());
         Book book = choice.showAndWait().orElse(null);
         if (book == null) {
             return;
@@ -212,6 +257,7 @@ public class DownloadsView implements AppView {
         dialog.setTitle("下载《" + book.title + "》");
         dialog.initOwner(window.stage());
         dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        Ui.styleDialog(dialog, window.stage());
 
         ToggleGroup group = new ToggleGroup();
         RadioButton all = new RadioButton("全部章节");
@@ -229,9 +275,9 @@ public class DownloadsView implements AppView {
         to.disableProperty().bind(range.selectedProperty().not());
 
         GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-        grid.setPadding(new Insets(12));
+        grid.setHgap(Ui.SPACE_FORM);
+        grid.setVgap(Ui.SPACE_FORM);
+        grid.setPadding(new Insets(Ui.SPACE_FORM + 2));
         grid.add(all, 0, 0, 3, 1);
         grid.add(uncached, 0, 1, 3, 1);
         grid.add(range, 0, 2, 3, 1);

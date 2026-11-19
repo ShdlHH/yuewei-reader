@@ -15,13 +15,14 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.control.Separator;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
@@ -43,7 +44,7 @@ public class SettingsView implements AppView {
     private final BorderPane root = new BorderPane();
 
     private final Spinner<Integer> fontSize = new Spinner<>(12, 32, 18);
-    private final Spinner<Double> lineSpacing = new Spinner<>(1.2, 3.0, 1.8, 0.1);
+    private final Spinner<Double> lineSpacing = new Spinner<>(1.2, 3.0, 2.0, 0.1);
     private final ComboBox<String> fontFamily = new ComboBox<>();
     private final ComboBox<String> theme = new ComboBox<>();
     private final Spinner<Integer> timeout = new Spinner<>(5, 60, 20);
@@ -95,7 +96,7 @@ public class SettingsView implements AppView {
 
     private void build() {
         fontFamily.getItems().setAll(Ui.fontFamilies());
-        fontFamily.setPrefWidth(220);
+        fontFamily.setPrefWidth(150);
         fontFamily.setCellFactory(list -> new ListCell<>() {
             @Override
             protected void updateItem(String item, boolean empty) {
@@ -112,28 +113,31 @@ public class SettingsView implements AppView {
         theme.getItems().addAll("纸白", "夜间", "护眼");
         theme.setPrefWidth(220);
 
-        userAgent.setPrefWidth(520);
+        userAgent.setPrefWidth(360);
 
         GridPane readerGrid = grid();
         int row = 0;
-        readerGrid.add(new Label("正文字号"), 0, row);
-        readerGrid.add(fontSize, 1, row++);
-        readerGrid.add(new Label("行距（倍）"), 0, row);
-        readerGrid.add(lineSpacing, 1, row++);
+        HBox sizeRow = new HBox(8, fontSize, lineSpacing);
+        sizeRow.setAlignment(Pos.CENTER_LEFT);
+        readerGrid.add(new Label("字号 / 行距"), 0, row);
+        readerGrid.add(sizeRow, 1, row++);
         readerGrid.add(new Label("字体"), 0, row);
-        Button importFont = Ui.button("导入字体文件", "ghost-button");
+        Button importFont = Ui.button("导入", "ghost-button");
         importFont.setOnAction(e -> importFont());
         HBox fontRow = new HBox(10, fontFamily, importFont);
         fontRow.setAlignment(Pos.CENTER_LEFT);
         readerGrid.add(fontRow, 1, row++);
         readerGrid.add(new Label("主题"), 0, row);
         readerGrid.add(theme, 1, row++);
+        readerGrid.add(Ui.label("主题同时影响主界面与阅读页", "muted"), 1, row++);
         readerGrid.add(fontHint, 1, row++);
         GridPane.setColumnSpan(fontHint, 1);
         fontHint.setWrapText(true);
-        fontHint.setMaxWidth(560);
+        fontHint.setMaxWidth(360);
+        styleGrid(readerGrid);
 
-        previewFlow.setPadding(new Insets(16, 18, 16, 18));
+        previewFlow.getStyleClass().add("preview-page");
+        previewFlow.setPadding(new Insets(0));
         previewFlow.setPrefWidth(560);
 
         VBox punctBox = new VBox(8);
@@ -190,6 +194,7 @@ public class SettingsView implements AppView {
         networkGrid.add(requestInterval, 1, row++);
         networkGrid.add(new Label("User-Agent"), 0, row);
         networkGrid.add(userAgent, 1, row++);
+        styleGrid(networkGrid);
 
         GridPane storageGrid = grid();
         row = 0;
@@ -200,6 +205,7 @@ public class SettingsView implements AppView {
         storageGrid.add(new Label("缓存上限（MB）"), 0, row);
         storageGrid.add(cacheLimit, 1, row++);
         cacheLimit.valueProperty().addListener((observable, oldValue, newValue) -> refreshCacheUsage());
+        styleGrid(storageGrid);
 
         Button cleanCache = Ui.button("清理全部缓存", "ghost-button");
         cleanCache.setOnAction(e -> cleanCache());
@@ -207,7 +213,7 @@ public class SettingsView implements AppView {
                 Ui.label("仅清理在线书正文缓存；本地导入的 TXT 不受影响。", "muted"));
         storageActions.setAlignment(Pos.CENTER_LEFT);
 
-        syncUrl.setPrefWidth(420);
+        syncUrl.setPrefWidth(360);
         syncAccount.setPrefWidth(220);
         syncPassword.setPrefWidth(220);
         syncDir.setPrefWidth(160);
@@ -228,7 +234,7 @@ public class SettingsView implements AppView {
         syncGrid.add(syncEnabled, 1, row++);
         syncGrid.add(syncHint, 1, row);
         syncHint.setWrapText(true);
-        syncHint.setMaxWidth(560);
+        syncHint.setMaxWidth(360);
 
         Button syncNowButton = Ui.button("立即同步", "ghost-button");
         syncNowButton.setOnAction(e -> saveSyncAndRun());
@@ -241,30 +247,41 @@ public class SettingsView implements AppView {
 
         Button save = Ui.button("保存设置", "primary-button");
         save.setOnAction(e -> save());
+        Button resetAll = Ui.button("恢复默认", "ghost-button");
+        resetAll.setOnAction(e -> resetDefaults());
 
-        HBox actions = new HBox(10, save, Ui.label("设置保存在本地数据目录，重启后仍生效。", "muted"));
-        actions.setAlignment(Pos.CENTER_LEFT);
-        actions.setPadding(new Insets(4, 0, 0, 0));
+        Label pageTitle = Ui.label("设置", "settings-page-title");
+        Label pageSub = Ui.label("阅读、标点与网络偏好", "settings-page-sub");
+        VBox pageTitles = new VBox(4, pageTitle, pageSub);
+        Region pageSpacer = new Region();
+        HBox.setHgrow(pageSpacer, Priority.ALWAYS);
+        HBox pageHead = new HBox(12, pageTitles, pageSpacer, resetAll, save);
+        pageHead.setAlignment(Pos.CENTER_LEFT);
+        pageHead.getStyleClass().add("settings-header");
 
-        VBox content = new VBox(12,
-                Ui.label("阅读", "section-title"), readerGrid,
-                Ui.label("标点着色", "section-title"), punctBox,
-                Ui.label("关闭总开关或取消某条规则，对应文字恢复墨色；夜间与护眼主题会自动调整明度。", "muted"),
-                Ui.label("预览", "section-title"), previewFlow,
-                new Separator(),
-                Ui.label("网络", "section-title"), networkGrid,
-                Ui.label("修改网络参数后立即生效；下载并发对新建任务生效。", "muted"),
-                new Separator(),
-                Ui.label("存储", "section-title"), storageGrid,
-                storageActions,
-                new Separator(),
-                Ui.label("同步（WebDAV）", "section-title"), syncGrid,
-                syncActions,
-                Ui.label("启动时自动拉取远端更新的进度；返回书架、切换章节和退出程序时会自动上传。"
-                        + "密码只保存在本地数据库，不会写进同步文件。", "muted"),
-                new Separator(),
-                actions);
-        content.setPadding(new Insets(20, 24, 24, 24));
+        Label punctHint = Ui.label("关闭总开关或取消某条规则，对应文字恢复墨色；夜间与护眼主题会自动调整明度。", "muted");
+        punctHint.setWrapText(true);
+        punctHint.setMaxWidth(520);
+        Label networkHint = Ui.label("修改网络参数后立即生效；下载并发对新建任务生效。", "muted");
+        Label syncNote = Ui.label("启动时自动拉取远端更新的进度；返回书架、切换章节和退出程序时会自动上传。"
+                + "密码只保存在本地数据库，不会写进同步文件。", "muted");
+        syncNote.setWrapText(true);
+        syncNote.setMaxWidth(560);
+
+        VBox previewCardBox = new VBox(previewFlow);
+        previewCardBox.getStyleClass().add("preview-card");
+        VBox previewSection = new VBox(8, Ui.label("预览", "settings-card-title"), previewCardBox);
+
+        VBox content = new VBox(16,
+                pageHead,
+                card("阅读", readerGrid),
+                previewSection,
+                card("标点着色", punctBox, punctHint),
+                card("网络", networkGrid, networkHint),
+                card("存储", storageGrid, storageActions),
+                card("同步（WebDAV）", syncGrid, syncActions, syncNote));
+        content.setPadding(new Insets(Ui.SPACE_PAGE, Ui.SPACE_PAGE + 4,
+                Ui.SPACE_PAGE + 4, Ui.SPACE_PAGE + 4));
 
         ScrollPane scroll = new ScrollPane(content);
         scroll.setFitToWidth(true);
@@ -272,10 +289,38 @@ public class SettingsView implements AppView {
         load();
     }
 
+    private VBox card(String title, Node... children) {
+        VBox box = new VBox(12);
+        box.getStyleClass().add("settings-card");
+        box.getChildren().add(Ui.label(title, "settings-card-title"));
+        box.getChildren().addAll(children);
+        return box;
+    }
+
+    private void styleGrid(GridPane grid) {
+        ColumnConstraints labelColumn = new ColumnConstraints(128);
+        ColumnConstraints controlColumn = new ColumnConstraints(220);
+        grid.getColumnConstraints().addAll(labelColumn, controlColumn);
+    }
+
+    private void resetDefaults() {
+        fontSize.getValueFactory().setValue(18);
+        lineSpacing.getValueFactory().setValue(2.0);
+        fontFamily.setValue(SettingsService.DEFAULT_FONT_FAMILY);
+        theme.setValue("纸白");
+        punctEnabled.setSelected(true);
+        boolean[] defaults = {true, true, true, true, false, false};
+        for (int i = 0; i < punctRules.size() && i < defaults.length; i++) {
+            punctRules.get(i).box.setSelected(defaults[i]);
+        }
+        updatePreview();
+        window.status("已恢复默认，保存后生效");
+    }
+
     private GridPane grid() {
         GridPane grid = new GridPane();
-        grid.setHgap(12);
-        grid.setVgap(10);
+        grid.setHgap(Ui.SPACE_FORM + 2);
+        grid.setVgap(Ui.SPACE_FORM);
         return grid;
     }
 
@@ -287,7 +332,7 @@ public class SettingsView implements AppView {
         ColorPicker picker = new ColorPicker(Color.web(defaultColor));
         picker.setPrefWidth(120);
         Label sample = new Label(sampleText);
-        sample.setFont(Font.font(14));
+        sample.setFont(Font.font(13));
 
         PunctRule rule = new PunctRule(role, colorKey, defaultColor, box, picker, sample);
         punctRules.add(rule);
@@ -365,28 +410,17 @@ public class SettingsView implements AppView {
 
         String background;
         String foreground;
-        switch (themeKey()) {
-            case "night" -> {
-                background = "#1b1c20";
-                foreground = "#c8c6c0";
-            }
-            case "green" -> {
-                background = "#e6efe4";
-                foreground = "#2d3a2b";
-            }
-            default -> {
-                background = "#f6f1e7";
-                foreground = "#2f2a24";
-            }
-        }
-        previewFlow.setStyle("-fx-background-color:" + background + "; -fx-background-radius:8;");
+        Ui.Theme theme = Ui.theme(themeKey());
+        background = theme.background;
+        foreground = theme.ink;
+        previewFlow.setStyle("-fx-background-color:" + background + ";");
 
         Map<Role, Color> colors = previewColors(themeKey());
         Color ink = Color.web(foreground);
         ReaderStyles.fill(previewFlow, PREVIEW_TEXT, previewFont, punctEnabled.isSelected(),
                 previewRules(), colors, ink);
         for (PunctRule rule : punctRules) {
-            rule.sample.setFont(Font.font(family == null ? Font.getDefault().getFamily() : family, 14));
+            rule.sample.setFont(Font.font(family == null ? Font.getDefault().getFamily() : family, 13));
             rule.sample.setStyle("-fx-text-fill:" + toHex(colors.getOrDefault(rule.role, ink)) + ";");
         }
     }
