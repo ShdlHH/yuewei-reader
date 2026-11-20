@@ -9,6 +9,8 @@ import com.yuewei.reader.infrastructure.txt.TextCleaner;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.jsoup.nodes.Node;
+import org.jsoup.nodes.TextNode;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -93,14 +95,15 @@ public class RuleEngine {
         }
         BookDetail d = new BookDetail();
         d.bookUrl = pageUrl;
-        d.title = firstText(doc.body(), str(bi, "name"), pageUrl);
-        d.author = firstText(doc.body(), str(bi, "author"), pageUrl);
-        d.coverUrl = firstUrl(doc.body(), str(bi, "coverUrl"), pageUrl);
-        d.intro = firstText(doc.body(), str(bi, "intro"), pageUrl);
-        d.kind = firstText(doc.body(), str(bi, "kind"), pageUrl);
-        d.lastChapter = firstText(doc.body(), str(bi, "lastChapter"), pageUrl);
+        // meta 标签在 head 中，必须从 Document 根节点查，不能只用 body
+        d.title = firstText(doc, str(bi, "name"), pageUrl);
+        d.author = firstText(doc, str(bi, "author"), pageUrl);
+        d.coverUrl = firstUrl(doc, str(bi, "coverUrl"), pageUrl);
+        d.intro = firstText(doc, str(bi, "intro"), pageUrl);
+        d.kind = firstText(doc, str(bi, "kind"), pageUrl);
+        d.lastChapter = firstText(doc, str(bi, "lastChapter"), pageUrl);
         String tocRule = str(bi, "tocUrl");
-        d.tocUrl = tocRule.isBlank() ? null : firstUrl(doc.body(), tocRule, pageUrl);
+        d.tocUrl = tocRule.isBlank() ? null : firstUrl(doc, tocRule, pageUrl);
         if (stats != null) {
             stats.matched = d.title.isBlank() ? 0 : 1;
             stats.fields.put("书名", nullToEmpty(d.title));
@@ -156,11 +159,28 @@ public class RuleEngine {
                 text = TextCleaner.clean(values.get(0), true);
             }
         }
+        text = applyReplaceRegex(text, str(rc, "replaceRegex"));
         if (stats != null) {
             stats.matched = text.isBlank() ? 0 : 1;
             stats.fields.put("正文长度", text.length() + " 字");
         }
         return text;
+    }
+
+    /** Legado 的 ruleContent.replaceRegex：##正则##替换，只有一段时替换为空。 */
+    private static String applyReplaceRegex(String text, String rule) {
+        if (text == null || text.isEmpty() || rule == null || rule.isBlank()) {
+            return text == null ? "" : text;
+        }
+        String body = rule.startsWith("##") ? rule.substring(2) : rule;
+        String[] parts = body.split("##", -1);
+        String regex = parts[0];
+        String replacement = parts.length > 1 ? parts[1] : "";
+        try {
+            return text.replaceAll(regex, replacement);
+        } catch (Exception ignored) {
+            return text;
+        }
     }
 
     /** 正文分页时取下一页地址；无此规则返回 null。 */
@@ -278,6 +298,17 @@ public class RuleEngine {
                         }
                     }
                 }
+                case CSS -> {
+                    try {
+                        for (Element e : el.select(step.name)) {
+                            if (e != el && !out.contains(e)) {
+                                out.add(e);
+                            }
+                        }
+                    } catch (Exception ignored) {
+                        // 非法 CSS 选择器不参与匹配
+                    }
+                }
                 default -> {
                 }
             }
@@ -305,6 +336,15 @@ public class RuleEngine {
             case HREF -> Urls.absolutize(baseUrl, el.attr("href"));
             case SRC -> Urls.absolutize(baseUrl, el.attr("src"));
             case ATTR -> el.attr(step.name);
+            case TEXT_NODES -> {
+                StringBuilder sb = new StringBuilder();
+                for (Node child : el.childNodes()) {
+                    if (child instanceof TextNode textNode) {
+                        sb.append(textNode.text());
+                    }
+                }
+                yield sb.toString().trim();
+            }
             default -> null;
         };
     }
@@ -322,7 +362,8 @@ public class RuleEngine {
         String out = value;
         for (String[] pair : replacements) {
             try {
-                out = out.replaceAll(pair[0], Matcher.quoteReplacement(pair[1]));
+                // 替换串里可能带 $1 之类的分组引用，不能 quoteReplacement
+                out = out.replaceAll(pair[0], pair[1]);
             } catch (Exception ignored) {
                 // 非法正则不影响主流程
             }
@@ -333,7 +374,7 @@ public class RuleEngine {
     // ---------------------------------------------------------------- 规则解析
 
     public enum Kind {
-        CLASS, TAG, ID, TEXT, OWN_TEXT, HREF, SRC, HTML, ATTR
+        CLASS, TAG, ID, CSS, TEXT, OWN_TEXT, HREF, SRC, HTML, ATTR, TEXT_NODES
     }
 
     public static class Step {
@@ -376,9 +417,20 @@ public class RuleEngine {
                 continue;
             }
             Step step = parseStep(s);
-            if (step != null) {
-                parsed.steps.add(step);
+            if (step == null) {
+                step = new Step();
+                if (!parsed.steps.isEmpty() && s.matches("[A-Za-z_][A-Za-z0-9_:-]*")) {
+                    // @content 等 Legado 属性简写
+                    step.kind = Kind.ATTR;
+                    step.name = s;
+                    step.extractor = true;
+                } else {
+                    // 含空格、#、[ 等复合 CSS 选择器
+                    step.kind = Kind.CSS;
+                    step.name = s;
+                }
             }
+            parsed.steps.add(step);
         }
         return parsed;
     }
@@ -430,6 +482,17 @@ public class RuleEngine {
             }
             case "html" -> {
                 step.kind = Kind.HTML;
+                step.extractor = true;
+                return step;
+            }
+            case "textnodes" -> {
+                step.kind = Kind.TEXT_NODES;
+                step.extractor = true;
+                return step;
+            }
+            case "content" -> {
+                step.kind = Kind.ATTR;
+                step.name = "content";
                 step.extractor = true;
                 return step;
             }

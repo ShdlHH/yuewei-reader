@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -211,5 +212,81 @@ class RuleEngineTest {
                 """);
         assertNull(RuleEngine.nextContentUrl(
                 RuleEngine.parseHtml(html, BASE + "/c1.html"), BASE + "/c1.html", noNext));
+    }
+
+    @Test
+    void supportsCssSelectorsAndMetaContent() throws Exception {
+        String html = """
+                <html><head>
+                <meta property="og:novel:book_name" content="斗罗大陆">
+                <meta property="og:novel:author" content="唐家三少">
+                </head><body>
+                <div id="sitebox">
+                  <dl>
+                    <dt><a href="/book/9"><img src="/cover.jpg"></a></dt>
+                    <dd><h3><span class="uptime">2015</span><a href="/book/9">斗罗大陆</a></h3></dd>
+                    <dd class="book_other">作者：<span>唐家三少</span></dd>
+                  </dl>
+                </div>
+                </body></html>
+                """;
+        JsonNode rules = rules("""
+                {
+                  "ruleSearch": {
+                    "bookList": "#sitebox dl",
+                    "name": "a.1@text",
+                    "author": "span.1@text",
+                    "bookUrl": "a.1@href"
+                  },
+                  "ruleBookInfo": {
+                    "name": "[property$=book_name]@content",
+                    "author": "[property$=author]@content"
+                  }
+                }
+                """);
+        RuleEngine.Stats stats = new RuleEngine.Stats();
+        List<SearchResult> results = RuleEngine.parseSearch(
+                RuleEngine.parseHtml(html, BASE + "/search"), BASE + "/search", rules, stats);
+        assertEquals(1, results.size());
+        assertEquals("斗罗大陆", results.get(0).title);
+        assertEquals("唐家三少", results.get(0).author);
+        assertEquals(BASE + "/book/9", results.get(0).bookUrl);
+
+        BookDetail detail = RuleEngine.parseDetail(
+                RuleEngine.parseHtml(html, BASE + "/book/9"), BASE + "/book/9", rules, stats);
+        assertNotNull(detail);
+        assertEquals("斗罗大陆", detail.title);
+        assertEquals("唐家三少", detail.author);
+    }
+
+    @Test
+    void supportsTextNodesAndContentReplaceRegex() throws Exception {
+        String html = """
+                <html><body>
+                <div id="content">正文第一段。<script>bad()</script>正文第二段。</div>
+                </body></html>
+                """;
+        List<String> nodes = RuleEngine.extract(
+                RuleEngine.parseHtml(html, BASE + "/c1.html"), "#content@textNodes", BASE);
+        assertEquals(1, nodes.size());
+        assertTrue(nodes.get(0).contains("正文第一段"));
+        assertFalse(nodes.get(0).contains("bad()"));
+
+        String contentHtml = """
+                <html><body>
+                <div id="content">
+                  <p>随机推荐：别的书</p>
+                  <p>正文第一段。</p>
+                  <p>正文第二段。</p>
+                </div>
+                </body></html>
+                """;
+        JsonNode rules = rules("""
+                {"ruleContent": {"content": "#content@textNodes", "replaceRegex": "##随机推荐.*"}}
+                """);
+        String text = RuleEngine.parseContent(
+                RuleEngine.parseHtml(contentHtml, BASE + "/c1.html"), BASE + "/c1.html", rules, null);
+        assertTrue(text.contains("正文第一段"));
+        assertFalse(text.contains("随机推荐"));
     }
 }

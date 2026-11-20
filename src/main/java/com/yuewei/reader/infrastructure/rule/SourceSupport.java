@@ -49,7 +49,8 @@ public final class SourceSupport {
             if (v.contains("@js:") || v.contains("<js>") || v.startsWith("js:")) {
                 notes.add("规则内嵌 JS 脚本");
             }
-            if (v.contains(",{")) {
+            if (v.contains(",{") && (v.contains("\"method\"") || v.contains("\"headers\"")
+                    || v.contains("\"body\""))) {
                 notes.add("包含 POST/Headers 请求参数，当前仅支持 GET");
             }
             return;
