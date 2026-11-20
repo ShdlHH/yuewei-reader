@@ -45,10 +45,11 @@ public final class Ui {
         public final String accent;
         public final String accent2;
         public final String line;
+        public final String warn;
 
         Theme(String label, String background, String bar, String card, String card2,
               String ink, String ink2, String muted, String faint,
-              String accent, String accent2, String line) {
+              String accent, String accent2, String line, String warn) {
             this.label = label;
             this.background = background;
             this.bar = bar;
@@ -61,16 +62,20 @@ public final class Ui {
             this.accent = accent;
             this.accent2 = accent2;
             this.line = line;
+            this.warn = warn;
         }
     }
 
     private static final Map<String, Theme> THEMES = Map.of(
             "paper", new Theme("纸白", "#f4eddf", "#eae0cb", "#fbf6ea", "#f7f0e1",
-                    "#221d18", "#4b4238", "#8b7f6c", "#b7ab96", "#a63b2c", "#c76a53", "#ded1b8"),
+                    "#221d18", "#4b4238", "#8b7f6c", "#b7ab96", "#a63b2c", "#c76a53", "#ded1b8",
+                    "#8c5a32"),
             "night", new Theme("夜间", "#141519", "#1b1d23", "#191b21", "#1e2027",
-                    "#d2cec4", "#a9a399", "#8b877d", "#5e5b54", "#d07a66", "#e29a86", "#2d3038"),
+                    "#d2cec4", "#a9a399", "#8b877d", "#5e5b54", "#d07a66", "#e29a86", "#2d3038",
+                    "#c08a5e"),
             "green", new Theme("护眼", "#e8f0e3", "#dce8d5", "#f2f8ee", "#eaf2e5",
-                    "#22301f", "#45533f", "#67735f", "#9aaa94", "#3f5c3d", "#5e7c58", "#c9dac2"));
+                    "#22301f", "#45533f", "#67735f", "#9aaa94", "#3f5c3d", "#5e7c58", "#c9dac2",
+                    "#7a6238"));
 
     /** 当前主题键：主窗口注入令牌时同步，供弹窗等独立场景复用。 */
     private static String themeKey = "paper";
@@ -98,7 +103,8 @@ public final class Ui {
                 + "-faint:" + theme.faint + ";"
                 + "-accent:" + theme.accent + ";"
                 + "-accent-2:" + theme.accent2 + ";"
-                + "-line:" + theme.line + ";";
+                + "-line:" + theme.line + ";"
+                + "-warn:" + theme.warn + ";";
     }
 
     /** 弹窗复用主窗口样式表与主题令牌，避免回落到 JavaFX 默认外观或纸白底色。 */

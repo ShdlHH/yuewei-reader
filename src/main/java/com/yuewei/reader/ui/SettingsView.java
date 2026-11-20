@@ -61,6 +61,7 @@ public class SettingsView implements AppView {
     private final TextField syncDir = new TextField();
     private final Label syncHint = Ui.label("", "muted");
     private final TextFlow previewFlow = new TextFlow();
+    private final VBox previewCard = new VBox();
     private final CheckBox punctEnabled = new CheckBox("开启标点着色");
     private final List<PunctRule> punctRules = new ArrayList<>();
     private final Label fontHint = Ui.label("", "muted");
@@ -268,9 +269,9 @@ public class SettingsView implements AppView {
         syncNote.setWrapText(true);
         syncNote.setMaxWidth(560);
 
-        VBox previewCardBox = new VBox(previewFlow);
-        previewCardBox.getStyleClass().add("preview-card");
-        VBox previewSection = new VBox(8, Ui.label("预览", "settings-card-title"), previewCardBox);
+        previewCard.getChildren().setAll(previewFlow);
+        previewCard.getStyleClass().add("preview-card");
+        VBox previewSection = new VBox(8, Ui.label("预览", "settings-card-title"), previewCard);
 
         VBox content = new VBox(16,
                 pageHead,
@@ -330,7 +331,10 @@ public class SettingsView implements AppView {
         box.setSelected(on);
         box.setPrefWidth(160);
         ColorPicker picker = new ColorPicker(Color.web(defaultColor));
-        picker.setPrefWidth(120);
+        picker.getStyleClass().add("punct-color-picker");
+        picker.setPrefWidth(56);
+        picker.setMinWidth(56);
+        picker.setMaxWidth(56);
         Label sample = new Label(sampleText);
         sample.setFont(Font.font(13));
 
@@ -413,7 +417,7 @@ public class SettingsView implements AppView {
         Ui.Theme theme = Ui.theme(themeKey());
         background = theme.background;
         foreground = theme.ink;
-        previewFlow.setStyle("-fx-background-color:" + background + ";");
+        previewCard.setStyle("-fx-background-color:" + background + ";");
 
         Map<Role, Color> colors = previewColors(themeKey());
         Color ink = Color.web(foreground);

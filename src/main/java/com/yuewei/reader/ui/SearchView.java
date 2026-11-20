@@ -156,9 +156,11 @@ public class SearchView implements AppView {
         sideCard.setPrefWidth(200);
         sideCard.setMinWidth(200);
         sideCard.setMaxWidth(200);
+        sideCard.setMaxHeight(Region.USE_PREF_SIZE);
         VBox.setVgrow(progressList, Priority.ALWAYS);
 
         HBox body = new HBox(12, mainColumn, sideCard);
+        body.setAlignment(Pos.TOP_LEFT);
         body.setPadding(new Insets(0, Ui.SPACE_LIST, Ui.SPACE_LIST, Ui.SPACE_LIST));
 
         root.setTop(new VBox(header, toolbar));

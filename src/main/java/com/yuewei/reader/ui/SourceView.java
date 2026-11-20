@@ -136,7 +136,10 @@ public class SourceView implements AppView {
         ContextMenu moreMenu = new ContextMenu(removeItem, enableAllItem, disableAllItem, exportItem);
 
         Button more = Ui.button("更多 ▾", "ghost-button");
-        more.setOnAction(e -> moreMenu.show(more, Side.BOTTOM, 0, 4));
+        more.setOnAction(e -> {
+            moreMenu.setStyle(Ui.themeTokens(Ui.theme(ctx.settings.theme())));
+            moreMenu.show(more, Side.BOTTOM, 0, 4);
+        });
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);

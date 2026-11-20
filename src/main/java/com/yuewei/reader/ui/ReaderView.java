@@ -24,6 +24,7 @@ import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
@@ -175,6 +176,8 @@ public class ReaderView implements AppView {
                 }
                 Label name = new Label(item.title);
                 name.getStyleClass().add("toc-name");
+                name.setTextOverrun(OverrunStyle.ELLIPSIS);
+                name.setMinWidth(0);
                 name.setMaxWidth(Double.MAX_VALUE);
                 HBox.setHgrow(name, Priority.ALWAYS);
                 HBox row = new HBox(8, name);

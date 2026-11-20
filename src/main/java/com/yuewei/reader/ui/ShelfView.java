@@ -5,17 +5,21 @@ import com.yuewei.reader.domain.Book;
 import com.yuewei.reader.domain.DownloadRangeType;
 import com.yuewei.reader.domain.ReadingProgress;
 import com.yuewei.reader.domain.SourceType;
+import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.geometry.Side;
 import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
-import javafx.scene.control.ComboBox;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -23,6 +27,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
+import javafx.stage.Popup;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -39,8 +44,8 @@ public class ShelfView implements AppView {
     private final VBox rows = new VBox();
     private final VBox heroHolder = new VBox();
     private final TextField query = new TextField();
-    private final ComboBox<String> filter = new ComboBox<>();
-    private final ComboBox<String> sort = new ComboBox<>();
+    private String filterValue = "全部";
+    private String sortValue = "最近阅读";
     private final Label summary = Ui.label("", "muted");
 
     public ShelfView(AppContext ctx, MainWindow window) {
@@ -51,16 +56,33 @@ public class ShelfView implements AppView {
 
     private void build() {
         query.setPromptText("搜索书名或作者");
-        query.setPrefWidth(220);
+        query.setPrefWidth(360);
+        query.setMaxWidth(520);
         query.textProperty().addListener((observable, oldValue, newValue) -> refresh());
+        HBox.setHgrow(query, Priority.ALWAYS);
 
-        filter.getItems().addAll("全部", "本地", "在线");
-        filter.setValue("全部");
-        filter.valueProperty().addListener((observable, oldValue, newValue) -> refresh());
+        VBox filterPanel = buildFilterPanel();
+        Popup filterPopup = new Popup();
+        filterPopup.setAutoHide(true);
+        filterPopup.getContent().add(filterPanel);
+        filterPopup.setOnShown(event -> {
+            filterPanel.setStyle(Ui.themeTokens(Ui.theme(ctx.settings.theme())));
+            if (filterPopup.getScene() != null && root.getScene() != null) {
+                filterPopup.getScene().getStylesheets().setAll(root.getScene().getStylesheets());
+            }
+        });
 
-        sort.getItems().addAll("最近阅读", "添加时间", "书名");
-        sort.setValue("最近阅读");
-        sort.valueProperty().addListener((observable, oldValue, newValue) -> refresh());
+        Button filterButton = Ui.button("筛选", "ghost-button");
+        filterButton.setOnAction(e -> {
+            if (filterPopup.isShowing()) {
+                filterPopup.hide();
+                return;
+            }
+            Bounds bounds = filterButton.localToScreen(filterButton.getBoundsInLocal());
+            if (bounds != null) {
+                filterPopup.show(filterButton, bounds.getMinX(), bounds.getMaxY() + 6);
+            }
+        });
 
         Button importButton = Ui.button("导入 TXT", "primary-button");
         importButton.setOnAction(e -> importTxt());
@@ -82,7 +104,7 @@ public class ShelfView implements AppView {
         header.getStyleClass().add("shelf-header");
         header.setAlignment(Pos.CENTER_LEFT);
 
-        HBox tools = new HBox(10, query, filter, sort);
+        HBox tools = new HBox(10, query, filterButton);
         tools.getStyleClass().add("shelf-tools");
         tools.setAlignment(Pos.CENTER_LEFT);
 
@@ -105,12 +127,12 @@ public class ShelfView implements AppView {
     }
 
     public void refresh() {
-        SourceType type = switch (filter.getValue()) {
+        SourceType type = switch (filterValue) {
             case "本地" -> SourceType.LOCAL;
             case "在线" -> SourceType.ONLINE;
             default -> null;
         };
-        String sortKey = switch (sort.getValue()) {
+        String sortKey = switch (sortValue) {
             case "添加时间" -> "added";
             case "书名" -> "title";
             default -> "recent";
@@ -152,17 +174,70 @@ public class ShelfView implements AppView {
 
         Label title = Ui.label(book.title, "hero-title");
         Label meta = Ui.label(chapter, "hero-meta");
-        VBox info = new VBox(7, title, meta);
+        Label action = Ui.label("继续阅读", "hero-continue");
+        VBox info = new VBox(7, meta, title, action);
         HBox.setHgrow(info, Priority.ALWAYS);
 
-        Label action = Ui.label("继续阅读", "hero-continue");
-        hero.getChildren().addAll(verticalSpine(book.title), info, action);
+        hero.getChildren().addAll(verticalSpine(book.title), info);
         hero.setOnMouseClicked(event -> {
             if (event.getClickCount() == 1) {
                 window.openBook(book);
             }
         });
         return hero;
+    }
+
+    /** 筛选气泡：范围与排序放进一个轻量面板，替代两个下拉。 */
+    private VBox buildFilterPanel() {
+        ToggleGroup scopeGroup = new ToggleGroup();
+        HBox scopeRow = new HBox(6,
+                Ui.label("范围", "filter-label"),
+                chip("全部", scopeGroup, true),
+                chip("本地", scopeGroup, false),
+                chip("在线", scopeGroup, false));
+
+        ToggleGroup sortGroup = new ToggleGroup();
+        HBox sortRow = new HBox(6,
+                Ui.label("排序", "filter-label"),
+                chip("最近阅读", sortGroup, true),
+                chip("添加时间", sortGroup, false),
+                chip("书名", sortGroup, false));
+
+        scopeRow.setAlignment(Pos.CENTER_LEFT);
+        sortRow.setAlignment(Pos.CENTER_LEFT);
+        scopeGroup.selectedToggleProperty().addListener((observable, oldValue, newValue) -> {
+            if (newValue == null) {
+                if (oldValue != null) {
+                    oldValue.setSelected(true);
+                }
+                return;
+            }
+            filterValue = ((ToggleButton) newValue).getText();
+            refresh();
+        });
+        sortGroup.selectedToggleProperty().addListener((observable, oldValue, newValue) -> {
+            if (newValue == null) {
+                if (oldValue != null) {
+                    oldValue.setSelected(true);
+                }
+                return;
+            }
+            sortValue = ((ToggleButton) newValue).getText();
+            refresh();
+        });
+
+        VBox panel = new VBox(10, Ui.label("筛选", "filter-title"), scopeRow, sortRow);
+        panel.getStyleClass().add("filter-popup");
+        panel.setPrefWidth(400);
+        return panel;
+    }
+
+    private ToggleButton chip(String text, ToggleGroup group, boolean selected) {
+        ToggleButton button = new ToggleButton(text);
+        button.getStyleClass().add("filter-chip");
+        button.setToggleGroup(group);
+        button.setSelected(selected);
+        return button;
     }
 
     private String greetingText() {
@@ -250,9 +325,23 @@ public class ShelfView implements AppView {
         percent.setMinWidth(64);
         percent.setAlignment(Pos.CENTER_RIGHT);
 
-        HBox row = new HBox(14, index, info, percent);
+        Button more = Ui.button("⋯", "shelf-more");
+        more.setOpacity(0);
+        more.setMouseTransparent(true);
+        more.setOnAction(e -> contextMenu(book, more).show(more, Side.BOTTOM, 0, 4));
+        more.addEventFilter(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
+
+        HBox row = new HBox(14, index, info, percent, more);
         row.setAlignment(Pos.CENTER_LEFT);
         row.getStyleClass().add("shelf-row");
+        row.setOnMouseEntered(event -> {
+            more.setOpacity(1);
+            more.setMouseTransparent(false);
+        });
+        row.setOnMouseExited(event -> {
+            more.setOpacity(0);
+            more.setMouseTransparent(true);
+        });
         row.setOnMouseClicked(event -> {
             if (event.getClickCount() == 1) {
                 window.openBook(book);
@@ -274,6 +363,7 @@ public class ShelfView implements AppView {
 
     private ContextMenu contextMenu(Book book, Node anchor) {
         ContextMenu menu = new ContextMenu();
+        menu.setStyle(Ui.themeTokens(Ui.theme(ctx.settings.theme())));
         MenuItem read = new MenuItem("阅读");
         read.setOnAction(e -> window.openBook(book));
 

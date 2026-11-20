@@ -186,10 +186,10 @@
 
 .danger-button {
     -fx-background-color: transparent;
-    -fx-border-color: -accent;
+    -fx-border-color: -warn;
     -fx-border-radius: 999;
     -fx-background-radius: 999;
-    -fx-text-fill: -accent;
+    -fx-text-fill: -warn;
     -fx-padding: 0 14 0 14;
     -fx-min-height: 32;
     -fx-pref-height: 32;
@@ -314,6 +314,60 @@
     -fx-font-family: "Consolas", "Courier New", monospace;
     -fx-font-size: 12px;
     -fx-text-fill: -accent;
+}
+
+/* 行内更多：hover 时才出现 */
+.shelf-more {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-text-fill: -muted;
+    -fx-font-size: 15px;
+    -fx-padding: 0;
+    -fx-min-width: 28;
+    -fx-pref-width: 28;
+    -fx-max-width: 28;
+    -fx-min-height: 28;
+    -fx-pref-height: 28;
+    -fx-cursor: hand;
+}
+
+.shelf-more:hover {
+    -fx-text-fill: -accent;
+    -fx-background-color: -card-2;
+    -fx-background-radius: 999;
+}
+
+/* 右键 / 更多菜单：与卡片同一套语言 */
+.context-menu {
+    -fx-background-color: -card;
+    -fx-background-radius: 12;
+    -fx-border-color: -line;
+    -fx-border-radius: 12;
+    -fx-padding: 6;
+    -fx-effect: dropshadow(gaussian, rgba(52, 40, 24, 0.18), 18, 0, 0, 8);
+}
+
+.context-menu .menu-item {
+    -fx-background-color: transparent;
+    -fx-background-radius: 8;
+    -fx-padding: 7 14 7 12;
+}
+
+.context-menu .menu-item .label {
+    -fx-text-fill: -ink-2;
+    -fx-font-size: 12.5px;
+}
+
+.context-menu .menu-item:focused {
+    -fx-background-color: -card-2;
+}
+
+.context-menu .menu-item:focused .label {
+    -fx-text-fill: -ink;
+}
+
+.context-menu .menu-item:disabled .label {
+    -fx-text-fill: -faint;
 }
 
 .empty-title {
@@ -455,8 +509,8 @@
 }
 
 .toc-count {
-    -fx-font-size: 11px;
-    -fx-text-fill: -muted;
+    -fx-font-size: 10px;
+    -fx-text-fill: -faint;
 }
 
 .toc-search-toggle {
@@ -668,13 +722,15 @@
 }
 
 .table-view .column-header-background {
-    -fx-background-color: -card-2;
+    -fx-background-color: transparent;
+    -fx-border-color: transparent transparent -line transparent;
+    -fx-border-width: 0 0 1 0;
 }
 
 .table-view .column-header,
 .table-view .filler {
     -fx-background-color: transparent;
-    -fx-border-color: transparent -line transparent transparent;
+    -fx-border-color: transparent;
 }
 
 .table-view .column-header .label {
@@ -887,9 +943,73 @@
 }
 
 .preview-card {
-    -fx-background-color: -paper-2;
+    -fx-background-color: -paper;
     -fx-border-color: -line;
     -fx-background-radius: 12;
     -fx-border-radius: 12;
-    -fx-padding: 18;
+    -fx-padding: 24;
+}
+
+/* ---------------- 书架筛选气泡 ---------------- */
+
+.filter-popup {
+    -fx-background-color: -card;
+    -fx-border-color: -line;
+    -fx-background-radius: 12;
+    -fx-border-radius: 12;
+    -fx-padding: 14;
+    -fx-effect: dropshadow(gaussian, rgba(52, 40, 24, 0.18), 18, 0, 0, 8);
+}
+
+.filter-title {
+    -fx-font-size: 13px;
+    -fx-text-fill: -ink-2;
+}
+
+.filter-label {
+    -fx-font-size: 10.5px;
+    -fx-text-fill: -muted;
+    -fx-min-width: 28;
+}
+
+.filter-chip {
+    -fx-background-color: transparent;
+    -fx-border-color: -line;
+    -fx-border-radius: 999;
+    -fx-background-radius: 999;
+    -fx-text-fill: -ink-2;
+    -fx-padding: 4 10 4 10;
+    -fx-font-size: 11.5px;
+    -fx-cursor: hand;
+}
+
+.filter-chip:hover {
+    -fx-border-color: -accent;
+}
+
+.filter-chip:selected {
+    -fx-background-color: -card-2;
+    -fx-border-color: -accent;
+    -fx-text-fill: -accent;
+}
+
+/* ---------------- 标点颜色小色块 ---------------- */
+
+.punct-color-picker {
+    -fx-color-label-visible: false;
+    -fx-pref-height: 24;
+    -fx-min-height: 24;
+    -fx-max-height: 24;
+    -fx-padding: 2 4 2 2;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+}
+
+.punct-color-picker > .arrow-button {
+    -fx-padding: 0 2 0 0;
+}
+
+.punct-color-picker > .arrow-button > .arrow {
+    -fx-background-color: -faint;
+    -fx-padding: 2;
 }
