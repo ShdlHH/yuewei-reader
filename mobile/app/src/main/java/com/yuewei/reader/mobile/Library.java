@@ -4,6 +4,7 @@ import android.content.Context;
 
 import com.yuewei.reader.domain.BookDetail;
 import com.yuewei.reader.domain.TocChapter;
+import com.yuewei.reader.infrastructure.network.Urls;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -271,11 +272,14 @@ public class Library {
 
     /** 在线书按「书源地址 + 书籍地址」匹配，书源 ID 在不同设备上不通用。 */
     public synchronized Book findOnline(String sourceUrl, String bookUrl) {
-        if (sourceUrl == null || sourceUrl.isEmpty() || bookUrl == null || bookUrl.isEmpty()) {
+        String sourceKey = Urls.key(sourceUrl);
+        String bookKey = Urls.key(bookUrl);
+        if (sourceKey.isEmpty() || bookKey.isEmpty()) {
             return null;
         }
         for (Book book : books) {
-            if (sourceUrl.equals(book.sourceUrl) && bookUrl.equals(book.bookUrl)) {
+            if (sourceKey.equals(Urls.key(book.sourceUrl))
+                    && bookKey.equals(Urls.key(book.bookUrl))) {
                 return book;
             }
         }

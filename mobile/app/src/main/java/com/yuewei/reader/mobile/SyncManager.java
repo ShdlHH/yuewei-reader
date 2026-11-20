@@ -7,6 +7,7 @@ import android.util.Log;
 
 import com.yuewei.reader.domain.BookDetail;
 import com.yuewei.reader.domain.SearchResult;
+import com.yuewei.reader.infrastructure.network.Urls;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -327,9 +328,10 @@ public final class SyncManager {
             return online;
         }
         String bookUrl = str(item, "bookUrl");
-        if (!bookUrl.isEmpty()) {
+        String bookKey = Urls.key(bookUrl);
+        if (!bookKey.isEmpty()) {
             for (Library.Book book : library.books) {
-                if (bookUrl.equals(book.bookUrl)) {
+                if (bookKey.equals(Urls.key(book.bookUrl))) {
                     return book;
                 }
             }

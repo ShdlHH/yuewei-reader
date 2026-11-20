@@ -196,11 +196,7 @@ public class SourceService {
     }
 
     public static String normalizeUrl(String url) {
-        String value = url == null ? "" : url.trim();
-        while (value.endsWith("/") && value.length() > 8) {
-            value = value.substring(0, value.length() - 1);
-        }
-        return value;
+        return com.yuewei.reader.infrastructure.network.Urls.key(url);
     }
 
     public static String dedupeKey(String url) {

@@ -12,6 +12,7 @@ import org.robolectric.RuntimeEnvironment;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /** 移动端同步：进度推送、书架字段、删除墓碑与设置合并。 */
@@ -322,6 +323,18 @@ public class SyncManagerTest {
 
         JSONObject progress = new JSONObject(dav.files.get("bookProgress/未缓存在线书_作者己.json"));
         assertEquals("章内长度未知时不应把远端位点清零", 120, progress.getInt("durChapterPos"));
+    }
+
+    @Test
+    public void matchesBookSourceUrlWithTrailingSlash() throws Exception {
+        sources.importJson("[{\"bookSourceName\":\"测试源\",\"bookSourceUrl\":\"https://source.test/\"}]");
+        assertEquals("https://source.test", sources.sources.get(0).url);
+        assertNotNull(sources.find("https://source.test"));
+        assertNotNull(sources.find("https://source.test/"));
+
+        Library.Book book = onlineBook();
+        assertNotNull(library.findOnline("https://source.test/", "https://source.test/book/9/"));
+        assertEquals(book, library.findOnline("https://SOURCE.TEST", "https://source.test/book/9"));
     }
 
     private static JSONObject itemByHash(JSONArray books, String hash) throws Exception {

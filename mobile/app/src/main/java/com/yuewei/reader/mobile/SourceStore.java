@@ -4,6 +4,7 @@ import android.content.Context;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yuewei.reader.infrastructure.network.Urls;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -69,6 +70,18 @@ public class SourceStore {
         } catch (Exception ignored) {
             // 文件损坏时从空书源开始
         }
+        // 旧数据里可能带末尾斜杠，统一成匹配键后保存，避免与桌面端对不上
+        boolean migrated = false;
+        for (Source source : sources) {
+            String key = Urls.key(source.url);
+            if (!key.equals(source.url)) {
+                source.url = key;
+                migrated = true;
+            }
+        }
+        if (migrated) {
+            save();
+        }
     }
 
     public void save() {
@@ -101,8 +114,9 @@ public class SourceStore {
         }
         int added = 0;
         for (JsonNode item : items) {
-            String url = item.path("bookSourceUrl").asText(item.path("url").asText(""));
+            String rawUrl = item.path("bookSourceUrl").asText(item.path("url").asText(""));
             String name = item.path("bookSourceName").asText(item.path("name").asText(""));
+            String url = Urls.key(rawUrl);
             if (url.isBlank() || name.isBlank() || find(url) != null) {
                 continue;
             }
@@ -120,8 +134,9 @@ public class SourceStore {
     }
 
     public Source find(String url) {
+        String key = Urls.key(url);
         for (Source source : sources) {
-            if (source.url.equals(url)) {
+            if (Urls.key(source.url).equals(key)) {
                 return source;
             }
         }
