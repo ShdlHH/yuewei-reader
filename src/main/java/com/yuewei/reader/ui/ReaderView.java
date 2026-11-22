@@ -82,6 +82,8 @@ public class ReaderView implements AppView {
     private double pendingFraction = -1;
     private String content = "";
     private Font readerFont = Font.font(18);
+    /** 当前解析后的字体家族，首段放大时也沿用，不再写死楷体。 */
+    private String readerFamily;
     private Chapter currentChapter;
     private int cachedCount;
     private double tocWidth = 270;
@@ -411,14 +413,18 @@ public class ReaderView implements AppView {
         }
         line.setLineSpacing(lineGap());
         line.setMaxWidth(Double.MAX_VALUE);
-        Font font = first
-                ? Font.font("KaiTi", Math.min(32, ctx.settings.fontSize() + 1))
-                : readerFont;
+        Font font = first ? firstParagraphFont() : readerFont;
         ReaderStyles.fillRaw(line, text, font, ctx.settings.punctEnabled(),
                 ReaderStyles.rules(ctx.settings),
                 ReaderStyles.colors(ctx.settings, ctx.settings.theme()),
                 Color.web(theme().ink));
         return line;
+    }
+
+    /** 首段与正文使用同一字体家族，只放大约一号。 */
+    private Font firstParagraphFont() {
+        double size = Math.min(32, ctx.settings.fontSize() + 1);
+        return readerFamily == null ? Font.font(size) : Font.font(readerFamily, size);
     }
 
     /** 滚轮整页翻页；滚动累计到阈值再翻，避免触控板高频事件连翻多页。 */
@@ -911,6 +917,7 @@ public class ReaderView implements AppView {
         Ui.Theme theme = theme();
 
         readerFont = family == null ? Font.font(size) : Font.font(family, size);
+        readerFamily = family;
         // 段落被拆成独立 TextFlow，段间距也要跟随行距设置，否则只在段内换行时生效
         flow.setSpacing(lineGap());
         // 重新排版会重建分页，用当前页比例保住阅读位置

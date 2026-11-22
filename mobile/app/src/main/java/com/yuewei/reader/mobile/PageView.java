@@ -10,10 +10,8 @@ import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.text.Layout;
 import android.text.SpannableString;
-import android.text.Spanned;
 import android.text.StaticLayout;
 import android.text.TextPaint;
-import android.text.style.LineHeightSpan;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
@@ -305,7 +303,7 @@ public class PageView extends View {
             return;
         }
         layout = StaticLayout.Builder
-                .obtain(withParagraphGaps(text), 0, text.length(), paint, width)
+                .obtain(styledText(text), 0, text.length(), paint, width)
                 .setLineSpacing(0, lineSpacing)
                 .setIncludePad(false)
                 .setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE)
@@ -390,40 +388,11 @@ public class PageView extends View {
         return sb.toString();
     }
 
-    /** 段落之间加一点额外间距，避免整页文字过密；首段不加。 */
-    private SpannableString withParagraphGaps(String value) {
-        int gap = Math.round(paint.getTextSize() * 0.35f);
+    /** 只做标点着色；行距统一交给 setLineSpacing，避免段首行被额外撑高。 */
+    private SpannableString styledText(String value) {
         SpannableString spannable = new SpannableString(value);
-        if (gap > 0 && value.length() >= 2) {
-            for (int i = 1; i < value.length(); i++) {
-                if (value.charAt(i - 1) == '\n' && value.charAt(i) != '\n') {
-                    spannable.setSpan(new ParagraphGapSpan(gap), i, i + 1,
-                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                }
-            }
-        }
-        // 同一份 Spannable 上叠加标点颜色，避免再复制一次正文
         PunctuationSplitter.apply(spannable, punctEnabled, punctRules, punctColors);
         return spannable;
-    }
-
-    /** 仅抬高段落首行的上沿，形成段间距。 */
-    private static final class ParagraphGapSpan implements LineHeightSpan {
-        private final int gap;
-
-        ParagraphGapSpan(int gap) {
-            this.gap = gap;
-        }
-
-        @Override
-        public void chooseHeight(CharSequence text, int start, int end, int spanstartv,
-                                 int lineHeight, Paint.FontMetricsInt metrics) {
-            if (spanstartv == 0) {
-                return;
-            }
-            metrics.ascent -= gap;
-            metrics.top -= gap;
-        }
     }
 
     private int dp(int value) {
