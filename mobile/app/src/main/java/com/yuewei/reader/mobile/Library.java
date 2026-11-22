@@ -14,7 +14,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -114,6 +116,7 @@ public class Library {
 
     private final File root;
     private final File metaFile;
+    private final File backupFile;
     public final List<Book> books = new ArrayList<>();
 
     public Library(Context context) {
@@ -121,28 +124,44 @@ public class Library {
         //noinspection ResultOfMethodCallIgnored
         root.mkdirs();
         metaFile = new File(root, "books.json");
+        backupFile = new File(root, "books.json.bak");
         reload();
     }
 
     public synchronized void reload() {
         books.clear();
-        if (!metaFile.isFile()) {
+        JSONArray array = readBooksArray();
+        if (array == null) {
             return;
         }
         try {
-            String text = new String(Files.readAllBytes(metaFile.toPath()), StandardCharsets.UTF_8);
-            JSONObject rootNode = new JSONObject(text);
-            JSONArray array = rootNode.optJSONArray("books");
-            if (array != null) {
-                List<Book> loaded = new ArrayList<>();
-                for (int i = 0; i < array.length(); i++) {
-                    loaded.add(Book.fromJson(array.getJSONObject(i)));
-                }
-                books.addAll(dedupe(loaded));
+            List<Book> loaded = new ArrayList<>();
+            for (int i = 0; i < array.length(); i++) {
+                loaded.add(Book.fromJson(array.getJSONObject(i)));
             }
-        } catch (IOException | JSONException ignored) {
+            books.addAll(dedupe(loaded));
+        } catch (JSONException ignored) {
             // 元数据损坏时从空书架开始，章节文件仍在磁盘上
         }
+    }
+
+    /** 依次尝试正式文件与备份；返回 null 表示两者都不可用。 */
+    private JSONArray readBooksArray() {
+        for (File file : new File[]{metaFile, backupFile}) {
+            if (!file.isFile()) {
+                continue;
+            }
+            try {
+                String text = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+                JSONArray array = new JSONObject(text).optJSONArray("books");
+                if (array != null) {
+                    return array;
+                }
+            } catch (IOException | JSONException ignored) {
+                // 尝试下一个文件
+            }
+        }
+        return null;
     }
 
     /**
@@ -178,31 +197,41 @@ public class Library {
             }
             rootNode.put("version", 1);
             rootNode.put("books", array);
-            try (FileOutputStream out = new FileOutputStream(metaFile)) {
+            // 先写临时文件并落盘，再用整文件替换；进程被杀也不会留下半截 JSON
+            File tmp = new File(root, "books.json.tmp");
+            try (FileOutputStream out = new FileOutputStream(tmp)) {
                 out.write(rootNode.toString().getBytes(StandardCharsets.UTF_8));
+                out.getFD().sync();
+            }
+            if (metaFile.isFile()) {
+                Files.move(metaFile.toPath(), backupFile.toPath(),
+                        StandardCopyOption.REPLACE_EXISTING);
+            }
+            try {
+                Files.move(tmp.toPath(), metaFile.toPath(),
+                        StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(tmp.toPath(), metaFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (IOException | JSONException ignored) {
-            // 写入失败时下次保存再试
+            // 写入失败时下次保存再试，旧文件与备份仍可读
         }
     }
 
     private Map<String, Book> readDiskBooks() {
         Map<String, Book> map = new HashMap<>();
-        if (!metaFile.isFile()) {
+        JSONArray array = readBooksArray();
+        if (array == null) {
             return map;
         }
         try {
-            String text = new String(Files.readAllBytes(metaFile.toPath()), StandardCharsets.UTF_8);
-            JSONArray array = new JSONObject(text).optJSONArray("books");
-            if (array != null) {
-                for (int i = 0; i < array.length(); i++) {
-                    Book book = Book.fromJson(array.getJSONObject(i));
-                    if (book.id != null && !book.id.isEmpty()) {
-                        map.put(book.id, book);
-                    }
+            for (int i = 0; i < array.length(); i++) {
+                Book book = Book.fromJson(array.getJSONObject(i));
+                if (book.id != null && !book.id.isEmpty()) {
+                    map.put(book.id, book);
                 }
             }
-        } catch (IOException | JSONException ignored) {
+        } catch (JSONException ignored) {
             // 损坏时按空处理
         }
         return map;

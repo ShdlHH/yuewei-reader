@@ -62,6 +62,30 @@ public class LibraryTest {
     }
 
     @Test
+    public void reloadFallsBackToBackupWhenMainFileIsTruncated() throws Exception {
+        Library.Book book = new Library.Book();
+        book.id = "b1";
+        book.title = "本地书";
+        library.books.add(book);
+        library.save();
+        library.save();
+
+        File dir = new File(context.getFilesDir(), "library");
+        File meta = new File(dir, "books.json");
+        File backup = new File(dir, "books.json.bak");
+        assertTrue(meta.isFile());
+        assertTrue(backup.isFile());
+        assertFalse("临时文件不应残留", new File(dir, "books.json.tmp").exists());
+
+        // 模拟进程在写盘途中被杀：正式文件留下半截 JSON
+        Files.write(meta.toPath(), "{\"books\":[".getBytes(StandardCharsets.UTF_8));
+
+        Library recovered = new Library(context);
+        assertEquals(1, recovered.books.size());
+        assertEquals("b1", recovered.books.get(0).id);
+    }
+
+    @Test
     public void reloadKeepsTombstoneAndOnlineFields() {
         Library.Book book = new Library.Book();
         book.id = "o1";
