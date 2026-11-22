@@ -70,6 +70,7 @@ public final class SyncManager {
             }
             return;
         }
+        settings.saveSyncPending(true);
         new Thread(() -> {
             String message;
             boolean ok;
@@ -77,10 +78,13 @@ public final class SyncManager {
                 message = run(context, settings);
                 ok = true;
                 settings.saveSyncDone(message);
+                settings.saveSyncPending(false);
                 Log.i(TAG, "同步完成：" + message);
             } catch (Exception e) {
                 message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
                 ok = false;
+                // 已捕获的失败算一次完成的尝试；只有进程被杀才会留下进行中标记
+                settings.saveSyncPending(false);
                 Log.e(TAG, "同步失败", e);
             }
             String finalMessage = message;
@@ -101,11 +105,12 @@ public final class SyncManager {
      */
     public static boolean autoSync(Context context, long minIntervalMs, Callback callback) {
         AppSettings settings = new AppSettings(context);
-        if (!settings.autoSync() || !settings.syncEnabled() || settings.syncUrl().isEmpty()) {
+        boolean pending = settings.syncPending();
+        if ((!pending && !settings.autoSync()) || !settings.syncEnabled() || settings.syncUrl().isEmpty()) {
             return false;
         }
-        // 成功时间与尝试时间取较新者：失败后也不会每次回到应用都重试并弹提示
-        long last = Math.max(settings.lastSyncAt(), settings.lastAttemptAt());
+        // 上次同步被中断时立即补跑；否则按间隔限流
+        long last = pending ? 0 : Math.max(settings.lastSyncAt(), settings.lastAttemptAt());
         if (System.currentTimeMillis() - last < minIntervalMs) {
             return false;
         }
@@ -124,6 +129,9 @@ public final class SyncManager {
     /** 书架顶部显示的同步状态。 */
     static String lastSyncText(Context context) {
         AppSettings settings = new AppSettings(context);
+        if (settings.syncPending()) {
+            return "上次同步未完成";
+        }
         long at = settings.lastSyncAt();
         if (at <= 0) {
             return "尚未同步";

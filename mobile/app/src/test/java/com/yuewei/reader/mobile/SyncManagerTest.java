@@ -35,6 +35,13 @@ public class SyncManagerTest {
     }
 
     @Test
+    public void interruptedSyncIsReportedAsUnfinished() {
+        settings.saveSyncPending(true);
+        assertEquals("上次同步未完成", SyncManager.lastSyncText(context));
+        settings.saveSyncPending(false);
+    }
+
+    @Test
     public void autoSyncIsOnByDefaultAndCanBeDisabled() {
         assertTrue(settings.autoSync());
         settings.saveAutoSync(false);

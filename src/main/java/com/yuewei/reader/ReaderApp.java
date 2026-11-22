@@ -13,7 +13,7 @@ import java.net.URL;
 /** JavaFX 应用：初始化数据目录，装配主窗口。 */
 public class ReaderApp extends Application {
 
-    public static final String VERSION = "0.7.14";
+    public static final String VERSION = "0.7.16";
 
     private AppContext context;
     private MainWindow window;

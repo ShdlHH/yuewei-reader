@@ -82,6 +82,25 @@ class SyncServiceTest {
     }
 
     @Test
+    void interruptedSyncIsReportedAsUnfinished() {
+        ctx.settings.saveSyncResult("旧结果");
+        ctx.settings.saveSyncPending(true);
+        assertEquals("上次同步未完成", ctx.settings.lastSyncText());
+
+        ctx.settings.saveSyncPending(false);
+        assertTrue(ctx.settings.lastSyncText().startsWith("上次同步"));
+    }
+
+    @Test
+    void successfulSyncClearsPendingMarker() throws Exception {
+        ctx.settings.saveSyncPending(true);
+
+        ctx.syncService.syncNow();
+
+        assertFalse(ctx.settings.syncPending());
+    }
+
+    @Test
     void pushesLegadoCompatibleProgressAndPullsNewerRemote() throws Exception {
         SyncService.Result pushed = ctx.syncService.pushAll();
         assertEquals(1, pushed.pushed());

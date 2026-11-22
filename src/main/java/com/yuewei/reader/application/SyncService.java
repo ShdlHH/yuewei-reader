@@ -110,11 +110,18 @@ public class SyncService {
         if (!configured()) {
             return Result.skipped("未启用 WebDAV 同步");
         }
-        Result pulled = pull();
-        Result pushed = pushAll();
-        String message = pulled.message() + "；" + pushed.message();
-        settings.saveSyncResult(message);
-        return new Result(false, pushed.pushed(), pulled.applied(), message);
+        settings.saveSyncPending(true);
+        try {
+            Result pulled = pull();
+            Result pushed = pushAll();
+            String message = pulled.message() + "；" + pushed.message();
+            settings.saveSyncResult(message);
+            settings.saveSyncPending(false);
+            return new Result(false, pushed.pushed(), pulled.applied(), message);
+        } catch (IOException e) {
+            settings.saveSyncResult("同步未完成：" + e.getMessage());
+            throw e;
+        }
     }
 
     private int pullProgress(WebDavClient dav) throws IOException {
@@ -155,6 +162,7 @@ public class SyncService {
         if (!configured()) {
             return Result.skipped("未启用 WebDAV 同步");
         }
+        settings.saveSyncPending(true);
         WebDavClient dav = client();
         dav.ensureDir();
         int pushed = 0;
@@ -188,6 +196,7 @@ public class SyncService {
         String message = "上传 " + pushed + " 本进度、书架"
                 + (failed > 0 ? "（" + failed + " 本失败）" : "");
         settings.saveSyncResult(message);
+        settings.saveSyncPending(false);
         return new Result(false, pushed, 0, message);
     }
 

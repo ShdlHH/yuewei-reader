@@ -52,6 +52,8 @@ public class SettingsService {
     public static final String SYNC_DIR = "sync.webdav.dir";
     public static final String SYNC_LAST_AT = "sync.lastAt";
     public static final String SYNC_LAST_RESULT = "sync.lastResult";
+    /** 同步进行中标记：进程被关闭时来不及清除，下次启动据此补跑一次完整同步。 */
+    public static final String SYNC_PENDING = "sync.pending";
 
     private final com.yuewei.reader.infrastructure.db.SettingDao dao;
     private final Map<String, String> cache;
@@ -244,6 +246,9 @@ public class SettingsService {
     }
 
     public String lastSyncText() {
+        if (syncPending()) {
+            return "上次同步未完成";
+        }
         String at = get(SYNC_LAST_AT, "");
         String result = get(SYNC_LAST_RESULT, "");
         if (at.isBlank()) {
@@ -255,6 +260,14 @@ public class SettingsService {
     public void saveSyncResult(String message) {
         put(SYNC_LAST_RESULT, message == null ? "" : message);
         put(SYNC_LAST_AT, java.time.LocalDateTime.now().toString());
+    }
+
+    public boolean syncPending() {
+        return "1".equals(get(SYNC_PENDING, ""));
+    }
+
+    public void saveSyncPending(boolean pending) {
+        put(SYNC_PENDING, pending ? "1" : "0");
     }
 
     public void applyTo(HttpGateway http) {

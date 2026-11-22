@@ -173,4 +173,13 @@ public class AppSettings {
                 .putString("sync.lastResult", message == null ? "" : message)
                 .apply();
     }
+
+    /** 同步进行中标记；进程被杀时来不及清除，下次启动据此补跑。 */
+    public boolean syncPending() {
+        return prefs.getBoolean("sync.pending", false);
+    }
+
+    public void saveSyncPending(boolean pending) {
+        prefs.edit().putBoolean("sync.pending", pending).apply();
+    }
 }

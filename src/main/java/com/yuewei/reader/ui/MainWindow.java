@@ -145,13 +145,14 @@ public class MainWindow {
         pushQuietly();
     }
 
-    /** 启动后静默拉取一次进度；失败只提示状态栏，不影响使用。 */
+    /** 启动后静默拉取一次进度；上次同步被中断则补跑一次完整同步。 */
     private void pullOnStartup() {
         if (!ctx.syncService.configured()) {
             return;
         }
+        boolean resume = ctx.settings.syncPending();
         Ui.async("sync-pull",
-                () -> ctx.syncService.pull(),
+                () -> resume ? ctx.syncService.syncNow() : ctx.syncService.pull(),
                 result -> {
                     if (!result.skipped()) {
                         refreshShelf();
