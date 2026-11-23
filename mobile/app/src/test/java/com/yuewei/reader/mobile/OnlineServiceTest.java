@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -172,6 +173,80 @@ public class OnlineServiceTest {
             out.write(head.getBytes(StandardCharsets.UTF_8));
             out.write(body);
             out.flush();
+        }
+    }
+
+    @Test
+    public void reusesKeepAliveConnectionAcrossRequests() throws Exception {
+        AtomicInteger accepted = new AtomicInteger();
+        ServerSocket ka = new ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"));
+        Thread t = new Thread(() -> {
+            while (!ka.isClosed()) {
+                try (Socket socket = ka.accept()) {
+                    accepted.incrementAndGet();
+                    handleKeepAlive(socket);
+                } catch (IOException e) {
+                    return;
+                }
+            }
+        }, "fake-keepalive");
+        t.setDaemon(true);
+        t.start();
+        String kaBase = "http://127.0.0.1:" + ka.getLocalPort();
+        SourceStore.Source kaSource = new SourceStore.Source();
+        kaSource.name = "ka源";
+        kaSource.url = kaBase;
+        kaSource.ruleJson = RULES;
+
+        try {
+            OnlineService online = new OnlineService();
+            // content(/c1) 会跟随后续页 /c1b，再加 /c2，共 3 次请求
+            online.content(kaSource, kaBase + "/c1");
+            online.content(kaSource, kaBase + "/c2");
+            assertEquals("多次请求应复用同一 keep-alive 连接", 1, accepted.get());
+        } finally {
+            ka.close();
+        }
+    }
+
+    /** 支持 keep-alive 的最小服务：同一连接上顺序处理多个请求。 */
+    private void handleKeepAlive(Socket socket) throws IOException {
+        socket.setSoTimeout(500);
+        BufferedReader reader = new BufferedReader(new InputStreamReader(
+                socket.getInputStream(), StandardCharsets.UTF_8));
+        try {
+            while (!socket.isClosed()) {
+                String requestLine = reader.readLine();
+                if (requestLine == null) {
+                    return;
+                }
+                String line;
+                while ((line = reader.readLine()) != null && !line.isEmpty()) {
+                    // 跳过请求头
+                }
+                String path = "/";
+                String[] parts = requestLine.split(" ");
+                if (parts.length >= 2) {
+                    path = parts[1];
+                }
+                int query = path.indexOf('?');
+                if (query >= 0) {
+                    path = path.substring(0, query);
+                }
+                String html = pages.get(path);
+                byte[] body = (html == null ? "not found" : html).getBytes(StandardCharsets.UTF_8);
+                String status = html == null ? "404 Not Found" : "200 OK";
+                String head = "HTTP/1.1 " + status + "\r\n"
+                        + "Content-Type: text/html; charset=utf-8\r\n"
+                        + "Content-Length: " + body.length + "\r\n"
+                        + "Connection: keep-alive\r\n\r\n";
+                OutputStream out = socket.getOutputStream();
+                out.write(head.getBytes(StandardCharsets.UTF_8));
+                out.write(body);
+                out.flush();
+            }
+        } catch (IOException ignored) {
+            // 客户端关闭连接即结束
         }
     }
 }

@@ -195,4 +195,59 @@ public class LibraryTest {
         assertTrue(SyncManager.sortedBooks(library).isEmpty());
         assertFalse(library.books.isEmpty());
     }
+
+    @Test
+    public void cacheChapterDeferredDefersMetaWrite() throws Exception {
+        SourceStore.Source source = new SourceStore.Source();
+        source.name = "源";
+        source.url = "https://s.test";
+        source.ruleJson = "{}";
+
+        BookDetail detail = new BookDetail();
+        detail.title = "书";
+        detail.author = "作";
+        detail.bookUrl = "https://s.test/b";
+        detail.chapters.add(new TocChapter(0, "第1章", "https://s.test/c1"));
+        detail.chapters.add(new TocChapter(1, "第2章", "https://s.test/c2"));
+
+        Library.Book book = library.addOnline(source, detail);
+
+        // 延迟落盘：章节文件已写，但字数尚未写入 books.json
+        library.cacheChapter(book, 0, "第一章正文内容", false);
+        Library reloaded = new Library(context);
+        Library.Book loaded = reloaded.find(book.id);
+        assertEquals("延迟落盘时字数不应已持久化", 0, (int) loaded.chapterLengths.get(0));
+        assertTrue("章节文件应已写入", reloaded.chapterFile(book.id, 0).isFile());
+
+        // 显式 save 后字数才落盘
+        library.save();
+        Library reloaded2 = new Library(context);
+        assertEquals("save 后字数应持久化",
+                "第一章正文内容".length(), (int) reloaded2.find(book.id).chapterLengths.get(0));
+    }
+
+    @Test
+    public void metaCacheInvalidatesWhenFileChanges() throws Exception {
+        Library.Book book = new Library.Book();
+        book.id = "cache-1";
+        book.title = "缓存书";
+        book.author = "作";
+        library.books.add(book);
+        library.save();
+        // 首次构造填充解析缓存
+        assertEquals(1, new Library(context).books.size());
+
+        // 外部改写 books.json（增加一条，长度必变），新构造应看到改动
+        File meta = new File(context.getFilesDir(), "library/books.json");
+        JSONObject root = new JSONObject(new String(Files.readAllBytes(meta.toPath()), StandardCharsets.UTF_8));
+        JSONArray arr = root.getJSONArray("books");
+        JSONObject extra = new JSONObject(arr.getJSONObject(0).toString());
+        extra.put("id", "cache-2");
+        extra.put("title", "缓存书2");
+        arr.put(extra);
+        Files.write(meta.toPath(), root.toString().getBytes(StandardCharsets.UTF_8));
+
+        Library fresh = new Library(context);
+        assertEquals("外部改动后缓存应失效并重读", 2, fresh.books.size());
+    }
 }

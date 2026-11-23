@@ -12,6 +12,7 @@ import android.text.Layout;
 import android.text.SpannableString;
 import android.text.StaticLayout;
 import android.text.TextPaint;
+import android.text.style.ForegroundColorSpan;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
@@ -49,6 +50,8 @@ public class PageView extends View {
 
     private String text = "";
     private StaticLayout layout;
+    /** 当前布局所引用的文本；标点着色只改它的 span，不重建布局。 */
+    private SpannableString spanned;
     private int pageIndex;
     private int pageCount = 1;
     private final List<Integer> pageStartLines = new ArrayList<>();
@@ -136,13 +139,28 @@ public class PageView extends View {
         restorePercent(percent, hadPages);
     }
 
-    /** 设置标点着色；颜色只影响绘制，不改变分页。 */
+    /**
+     * 设置标点着色；颜色只影响绘制、不改变分页，因此原地更新 span 并 invalidate，
+     * 不再重建 StaticLayout，避免长章节切换标点时整章重排卡顿。
+     */
     public void setPunctuation(boolean enabled, boolean[] rules, int[] colors) {
         this.punctEnabled = enabled;
         this.punctRules = rules == null
                 ? new boolean[]{true, true, true, true, false, false} : rules.clone();
         this.punctColors = colors == null ? new int[6] : colors.clone();
-        rebuild();
+        SpannableString current = spanned;
+        if (current == null || layout == null) {
+            // 尚无布局（setText 之前）：走一次 rebuild 建立带 span 的文本
+            rebuild();
+            return;
+        }
+        // 清掉旧的颜色 span 再按新规则着色；布局指标不变，只需重绘
+        ForegroundColorSpan[] old = current.getSpans(0, current.length(), ForegroundColorSpan.class);
+        for (ForegroundColorSpan span : old) {
+            current.removeSpan(span);
+        }
+        PunctuationSplitter.apply(current, punctEnabled, punctRules, punctColors);
+        invalidate();
     }
 
     public void setText(String value) {
@@ -296,6 +314,7 @@ public class PageView extends View {
         int width = Math.max(dp(120), getWidth() - paddingX * 2);
         if (text.isEmpty()) {
             layout = null;
+            spanned = null;
             pageCount = 1;
             pageStartLines.clear();
             pageStartLines.add(0);
@@ -392,6 +411,7 @@ public class PageView extends View {
     private SpannableString styledText(String value) {
         SpannableString spannable = new SpannableString(value);
         PunctuationSplitter.apply(spannable, punctEnabled, punctRules, punctColors);
+        this.spanned = spannable;
         return spannable;
     }
 

@@ -42,6 +42,8 @@ final class DownloadManager {
             int done = 0;
             int failed = 0;
             boolean wasCancelled;
+            // 整本下载复用同一个 OnlineService：复用规则解析缓存与 HTTP keep-alive 连接
+            OnlineService online = new OnlineService();
             try {
                 for (int i = 0; i < total && !cancelled; i++) {
                     Library.Book latest = library.find(book.id);
@@ -60,16 +62,28 @@ final class DownloadManager {
                         continue;
                     }
                     try {
-                        String content = new OnlineService().content(source, url);
-                        library.cacheChapter(book, i, content);
+                        String content = online.content(source, url);
+                        // 延迟落盘：只写章节文件 + 内存字数，由下方周期批量 save，避免每章全量重写 books.json
+                        library.cacheChapter(book, i, content, false);
                         done++;
                     } catch (Exception e) {
                         failed++;
                     }
                     postProgress(listener, done, total, failed);
-                    if (i % 10 == 0) {
+                    if ((i + 1) % 20 == 0) {
+                        try {
+                            library.save();
+                        } catch (Exception ignored) {
+                            // 落盘失败不中断下载，下个周期或结束时再试
+                        }
                         CacheManager.pruneOnline(library, limitBytes, book.id);
                     }
+                }
+                // 循环结束后把剩余未落盘的章节字数一次性刷盘（含被取消/删除时的进度）
+                try {
+                    library.save();
+                } catch (Exception ignored) {
+                    // 刷盘失败：章节文件已在磁盘，字数下次打开可由已存文件重建
                 }
             } finally {
                 wasCancelled = cancelled;

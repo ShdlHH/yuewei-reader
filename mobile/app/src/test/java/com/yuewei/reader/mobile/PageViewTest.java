@@ -63,4 +63,48 @@ public class PageViewTest {
         assertTrue(report[2] > 0);
         assertTrue("用户翻页应标记 userTurn", userTurn[0]);
     }
+
+    @Test
+    public void togglingPunctuationDoesNotRelayout() {
+        PageView view = new PageView(RuntimeEnvironment.getApplication());
+        int[] pages = {0};
+        int[] changes = {0};
+        view.setListener(new PageView.Listener() {
+            @Override
+            public void onPageChanged(int page, int pgs, int percent, boolean user) {
+                pages[0] = pgs;
+                changes[0]++;
+            }
+
+            @Override
+            public boolean onNextChapter() {
+                return false;
+            }
+
+            @Override
+            public boolean onPreviousChapter() {
+                return false;
+            }
+        });
+        view.measure(View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(1800, View.MeasureSpec.EXACTLY));
+        view.layout(0, 0, 1080, 1800);
+
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < 120; i++) {
+            text.append("“对话内容。”普通正文。疑问？感叹！\n");
+        }
+        view.setText(text.toString());
+        int pagesAfterText = pages[0];
+        int changesAfterText = changes[0];
+        assertTrue("应有多页", pagesAfterText >= 2);
+
+        int[] colors = {0xFFFF0000, 0xFF00FF00, 0xFF0000FF, 0xFFFFFF00, 0xFF00FFFF, 0xFFFF00FF};
+        view.setPunctuation(true, new boolean[]{true, true, true, true, true, true}, colors);
+        view.setPunctuation(false, null, null);
+
+        // 标点着色只改 span 颜色、不改分页：不应触发重排回调，页数不变
+        assertEquals("切换标点不应触发重排", changesAfterText, changes[0]);
+        assertEquals("切换标点不应改变页数", pagesAfterText, pages[0]);
+    }
 }

@@ -145,24 +145,31 @@ public class OnlineService {
         connection.setReadTimeout(20000);
         connection.setRequestProperty("User-Agent", USER_AGENT);
         connection.setInstanceFollowRedirects(true);
-        int status = connection.getResponseCode();
-        if (status / 100 != 2) {
-            connection.disconnect();
-            throw new IOException("HTTP " + status + " · " + target);
-        }
-        Page page = new Page();
-        page.url = connection.getURL().toString();
-        try (InputStream in = connection.getInputStream()) {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buffer = new byte[16384];
-            int read;
-            while ((read = in.read(buffer)) >= 0) {
-                out.write(buffer, 0, read);
+        boolean reusable = false;
+        try {
+            int status = connection.getResponseCode();
+            if (status / 100 != 2) {
+                throw new IOException("HTTP " + status + " · " + target);
             }
-            page.body = out.toByteArray();
+            Page page = new Page();
+            page.url = connection.getURL().toString();
+            try (InputStream in = connection.getInputStream()) {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                byte[] buffer = new byte[16384];
+                int read;
+                while ((read = in.read(buffer)) >= 0) {
+                    out.write(buffer, 0, read);
+                }
+                page.body = out.toByteArray();
+            }
+            // 流已读完并关闭：不 disconnect，让 HttpURLConnection 把连接放回 keep-alive 池复用
+            reusable = true;
+            return page;
         } finally {
-            connection.disconnect();
+            // 只有完整读完的成功响应才复用；异常或非 2xx 直接断开，避免把坏连接放回池
+            if (!reusable) {
+                connection.disconnect();
+            }
         }
-        return page;
     }
 }

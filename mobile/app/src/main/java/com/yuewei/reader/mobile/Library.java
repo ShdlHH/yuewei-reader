@@ -119,6 +119,15 @@ public class Library {
     private final File backupFile;
     public final List<Book> books = new ArrayList<>();
 
+    /**
+     * 进程内按正式文件的 mtime+长度缓存解析结果：每个 Activity 都会 new Library，
+     * 未命中缓存时才读盘重解析，降低切页开销与主线程阻塞风险。仅缓存正式文件解析成功的结果。
+     */
+    private static final Object PARSE_LOCK = new Object();
+    private static volatile long cachedMetaMtime = -1L;
+    private static volatile long cachedMetaLength = -1L;
+    private static volatile JSONArray cachedMetaArray;
+
     public Library(Context context) {
         root = new File(context.getFilesDir(), "library");
         //noinspection ResultOfMethodCallIgnored
@@ -130,7 +139,7 @@ public class Library {
 
     public synchronized void reload() {
         books.clear();
-        JSONArray array = readBooksArray();
+        JSONArray array = cachedRead();
         if (array == null) {
             return;
         }
@@ -145,20 +154,48 @@ public class Library {
         }
     }
 
+    /** 命中缓存时直接返回已解析数组，不读盘；仅缓存正式文件解析成功的结果。 */
+    private JSONArray cachedRead() {
+        if (!metaFile.isFile()) {
+            return readBooksArray();
+        }
+        long mtime = metaFile.lastModified();
+        long length = metaFile.length();
+        JSONArray cached = cachedMetaArray;
+        if (cached != null && mtime == cachedMetaMtime && length == cachedMetaLength) {
+            return cached;
+        }
+        JSONArray fromMeta = parseFile(metaFile);
+        if (fromMeta != null) {
+            synchronized (PARSE_LOCK) {
+                cachedMetaMtime = mtime;
+                cachedMetaLength = length;
+                cachedMetaArray = fromMeta;
+            }
+            return fromMeta;
+        }
+        // 正式文件损坏：走“正式→备份”兜底，不缓存（避免把备份内容误绑到正式文件指纹上）
+        return readBooksArray();
+    }
+
+    private static JSONArray parseFile(File file) {
+        if (!file.isFile()) {
+            return null;
+        }
+        try {
+            String text = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+            return new JSONObject(text).optJSONArray("books");
+        } catch (IOException | JSONException ignored) {
+            return null;
+        }
+    }
+
     /** 依次尝试正式文件与备份；返回 null 表示两者都不可用。 */
     private JSONArray readBooksArray() {
         for (File file : new File[]{metaFile, backupFile}) {
-            if (!file.isFile()) {
-                continue;
-            }
-            try {
-                String text = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
-                JSONArray array = new JSONObject(text).optJSONArray("books");
-                if (array != null) {
-                    return array;
-                }
-            } catch (IOException | JSONException ignored) {
-                // 尝试下一个文件
+            JSONArray array = parseFile(file);
+            if (array != null) {
+                return array;
             }
         }
         return null;
@@ -212,6 +249,12 @@ public class Library {
                         StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             } catch (AtomicMoveNotSupportedException e) {
                 Files.move(tmp.toPath(), metaFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            }
+            // 写入成功后刷新进程内解析缓存，下次构造 Library 直接命中，不再读盘重解析
+            synchronized (PARSE_LOCK) {
+                cachedMetaMtime = metaFile.lastModified();
+                cachedMetaLength = metaFile.length();
+                cachedMetaArray = array;
             }
         } catch (IOException | JSONException ignored) {
             // 写入失败时下次保存再试，旧文件与备份仍可读
@@ -451,13 +494,24 @@ public class Library {
     }
 
     public synchronized void cacheChapter(Book book, int index, String content) throws IOException {
+        cacheChapter(book, index, content, true);
+    }
+
+    /**
+     * persist=false 时只写章节文件并更新内存里的字数，不立即重写 books.json。
+     * 下载整本时由 DownloadManager 周期性批量 save，避免每章全量落盘导致 O(n²)。
+     */
+    public synchronized void cacheChapter(Book book, int index, String content, boolean persist)
+            throws IOException {
         writeChapter(book.id, index, content);
         Book target = resolve(book);
         while (target.chapterLengths.size() <= index) {
             target.chapterLengths.add(0);
         }
         target.chapterLengths.set(index, content.length());
-        save();
+        if (persist) {
+            save();
+        }
     }
 
     /** reload() 会替换列表里的对象，这里按 id 找回最新对象，避免把进度写到旧快照上。 */

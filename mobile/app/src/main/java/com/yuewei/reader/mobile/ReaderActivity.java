@@ -46,6 +46,8 @@ public class ReaderActivity extends Activity {
     private static final int REQUEST_IMPORT_FONT = 3001;
 
     private final Library.Book[] current = new Library.Book[1];
+    /** 复用同一个 OnlineService：章节加载与预取共享规则解析缓存与 HTTP keep-alive 连接。 */
+    private final OnlineService online = new OnlineService();
     private Library library;
     private AppSettings settings;
     private Ui.Palette palette;
@@ -686,7 +688,7 @@ public class ReaderActivity extends Activity {
         }
         new Thread(() -> {
             try {
-                String content = new OnlineService().content(source, url);
+                String content = online.content(source, url);
                 library.cacheChapter(book, index, content);
                 CacheManager.pruneOnline(library,
                         settings.cacheLimitMb() * 1024L * 1024L, book.id);
@@ -1253,7 +1255,7 @@ public class ReaderActivity extends Activity {
         prefetchingChapter = next;
         new Thread(() -> {
             try {
-                String content = new OnlineService().content(source, url);
+                String content = online.content(source, url);
                 Library.Book latest = library.find(book.id);
                 if (latest == null || latest.deleted) {
                     return;
