@@ -9,6 +9,9 @@ import java.sql.Statement;
 
 /**
  * SQLite 数据库入口。每次操作独立取连接，避免 UI 与抓取线程共享同一连接。
+ *
+ * <p>WAL 模式让下载线程写章节时不阻塞 UI 线程读；synchronous=NORMAL 在 WAL 下仍是安全的，
+ * 同时省去每次提交的全量 fsync，显著降低读写互相等待与 busy_timeout。</p>
  */
 public class Db {
 
@@ -27,6 +30,9 @@ public class Db {
     public Connection open() throws SQLException {
         Connection c = DriverManager.getConnection(url);
         try (Statement s = c.createStatement()) {
+            // WAL 是持久化的（写入库头），重复执行无害；synchronous 与 busy_timeout 是连接级，每次都要设
+            s.execute("PRAGMA journal_mode=WAL");
+            s.execute("PRAGMA synchronous=NORMAL");
             s.execute("PRAGMA busy_timeout=5000");
             s.execute("PRAGMA foreign_keys=ON");
         }

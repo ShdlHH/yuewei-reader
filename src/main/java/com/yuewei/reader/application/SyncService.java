@@ -157,6 +157,27 @@ public class SyncService {
         return applied;
     }
 
+    /** 一次同步内复用的查询快照：避免每本书各查一次书源/进度、各扫一遍全表（N+1 / O(n²)）。 */
+    private record PushContext(Map<Long, BookSource> sources,
+                               Map<Long, ReadingProgress> progress,
+                               Map<String, Integer> baseKeyCounts,
+                               List<Book> allWithDeleted) {
+    }
+
+    private PushContext buildPushContext() {
+        Map<Long, BookSource> sources = new HashMap<>();
+        for (BookSource s : sourceDao.findAll()) {
+            sources.put(s.id, s);
+        }
+        Map<Long, ReadingProgress> progress = progressDao.findAll();
+        List<Book> allWithDeleted = bookDao.findAllWithDeleted();
+        Map<String, Integer> baseKeyCounts = new HashMap<>();
+        for (Book b : allWithDeleted) {
+            baseKeyCounts.merge(baseKey(b), 1, Integer::sum);
+        }
+        return new PushContext(sources, progress, baseKeyCounts, allWithDeleted);
+    }
+
     /** 退出阅读、切章或手动同步时调用：上传进度与书架。 */
     public synchronized Result pushAll() throws IOException {
         if (!configured()) {
@@ -165,11 +186,15 @@ public class SyncService {
         settings.saveSyncPending(true);
         WebDavClient dav = client();
         dav.ensureDir();
+        PushContext ctx = buildPushContext();
         int pushed = 0;
         int failed = 0;
-        for (Book book : bookDao.findAll()) {
+        for (Book book : ctx.allWithDeleted) {
+            if (book.deleted) {
+                continue;
+            }
             try {
-                if (pushBookProgress(dav, book)) {
+                if (pushBookProgress(dav, book, ctx)) {
                     pushed++;
                 }
             } catch (Exception e) {
@@ -177,7 +202,7 @@ public class SyncService {
                 failed++;
             }
         }
-        for (Book book : bookDao.findAllWithDeleted()) {
+        for (Book book : ctx.allWithDeleted) {
             if (!book.deleted) {
                 continue;
             }
@@ -187,12 +212,12 @@ public class SyncService {
                 continue;
             }
             try {
-                pushProgressTombstone(dav, book, deletedAt);
+                pushProgressTombstone(dav, book, deletedAt, ctx);
             } catch (IOException e) {
                 failed++;
             }
         }
-        pushShelf(dav);
+        pushShelf(dav, ctx);
         String message = "上传 " + pushed + " 本进度、书架"
                 + (failed > 0 ? "（" + failed + " 本失败）" : "");
         settings.saveSyncResult(message);
@@ -207,16 +232,16 @@ public class SyncService {
         }
         WebDavClient dav = client();
         dav.ensureDir();
-        if (pushBookProgress(dav, book)) {
+        if (pushBookProgress(dav, book, buildPushContext())) {
             settings.saveSyncResult("已上传《" + book.title + "》进度");
         }
     }
 
-    private boolean pushBookProgress(WebDavClient dav, Book book) throws IOException {
+    private boolean pushBookProgress(WebDavClient dav, Book book, PushContext ctx) throws IOException {
         if (book.deleted) {
             return false;
         }
-        ReadingProgress progress = progressDao.findByBook(book.id);
+        ReadingProgress progress = ctx.progress.get(book.id);
         if (progress == null) {
             return false;
         }
@@ -230,16 +255,20 @@ public class SyncService {
                 chapterPos(chapter, percent), millis(progress.updatedAt));
         node.put("durChapterTitle", chapter == null ? "" : chapter.title);
         byte[] body = json.writeValueAsBytes(node);
-        dav.put("bookProgress/" + fileKey(book) + ".json", body, "application/json; charset=utf-8");
+        dav.put("bookProgress/" + fileKey(book, ctx) + ".json", body, "application/json; charset=utf-8");
         return true;
     }
 
     /** 删除/复活后写入“进度归零”标记，防止残留的旧 bookProgress 在下次同步把进度拉回来。 */
     private void pushProgressTombstone(WebDavClient dav, Book book, long at) throws IOException {
+        pushProgressTombstone(dav, book, at, buildPushContext());
+    }
+
+    private void pushProgressTombstone(WebDavClient dav, Book book, long at, PushContext ctx) throws IOException {
         long time = at > 0 ? at : System.currentTimeMillis();
         ObjectNode node = progressJson(book, 0, 0, time);
         node.put("durChapterTitle", "");
-        dav.put("bookProgress/" + fileKey(book) + ".json",
+        dav.put("bookProgress/" + fileKey(book, ctx) + ".json",
                 json.writeValueAsBytes(node), "application/json; charset=utf-8");
     }
 
@@ -259,10 +288,10 @@ public class SyncService {
      * 上传前先读远端 shelf.json，按条目合并后再整份写入：
      * 本地没有的远端条目（另一台设备新增的本地书、删除墓碑）原样保留。
      */
-    private void pushShelf(WebDavClient dav) throws IOException {
+    private void pushShelf(WebDavClient dav, PushContext ctx) throws IOException {
         List<ObjectNode> localItems = new ArrayList<>();
-        for (Book book : bookDao.findAllWithDeleted()) {
-            localItems.add(shelfItem(book));
+        for (Book book : ctx.allWithDeleted) {
+            localItems.add(shelfItem(book, ctx));
         }
         JsonNode remoteRoot = readRemote(dav, "shelf.json");
         ObjectNode root = json.createObjectNode();
@@ -276,14 +305,14 @@ public class SyncService {
         dav.put("shelf.json", json.writeValueAsBytes(root), "application/json; charset=utf-8");
     }
 
-    private ObjectNode shelfItem(Book book) {
+    private ObjectNode shelfItem(Book book, PushContext ctx) {
         ObjectNode item = json.createObjectNode();
         item.put("deleted", book.deleted);
         item.put("title", book.title == null ? "" : book.title);
         item.put("author", book.author == null ? "" : book.author);
         item.put("sourceType", book.sourceType.name());
         item.put("sourceId", book.sourceId == null ? 0 : book.sourceId);
-        BookSource source = book.sourceId == null ? null : sourceDao.findById(book.sourceId);
+        BookSource source = book.sourceId == null ? null : ctx.sources.get(book.sourceId);
         item.put("sourceUrl", source == null ? "" : source.url);
         item.put("sourceName", source == null ? "" : source.name);
         item.put("bookUrl", book.bookUrl == null ? "" : book.bookUrl);
@@ -296,7 +325,7 @@ public class SyncService {
         if (book.deleted) {
             item.put("deletedAtMs", millis(book.lastReadAt));
         }
-        ReadingProgress progress = progressDao.findByBook(book.id);
+        ReadingProgress progress = ctx.progress.get(book.id);
         if (progress != null) {
             item.put("chapterIndex", progress.chapterIndex);
             item.put("percent", progress.charOffset);
@@ -481,12 +510,14 @@ public class SyncService {
         if (!books.isArray()) {
             return 0;
         }
+        // 整个拉取过程复用同一份本地书架快照，避免每个远端条目都全表扫一次（O(n²)）
+        List<Book> allWithDeleted = bookDao.findAllWithDeleted();
         int merged = 0;
         for (JsonNode item : books) {
             if (!item.isObject()) {
                 continue;
             }
-            Book local = matchAny(item);
+            Book local = matchAny(item, allWithDeleted);
             long remoteActivity = activity(item);
             long remoteDeletedAt = deletedAt(item);
             if (item.path("deleted").asBoolean(false)) {
@@ -500,6 +531,7 @@ public class SyncService {
                 bookDao.markDeleted(local.id);
                 chapterDao.deleteByBook(local.id);
                 progressDao.deleteByBook(local.id);
+                allWithDeleted = bookDao.findAllWithDeleted();
                 merged++;
                 continue;
             }
@@ -515,6 +547,7 @@ public class SyncService {
                     continue;
                 }
                 resetRemoteProgress(dav, revived, remoteActivity);
+                allWithDeleted = bookDao.findAllWithDeleted();
                 merged++;
                 continue;
             }
@@ -522,6 +555,7 @@ public class SyncService {
                 Book added = importOnline(item);
                 if (added != null) {
                     mergeMeta(added, item);
+                    allWithDeleted = bookDao.findAllWithDeleted();
                     merged++;
                 }
                 continue;
@@ -546,10 +580,9 @@ public class SyncService {
     }
 
     /** 匹配包含墓碑的记录，避免已删除的书被重新入架。 */
-    private Book matchAny(JsonNode item) {
+    private Book matchAny(JsonNode item, List<Book> all) {
         String hash = text(item, "fileHash");
         String bookUrl = text(item, "bookUrl");
-        List<Book> all = bookDao.findAllWithDeleted();
         if (!hash.isEmpty()) {
             for (Book book : all) {
                 if (hash.equals(book.fileHash)) {
@@ -727,14 +760,9 @@ public class SyncService {
     }
 
     /** 书名_作者；同一本书在不同设备上生成同一个文件名。 */
-    private String fileKey(Book book) {
+    private String fileKey(Book book, PushContext ctx) {
         String base = baseKey(book);
-        int count = 0;
-        for (Book other : bookDao.findAllWithDeleted()) {
-            if (baseKey(other).equals(base)) {
-                count++;
-            }
-        }
+        int count = ctx.baseKeyCounts.getOrDefault(base, 0);
         return count > 1 ? base + "_" + shortId(book) : base;
     }
 
