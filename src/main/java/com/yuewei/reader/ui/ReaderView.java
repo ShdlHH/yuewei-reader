@@ -43,7 +43,9 @@ import javafx.scene.text.TextFlow;
 import javafx.util.Duration;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /** 阅读器：目录侧栏 + 正文滚动区，进度按章节与章内百分比保存。 */
 public class ReaderView implements AppView {
@@ -104,6 +106,14 @@ public class ReaderView implements AppView {
     private boolean progressDirty;
     private boolean fadeNextRender;
     private Timeline pageAnimation;
+    /** 已预取到内存的章节正文（章序号 → 正文），切章时直接上屏，不再显示加载提示。 */
+    private final Map<Integer, String> prefetched = new HashMap<>();
+    /** 正在预取的章序号，-1 表示空闲；用于避免同一章重复抓取。 */
+    private int prefetching = -1;
+    /** 预取令牌：换书或重新加载时递增，丢弃过期的预取结果。 */
+    private int prefetchToken;
+    /** 章节加载令牌：快速连续切章时只让最后一次请求的结果上屏。 */
+    private int loadToken;
 
     public ReaderView(AppContext ctx, MainWindow window) {
         this.ctx = ctx;
@@ -299,6 +309,10 @@ public class ReaderView implements AppView {
         this.progressDirty = false;
         this.pendingFraction = Math.max(0, Math.min(1, charOffset / 10000.0));
         this.pendingPage = -1;
+        prefetched.clear();
+        prefetching = -1;
+        prefetchToken++;
+        loadToken++;
         blocks.clear();
         pages.clear();
         pageIndex = 0;
@@ -331,21 +345,92 @@ public class ReaderView implements AppView {
             pendingFraction = fraction;
         }
         pendingPage = -1;
+        int token = ++loadToken;
+        // 切章直出：内存预取或磁盘缓存命中时同步上屏，避免出现"正在加载章节…"
+        String ready = takeReadyContent(next, chapter);
+        if (ready != null) {
+            loading = false;
+            fadeNextRender = true;
+            setContent(ready);
+            window.syncBookProgress(book);
+            prefetchNextChapter();
+            return;
+        }
         loading = true;
         setContent("正在加载章节…");
         Ui.async("read-chapter",
                 () -> ctx.onlineBookService.loadContent(book, chapter),
                 loaded -> {
+                    if (token != loadToken) {
+                        return;
+                    }
                     loading = false;
                     fadeNextRender = true;
                     setContent(loaded);
                     window.syncBookProgress(book);
+                    prefetchNextChapter();
                 },
                 error -> {
+                    if (token != loadToken) {
+                        return;
+                    }
                     loading = false;
                     String message = Ui.message(error);
                     setContent("本章加载失败：" + message + "\n\n可以在书源页校验规则，或先下载本书离线阅读。");
                     window.status("章节加载失败：" + message);
+                });
+    }
+
+    /** 取可直出的正文：先看内存预取，再看磁盘缓存；都没有返回 null，交给网络加载。 */
+    private String takeReadyContent(int target, Chapter chapter) {
+        String text = prefetched.remove(target);
+        if (text != null) {
+            return text;
+        }
+        if (!ctx.onlineBookService.hasCache(book, chapter)) {
+            return null;
+        }
+        try {
+            return ctx.onlineBookService.loadContent(book, chapter);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** 当前章上屏后预取下一章正文，使后续切章可以直接显示。 */
+    private void prefetchNextChapter() {
+        int target = index + 1;
+        if (book == null || target < 0 || target >= chapters.size()) {
+            return;
+        }
+        if (prefetching == target || prefetched.containsKey(target)) {
+            return;
+        }
+        Book current = book;
+        Chapter chapter = chapters.get(target);
+        if (ctx.onlineBookService.hasCache(current, chapter)) {
+            return;
+        }
+        int token = ++prefetchToken;
+        prefetching = target;
+        Ui.async("prefetch-chapter",
+                () -> ctx.onlineBookService.loadContent(current, chapter),
+                text -> {
+                    if (token != prefetchToken) {
+                        return;
+                    }
+                    prefetching = -1;
+                    if (text != null && !text.isEmpty()) {
+                        if (prefetched.size() >= 3) {
+                            prefetched.clear();
+                        }
+                        prefetched.put(target, text);
+                    }
+                },
+                error -> {
+                    if (token == prefetchToken) {
+                        prefetching = -1;
+                    }
                 });
     }
 

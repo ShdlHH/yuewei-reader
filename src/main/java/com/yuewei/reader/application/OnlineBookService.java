@@ -121,6 +121,11 @@ public class OnlineBookService {
         return book;
     }
 
+    /** 该章正文是否已落盘缓存：供切章时判断能否同步直出，不触发网络。 */
+    public boolean hasCache(Book book, Chapter chapter) {
+        return cache.exists(book.id, chapter.idx);
+    }
+
     public String loadContent(Book book, Chapter chapter) {
         String cached = cache.read(book.id, chapter.idx);
         if (cached != null) {
