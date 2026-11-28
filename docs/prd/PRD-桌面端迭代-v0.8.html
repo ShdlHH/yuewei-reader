@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>阅微阅读器 · 桌面端迭代 PRD（v1.0 评审通过）</title>
+<style>
+  :root{
+    --ink:#1f1c18; --ink-2:#3d3831; --muted:#6f675c; --line:#e2dbcd;
+    --paper:#faf7f0; --card:#fffdf8; --accent:#a63d32; --accent-2:#2f6fa8;
+    --ok:#17786b; --warn:#c2632a; --tag:#f1ebdf;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"Noto Serif SC","Source Han Serif SC","Songti SC",SimSun,serif;
+    line-height:1.85; font-size:15.5px;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:48px 28px 96px;display:grid;grid-template-columns:220px 1fr;gap:44px}
+  header.doc{grid-column:1/-1;border-bottom:2px solid var(--ink);padding-bottom:22px;margin-bottom:6px}
+  header.doc .kicker{font-size:12.5px;letter-spacing:.22em;color:var(--accent);font-family:system-ui,sans-serif}
+  header.doc h1{font-size:31px;margin:10px 0 6px;letter-spacing:.01em}
+  header.doc .sub{color:var(--muted);font-size:14px}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  .meta span{background:var(--tag);border:1px solid var(--line);border-radius:999px;padding:3px 12px;font-size:12.5px;color:var(--ink-2);font-family:system-ui,sans-serif}
+  nav.toc{position:sticky;top:28px;align-self:start;font-family:system-ui,sans-serif;font-size:13.5px}
+  nav.toc h2{font-size:11.5px;letter-spacing:.2em;color:var(--muted);margin:0 0 12px;font-weight:600}
+  nav.toc ol{list-style:none;margin:0;padding:0;border-left:1px solid var(--line)}
+  nav.toc a{display:block;padding:5px 0 5px 14px;color:var(--ink-2);text-decoration:none;border-left:2px solid transparent;margin-left:-1px}
+  nav.toc a:hover{color:var(--accent);border-left-color:var(--accent)}
+  nav.toc .l2{padding-left:28px;font-size:12.5px;color:var(--muted)}
+  main{min-width:0}
+  section{margin-bottom:44px}
+  h2{font-size:23px;margin:0 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  h2 .num{color:var(--accent);font-size:15px;margin-right:10px;font-family:system-ui,sans-serif;letter-spacing:.1em}
+  h3{font-size:18px;margin:26px 0 10px}
+  h4{font-size:15.5px;margin:20px 0 8px;color:var(--ink-2)}
+  p{margin:10px 0}
+  ul,ol{padding-left:1.35em;margin:10px 0}
+  li{margin:5px 0}
+  code{background:var(--tag);padding:1px 6px;border-radius:4px;font-size:.9em;font-family:ui-monospace,Consolas,monospace}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px;background:var(--card)}
+  th,td{border:1px solid var(--line);padding:9px 11px;vertical-align:top;text-align:left}
+  th{background:var(--tag);font-weight:600;color:var(--ink-2);white-space:nowrap;font-family:system-ui,sans-serif;font-size:13px}
+  tbody tr:nth-child(even){background:#fdfbf6}
+  .tag{display:inline-block;font-family:system-ui,sans-serif;font-size:11.5px;padding:1px 8px;border-radius:999px;border:1px solid;line-height:1.6}
+  .p0{color:#8d2f26;border-color:#dcc3bb;background:#fbeee9}
+  .p1{color:#2a5f94;border-color:#c4d4e4;background:#eef3f9}
+  .no{color:#6f675c;border-color:var(--line);background:#f4efe6}
+  .out{color:#8a8a8a;border-color:#ddd;background:#f6f6f6;text-decoration:line-through}
+  .id{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;color:var(--accent);white-space:nowrap}
+  .card{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--accent);padding:14px 18px;margin:16px 0}
+  .card b{display:block;font-size:13px;letter-spacing:.06em;color:var(--accent);font-family:system-ui,sans-serif;margin-bottom:4px}
+  .note{color:var(--muted);font-size:13.5px}
+  .req{background:var(--card);border:1px solid var(--line);padding:20px 24px;margin:22px 0;border-radius:2px}
+  .req h3{margin:0 0 4px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .req .purpose{color:var(--muted);font-size:14px;margin:0 0 16px;padding-left:2px}
+  .req dl{margin:0}
+  .req dt{font-family:system-ui,sans-serif;font-size:12.5px;letter-spacing:.08em;color:var(--accent-2);margin-top:14px}
+  .req dd{margin:5px 0 0}
+  .req ul{margin:6px 0}
+  .tbd{color:#8a6d3b;background:#fdf6e3;border:1px dashed #e2cfa1;padding:2px 7px;border-radius:4px;font-size:13px;font-family:system-ui,sans-serif}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .revision{grid-column:1/-1;background:#fdfbf5;border:1px solid var(--line);border-radius:2px;padding:14px 20px;margin:6px 0 18px}
+  .revision h4{margin:0 0 8px;font-size:13px;letter-spacing:.08em;color:var(--muted);font-family:system-ui,sans-serif}
+  .revision table{margin:6px 0 0;font-size:13px}
+  footer.end{grid-column:1/-1;border-top:1px solid var(--line);padding-top:16px;color:var(--muted);font-size:13px;font-family:system-ui,sans-serif;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+  @media (max-width:900px){
+    .wrap{grid-template-columns:1fr;padding:28px 16px 64px;gap:24px}
+    nav.toc{position:static;order:2}
+    .grid2{grid-template-columns:1fr}
+  }
+  @media print{
+    body{background:#fff;font-size:11.5pt}
+    .wrap{display:block;max-width:none;padding:0}
+    nav.toc{display:none}
+    .req,table,.card{break-inside:avoid}
+    h2{break-after:avoid}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <div class="kicker">PRODUCT REQUIREMENT DOCUMENT · APPROVED</div>
+  <h1>阅微阅读器 · 桌面端迭代 PRD</h1>
+  <div class="sub">主题：把「能用」打磨成「好用、完整」——基于 0.7.19 现状的能力盘点与迭代设计（已剔除 3 项需求，评审通过）</div>
+  <div class="meta">
+    <span>版本 v1.0（评审通过）</span>
+    <span>日期 2026-11-28</span>
+    <span>状态 已评审 · 进入实现</span>
+    <span>端范围 桌面端（Windows）</span>
+    <span>现状基线 0.7.19</span>
+  </div>
+</header>
+
+<div class="revision">
+  <h4>修订记录</h4>
+  <table>
+    <thead><tr><th>版本</th><th>变更</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>v0.8.0</td><td>初版</td><td>含正文内搜索、书签与摘录、书架分组与批量三项需求</td></tr>
+      <tr><td>v0.8.1</td><td>按评审意见<b>剔除</b>原 U-01 正文内搜索、U-02 书签与摘录、U-03 书架分组与批量操作</td><td>相应功能需求、问题项、P0 范围与附录全部重排；新补两项已核实的可用性问题（章节切换入口隐蔽、下载任务无法直接打开阅读）</td></tr>
+      <tr><td><b>v1.0</b></td><td><b>评审通过</b></td><td>P0 五项确定进入实现；第 07 节 5 个待确认问题全部采纳建议并转为决策记录</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<nav class="toc">
+  <h2>目录</h2>
+  <ol>
+    <li><a href="#s1">一、功能分析（现状）</a></li>
+    <li><a class="l2" href="#s1-1">1.1 产品定位与信息架构</a></li>
+    <li><a class="l2" href="#s1-2">1.2 现有能力盘点</a></li>
+    <li><a class="l2" href="#s1-3">1.3 关键链路</a></li>
+    <li><a class="l2" href="#s1-4">1.4 问题清单</a></li>
+    <li><a class="l2" href="#s1-5">1.5 本次明确不做</a></li>
+    <li><a href="#s2">二、业务需求拆解</a></li>
+    <li><a class="l2" href="#s2-1">2.1 业务需求</a></li>
+    <li><a class="l2" href="#s2-2">2.2 用户需求</a></li>
+    <li><a class="l2" href="#s2-3">2.3 需求映射</a></li>
+    <li><a href="#s3">三、迭代范围</a></li>
+    <li><a href="#s4">四、功能需求（P0）</a></li>
+    <li><a href="#s5">五、P1 候选</a></li>
+    <li><a href="#s6">六、共享规则</a></li>
+    <li><a href="#s7">七、评审决策记录</a></li>
+    <li><a href="#s8">八、附录</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<!-- ================= 一 ================= -->
+<section id="s1">
+  <h2><span class="num">01</span>功能分析（现状）</h2>
+  <p>本节结论全部来自 0.7.19 桌面端代码与真机操作验证，不含推测。目的：先明确「现在有什么、缺什么、哪里不好用」，再据此定迭代范围。</p>
+
+  <h3 id="s1-1">1.1 产品定位与信息架构</h3>
+  <p>定位：不依赖网页、可自建书源的 Windows 小说阅读器，支持在线抓取阅读、本地 TXT 导入、整本下载离线、WebDAV 跨设备同步进度与书架。</p>
+  <table>
+    <thead><tr><th>层级</th><th>结构</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>主导航（左侧栏）</td><td>书架 / 搜索 / 书源 / 下载 / 设置</td><td>底部固定「上次同步」卡片（点击即同步）与「关于」；书架、书源带数量提示</td></tr>
+      <tr><td>书架页</td><td>页头（标题 + 同步状态）+ 工具条（筛选 / 导入 TXT / 搜索 / 书源 / 同步）+「继续阅读」卡片 + 书目列表</td><td>支持范围筛选（全部 / 本地 / 在线）与排序（最近阅读 / 添加时间 / 书名）</td></tr>
+      <tr><td>阅读页</td><td>工具条（← 书架 / 书名 / 目录 / Aa）+ 目录侧栏（可拖宽）+ 正文区 + 页眉页脚（章名、页码、阅读百分比）</td><td>整章预分页后逐页翻，非滚动阅读；<b>上一章 / 下一章按钮只存在于 Aa 面板内</b></td></tr>
+      <tr><td>搜索页</td><td>关键词框 + 书源范围下拉 + 结果表（书名/作者/最新章节/来源）+ 右侧书源进度 + 底部详情与「加入书架」</td><td>多书源并行搜索，按「书名 + 作者」聚合，可在详情里切换来源</td></tr>
+      <tr><td>书源页</td><td>导入文件 / 粘贴导入 / 新建 / 编辑 / 校验·调试 / 更多菜单 + 书源列表</td><td>兼容 Legado 3.0 规则子集</td></tr>
+      <tr><td>下载页</td><td>新建下载 + 暂停 / 继续（失败时为「重试失败」）/ 取消 / 刷新 + 任务表（书名、范围、状态、进度、失败章节、更新时间）</td><td>范围支持全部 / 仅未缓存 / 指定章节区间；<b>任务表不能直接打开书籍</b></td></tr>
+      <tr><td>设置页</td><td>阅读排版 → 标点着色 → 网络 → 存储 → WebDAV 同步 → 保存 / 恢复默认</td><td>含字体导入、主题（纸白/夜间/护眼）、超时/并发/间隔/UA、缓存上限与清理</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s1-2">1.2 现有能力盘点（按模块）</h3>
+  <table>
+    <thead><tr><th>模块</th><th>已具备</th><th>关键入口</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>阅读</td>
+        <td>翻页（空格 / PageDown / → / ↓；上一页反向）、章末自动进下一章、目录侧栏与章名搜索、字号 12–32、行距 1.2–3.0、字体选择与导入、三套主题、标点着色（6 类可配色）、章内百分比与整书百分比、切章直出（预取下一章）、进度自动保存</td>
+        <td>阅读页 / Aa 面板 / 键盘</td>
+      </tr>
+      <tr>
+        <td>书架</td>
+        <td>「继续阅读」卡片、单行书目（序号、作者、读至第 N 章、百分比）、范围与排序筛选、行内 ⋯ 菜单与右键菜单（阅读 / 全部下载 / 更新目录 / 书籍信息 / 清除缓存 / 删除书籍）、空态引导、缓存占用提示</td>
+        <td>书架页</td>
+      </tr>
+      <tr>
+        <td>搜索</td>
+        <td>多源并行、按书名+作者聚合、按来源切换、书源范围选择、逐源进度与失败原因、加入书架</td>
+        <td>搜索页 / Ctrl+F</td>
+      </tr>
+      <tr>
+        <td>书源</td>
+        <td>Legado 3.0 JSON 导入（文件 / 粘贴）、新建、编辑、单条校验与分阶段调试（搜索 / 详情 / 目录 / 正文）、更多菜单</td>
+        <td>书源页</td>
+      </tr>
+      <tr>
+        <td>下载</td>
+        <td>整本 / 仅未缓存 / 指定区间下载、并发数与请求间隔可控、暂停 / 继续 / 取消、失败章节记录与「重试失败」、任务持久化、缓存上限自动清理</td>
+        <td>下载页 / 书架右键</td>
+      </tr>
+      <tr>
+        <td>导入</td>
+        <td>TXT 编码识别、自动分章预览、SHA256 重复检测、固定大小 / 全文 / 正则 / 自动四种分章方式</td>
+        <td>书架「导入 TXT」/ Ctrl+O</td>
+      </tr>
+      <tr>
+        <td>同步</td>
+        <td>WebDAV 两阶段同步（进度 + 书架快照）、书名+作者聚合键、删除墓碑、启动自动拉取、手动立即同步、未完成同步下次启动补跑、Legado 兼容进度格式</td>
+        <td>书架同步按钮 / 侧栏同步卡 / 设置页</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 id="s1-3">1.3 关键链路</h3>
+  <div class="grid2">
+    <div class="card"><b>链路 A · 找书到开始读</b>
+      搜索关键词 → 多源并行抓取 → 结果按书名+作者聚合 → 选来源 → 加入书架 → 书架点开 → 拉取目录 → 加载首章 → 阅读
+    </div>
+    <div class="card"><b>链路 B · 长期阅读</b>
+      打开书 → 恢复上次章节与章内位置 → 逐页翻 → 章末进下一章（已预取则直出）→ 退出时保存进度 → 启动/手动同步
+    </div>
+    <div class="card"><b>链路 C · 离线化</b>
+      书架右键「全部下载」或下载页新建任务（全部/未缓存/区间）→ 队列抓取 → 失败章节集中重试 → 离线阅读
+    </div>
+    <div class="card"><b>链路 D · 书源维护</b>
+      导入 Legado JSON → 列表校验 → 失败时进入分阶段调试（搜索/详情/目录/正文）→ 修正或删除
+    </div>
+  </div>
+
+  <h3 id="s1-4">1.4 问题清单</h3>
+  <p>按「用户时刻 → 现象 → 后果」记录，均可在当前版本复现或由代码结构直接确认。</p>
+  <table>
+    <thead><tr><th>编号</th><th>分类</th><th>用户时刻</th><th>现象与后果</th></tr></thead>
+    <tbody>
+      <tr><td class="id">P-01</td><td>易用性</td><td>章节加载失败 / 书源规则失效</td><td>正文区只显示一段错误文字（含原始异常信息），<b>没有「重试 / 换源 / 去下载」动作</b>；用户只能自行猜测下一步，最易导致弃用</td></tr>
+      <tr><td class="id">P-02</td><td>完整性</td><td>追更中的在线书</td><td><b>没有新章节提醒</b>；需逐本手动「更新目录」才发现更新，书架也无「有更新」标记</td></tr>
+      <tr><td class="id">P-03</td><td>易用性</td><td>想直接跳到上一章 / 下一章</td><td>工具条只有「← 书架 / 目录 / Aa」，<b>上一章、下一章按钮藏在 Aa 设置对话框里</b>；必须开设置才能切章（真机验证时验证人员多次尝试仍未找到入口）</td></tr>
+      <tr><td class="id">P-04</td><td>易用性</td><td>长时间 / 夜间阅读</td><td><b>没有全屏或沉浸模式</b>，侧栏、页眉页脚、系统标题栏一直占位；<b>快捷键固定不可配置</b>（仅空格/方向键翻页），宽屏阅读干扰多</td></tr>
+      <tr><td class="id">P-05</td><td>易用性</td><td>下载完成后想开始读</td><td>下载任务表<b>没有「阅读」入口，双击也不打开书籍</b>；只能回书架再找这本书</td></tr>
+      <tr><td class="id">P-06</td><td>完整性</td><td>想知道自己读了多少</td><td><b>无阅读时长、字数、连续天数等统计</b>，只有单本百分比；长期使用缺少正反馈</td></tr>
+      <tr><td class="id">P-07</td><td>易用性</td><td>想按习惯调整排版</td><td>只有字号 / 行距 / 字体 / 主题；<b>无段间距、首行缩进、对齐、版心宽度、翻页动效开关</b>，长段落在宽屏上偏空</td></tr>
+      <tr><td class="id">P-08</td><td>易用性</td><td>同步失败时</td><td>侧栏只显示一行结果文本；<b>无失败原因展开与重试入口</b>，冲突合并结果对用户不可见</td></tr>
+      <tr><td class="id">P-09</td><td>完整性</td><td>想把内容带走</td><td><b>无导出</b>（单章 / 整本）；跨应用引用只能手动复制粘贴</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s1-5">1.5 本次明确不做（已排除）</h3>
+  <p>以下能力在上一版 PRD 中被列为需求，经评审确认<b>不纳入本次迭代</b>，且不作为本迭代的任何前置依赖：</p>
+  <table>
+    <thead><tr><th>能力</th><th>原编号</th><th>处理</th></tr></thead>
+    <tbody>
+      <tr><td>正文内搜索与定位</td><td>原 U-01 / FR-01</td><td><span class="tag out">剔除</span> 本次不设计、不预留入口</td></tr>
+      <tr><td>书签与摘录笔记</td><td>原 U-02 / FR-02</td><td><span class="tag out">剔除</span> 本次不设计、不预留入口</td></tr>
+      <tr><td>书架分组、标签与批量操作</td><td>原 U-03 / FR-03</td><td><span class="tag out">剔除</span> 书架筛选与排序保持现状</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ================= 二 ================= -->
+<section id="s2">
+  <h2><span class="num">02</span>业务需求拆解</h2>
+
+  <h3 id="s2-1">2.1 业务需求</h3>
+  <div class="card">
+    <b>原始需求</b>
+    「功能更加好用、更加完整」——在不改变「本地优先、自建书源、轻量无广告」定位的前提下，降低高频操作的成本，让用户能把它当作主力阅读器连续使用。
+  </div>
+  <p>据此给出两条业务目标（均为可观察结果，不设虚构量化指标）：</p>
+  <table>
+    <thead><tr><th>目标</th><th>可观察结果</th></tr></thead>
+    <tbody>
+      <tr><td><b>G-1 操作更省力</b></td><td>切章、下载后开始读、进入沉浸阅读都不超过一步；不用打开设置面板去找入口</td></tr>
+      <tr><td><b>G-2 异常有出路、使用有反馈</b></td><td>任一失败场景给出人话原因与下一步动作；阅读量与追更状态在应用内可见</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s2-2">2.2 用户需求（以场景表述）</h3>
+  <table>
+    <thead><tr><th>编号</th><th>用户需求</th><th>触发场景</th><th>完成标志</th></tr></thead>
+    <tbody>
+      <tr><td class="id">U-01</td><td>内容打不开时，我要知道怎么办</td><td>某章解析失败、书源失效、网络超时</td><td>看到人话原因，并有可用按钮：重试、换来源、先下载、去校验书源</td></tr>
+      <tr><td class="id">U-02</td><td>追更的书更新了要让我知道</td><td>书架上有正在连载的在线书</td><td>书架出现「更新 N 章」标记，可一键更新目录并跳到最新章</td></tr>
+      <tr><td class="id">U-03</td><td>我要一步切到上一章 / 下一章</td><td>读完一章想继续，或想回看上一章</td><td>阅读页工具条直接有「上一章 / 下一章」，目录能定位当前章</td></tr>
+      <tr><td class="id">U-04</td><td>长时间阅读要不被打扰，操作要顺手</td><td>夜间、宽屏、连续阅读数小时</td><td>可全屏沉浸（按需隐藏侧栏与页眉页脚），翻页/切章/目录等快捷键可自定义</td></tr>
+      <tr><td class="id">U-05</td><td>下载完就能马上接着读</td><td>整本或区间下载完成</td><td>下载任务可直接「阅读 / 打开所在章节」，无需回书架找书</td></tr>
+      <tr><td class="id">U-06</td><td>我要知道自己读了多少</td><td>使用一两周后</td><td>看到今日 / 本周 / 累计阅读时长、字数与连续天数</td></tr>
+      <tr><td class="id">U-07</td><td>我想按自己的习惯调整排版</td><td>宽屏、不同视力、不同题材</td><td>可调段间距、首行缩进、对齐、版心宽度与翻页动效</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="s2-3">2.3 需求映射</h3>
+  <table>
+    <thead><tr><th>业务目标</th><th>用户需求</th><th>功能需求</th><th>优先级</th></tr></thead>
+    <tbody>
+      <tr><td>G-2</td><td>U-01</td><td>FR-01 失败可恢复：错误分级与就地动作</td><td><span class="tag p0">P0</span></td></tr>
+      <tr><td>G-2</td><td>U-02</td><td>FR-02 新章节检测与更新提醒</td><td><span class="tag p0">P0</span></td></tr>
+      <tr><td>G-1</td><td>U-03</td><td>FR-03 阅读页章节导航与目录定位</td><td><span class="tag p0">P0</span></td></tr>
+      <tr><td>G-1</td><td>U-04</td><td>FR-04 沉浸式阅读与自定义快捷键</td><td><span class="tag p0">P0</span></td></tr>
+      <tr><td>G-1</td><td>U-05</td><td>FR-05 下载任务直达阅读</td><td><span class="tag p0">P0</span></td></tr>
+      <tr><td>G-2</td><td>U-06</td><td>FR-06 阅读统计</td><td><span class="tag p1">P1</span></td></tr>
+      <tr><td>G-1</td><td>U-07</td><td>FR-07 排版细节</td><td><span class="tag p1">P1</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ================= 三 ================= -->
+<section id="s3">
+  <h2><span class="num">03</span>迭代范围</h2>
+  <p>最小完整旅程：<b>书架打开一本追更书 → 章末进入新章 → 发现更新并跳到最新章 → 整本下载 → 下载页直接开读 → 出错时原地恢复</b>。围绕这条旅程定 P0，其余进入 P1。</p>
+  <table>
+    <thead><tr><th>范围</th><th>内容</th><th>判定依据</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="tag p0">P0 本次迭代</span></td>
+        <td>FR-01 失败可恢复<br>FR-02 新章节检测与更新提醒<br>FR-03 阅读页章节导航与目录定位<br>FR-04 沉浸式阅读与自定义快捷键<br>FR-05 下载任务直达阅读</td>
+        <td>五项都围绕「读的时候不被打断、断了能接上」，且全部建立在已有能力（目录刷新、下载任务、阅读页布局、书源与进度数据）之上，不引入新外部依赖与新的数据模型</td>
+      </tr>
+      <tr>
+        <td><span class="tag p1">P1 下一迭代</span></td>
+        <td>FR-06 阅读统计、FR-07 排版细节、FR-08 同步可观测、FR-09 导出、FR-10 TTS 朗读、FR-11 书源优先级与分享</td>
+        <td>需要新增统计数据或改动同步协议，先做会与 P0 的布局/入口重复改版</td>
+      </tr>
+      <tr>
+        <td><span class="tag no">不做</span></td>
+        <td>正文内搜索、书签与摘录笔记、书架分组/标签/批量（评审已剔除）；多窗口、EPUB/PDF、账号体系与云书城、社交、AI 摘要</td>
+        <td>前者为评审结论；后者与「本地优先、轻量」定位冲突或引入服务端依赖</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ================= 四 ================= -->
+<section id="s4">
+  <h2><span class="num">04</span>功能需求（P0）</h2>
+  <p>每条统一说明：目的 → 入口与触发 → 处理规则 → 结果与状态 → 异常与边界。共享口径统一见第 06 节，不重复。</p>
+
+  <!-- FR-01 -->
+  <div class="req" id="fr01">
+    <h3><span class="id">FR-01</span>失败可恢复：错误分级与就地动作 <span class="tag p0">P0</span></h3>
+    <p class="purpose">解决 P-01：现在只显示一段带原始异常的错误文字，用户无法自我恢复。</p>
+    <dl>
+      <dt>入口与触发</dt>
+      <dd>覆盖三个场景：阅读页章节加载失败、搜索页某书源失败、同步失败。</dd>
+      <dt>处理规则</dt>
+      <dd>
+        <ul>
+          <li>错误统一分级为四类，按类别给动作（技术细节收进「详情」折叠区，默认收起）：<br>
+            ① 网络不可达 / 超时 → 「重试」「检查网络设置」<br>
+            ② 书源规则失效（解析为空 / 结构不匹配）→ 「换用其它来源」「去校验书源」<br>
+            ③ 章节不存在或地址缺失 → 「更新目录」「先下载本书」<br>
+            ④ 书源被删除 / 书籍被删除 → 「查看书籍信息」「重新添加书源」
+          </li>
+          <li>「换用其它来源」：仅当该书在书架中记录了多个来源时可用，列出其它来源及其章节数供选择；切换后保留当前阅读位置的百分比。</li>
+          <li>「重试」必须复用当前章节位置，不重置阅读进度。</li>
+        </ul>
+      </dd>
+      <dt>结果与状态</dt>
+      <dd>
+        <ul>
+          <li>阅读页失败态：正文区居中展示「原因一句话 + 动作按钮 + 详情折叠」。重试成功后原位恢复正文，不闪回加载占位。</li>
+          <li>搜索页：失败书源在右侧进度列表中以「失败 · 原因类别」展示，并提供单源「重试」。</li>
+          <li>同步失败：侧栏同步卡显示「同步失败 · 类别」，点击展开详情与「重试同步」。</li>
+        </ul>
+      </dd>
+      <dt>异常与边界</dt>
+      <dd>
+        <ul>
+          <li>同一章连续失败 3 次：提示「可能规则已失效」并直接给出「去校验书源」。</li>
+          <li>离线状态：网络类动作改为「已离线，恢复网络后重试」，不反复弹出报错。</li>
+          <li>用户取消操作：回到失败态，不清除已缓存内容。</li>
+        </ul>
+      </dd>
+    </dl>
+  </div>
+
+  <!-- FR-02 -->
+  <div class="req" id="fr02">
+    <h3><span class="id">FR-02</span>新章节检测与更新提醒 <span class="tag p0">P0</span></h3>
+    <p class="purpose">解决 P-02：追更的书更新了，用户完全不知道。</p>
+    <dl>
+      <dt>入口与触发</dt>
+      <dd>
+        <ul>
+          <li>手动：书架 ⋯ 菜单「更新目录」（已有）保留。</li>
+          <li>自动：应用启动后与每 <span class="tbd">[TBD：默认 60 分钟，可关闭]</span> 一次，对书架中的在线书检查目录新增章节；仅在应用打开且距上次检查超过间隔时执行，不常驻后台。</li>
+        </ul>
+      </dd>
+      <dt>处理规则</dt>
+      <dd>
+        <ul>
+          <li>一次检查只请求目录页，不抓正文；按书串行，遵守请求间隔设置。</li>
+          <li>新增章节数 &gt; 0 时记录「有更新」并缓存新增章名；用户读到新章节后清除标记。</li>
+          <li>单轮最多检查 <span class="tbd">[TBD：20 本]</span>，其余下一轮继续。</li>
+          <li>检查失败不改变「有更新」状态，也不打断阅读。</li>
+        </ul>
+      </dd>
+      <dt>结果与状态</dt>
+      <dd>
+        <ul>
+          <li>书目行显示「更新 N 章」标记；「继续阅读」卡片在无在读进度时优先展示有更新的书。</li>
+          <li>⋯ 菜单与「继续阅读」卡片提供「读最新章」：更新目录后直接跳到最新章并提示「已是最新」。</li>
+          <li>设置页新增「更新检查」开关与间隔（关闭 / 30 分钟 / 60 分钟 / 手动）。</li>
+        </ul>
+      </dd>
+      <dt>异常与边界</dt>
+      <dd>
+        <ul>
+          <li>书源失效：书中标记「来源失效」，不进入自动更新队列，直到用户处理。</li>
+          <li>目录长度缩短（源站删章）：不删本地已缓存章节，仅提示「目录变化」。</li>
+          <li>离线：只做本地检查，不影响可读性。</li>
+        </ul>
+      </dd>
+    </dl>
+  </div>
+
+  <!-- FR-03 -->
+  <div class="req" id="fr03">
+    <h3><span class="id">FR-03</span>阅读页章节导航与目录定位 <span class="tag p0">P0</span></h3>
+    <p class="purpose">解决 P-03：上一个/下一个章节按钮藏在 Aa 设置对话框中，切章要多开一层。</p>
+    <dl>
+      <dt>入口与触发</dt>
+      <dd>
+        <ul>
+          <li>阅读页工具条新增「‹ 上一章」与「下一章 ›」，紧随「← 书架」之后，始终可见。</li>
+          <li>目录侧栏新增「定位到当前章」按钮；打开目录时若列表未停在当前章，显示提示条「已跳到第 N 章位置」。</li>
+          <li>Aa 面板内的上一章 / 下一章按钮保留（不影响既有习惯）。</li>
+        </ul>
+      </dd>
+      <dt>处理规则</dt>
+      <dd>
+        <ul>
+          <li>工具条切章行为与键盘 <code>PageUp/PageDown</code> 一致：往后落在新章开头，往前落在上一章结尾。</li>
+          <li>首章时「上一章」置灰，末章时「下一章」置灰，并悬停提示「已是第一章 / 最后一章」。</li>
+          <li>切换过程中防抖：同一章在 350ms 内不重复触发（与现有翻章节奏一致）。</li>
+        </ul>
+      </dd>
+      <dt>结果与状态</dt>
+      <dd>
+        <ul>
+          <li>点击后章名、页码、百分比即时刷新；已缓存或已预取的章节直接显示正文。</li>
+          <li>目录中当前章始终高亮；「定位到当前章」把列表滚动到当前章并选中。</li>
+        </ul>
+      </dd>
+      <dt>异常与边界</dt>
+      <dd>
+        <ul>
+          <li>章节加载失败：保持工具条可用，正文区进入 FR-01 的失败态。</li>
+          <li>目录尚未加载完成：两个按钮置灰并提示「目录加载中」。</li>
+          <li>快速连点：只响应最后一次，不产生越界跳转。</li>
+        </ul>
+      </dd>
+    </dl>
+  </div>
+
+  <!-- FR-04 -->
+  <div class="req" id="fr04">
+    <h3><span class="id">FR-04</span>沉浸式阅读与自定义快捷键 <span class="tag p0">P0</span></h3>
+    <p class="purpose">解决 P-04：没有全屏/沉浸模式，快捷键固定，长时间阅读干扰多。</p>
+    <dl>
+      <dt>入口与触发</dt>
+      <dd>
+        <ul>
+          <li><code>F11</code> 或双击正文空白处进入 / 退出全屏；退出用 <code>Esc</code>。</li>
+          <li>工具条新增「沉浸」按钮（图标），点击后隐藏左侧目录侧栏、页眉页脚与工具条，仅保留正文与右下角页码。</li>
+          <li>设置页新增「快捷键」区：翻页（下一页 / 上一页）、切章（下一章 / 上一章）、目录、阅读设置、沉浸模式共 7 项可改键。</li>
+        </ul>
+      </dd>
+      <dt>处理规则</dt>
+      <dd>
+        <ul>
+          <li>沉浸模式：鼠标移入屏幕顶部 60px 或按 <code>Esc</code> 临时唤出工具条；3 秒无操作再次隐藏。</li>
+          <li>全屏与沉浸可叠加：全屏只影响窗口，沉浸影响页面元素；退出沉浸不影响全屏状态。</li>
+          <li>改键：点击后按下新组合键即生效；与已占用组合冲突时提示「该组合已用于 xx」，允许覆盖或取消。</li>
+          <li>快捷键只在本应用窗口内生效；焦点在输入框时不拦截。</li>
+          <li>提供「恢复默认快捷键」。</li>
+        </ul>
+      </dd>
+      <dt>结果与状态</dt>
+      <dd>
+        <ul>
+          <li>进入沉浸：正文版心随窗口自适应，页码与百分比保留在右下角；阅读位置不变、不触发重新分页跳页。</li>
+          <li>快捷键修改立即保存，重启后保持；设置页显示当前组合与「默认值」对照。</li>
+        </ul>
+      </dd>
+      <dt>异常与边界</dt>
+      <dd>
+        <ul>
+          <li>全屏被系统占用/失败：回退为「最大化 + 隐藏框架」，并提示一次。</li>
+          <li>目录侧栏原本是关闭状态：退出沉浸后恢复进入前的显隐状态。</li>
+          <li>用户把「下一页」绑定到与「下一章」相同的键：阻止保存并说明冲突。</li>
+        </ul>
+      </dd>
+    </dl>
+  </div>
+
+  <!-- FR-05 -->
+  <div class="req" id="fr05">
+    <h3><span class="id">FR-05</span>下载任务直达阅读 <span class="tag p0">P0</span></h3>
+    <p class="purpose">解决 P-05：下载完成后任务表没有阅读入口，只能回书架找书。</p>
+    <dl>
+      <dt>入口与触发</dt>
+      <dd>
+        <ul>
+          <li>下载任务表双击任意行 → 打开该书的阅读页。</li>
+          <li>任务表右键菜单与工具条新增「阅读」按钮（未选中任务时置灰）。</li>
+          <li>任务完成时在状态栏提示中加入「打开」动作链接。</li>
+        </ul>
+      </dd>
+      <dt>处理规则</dt>
+      <dd>
+        <ul>
+          <li>打开位置：若该书有阅读进度则恢复到进度位置；无进度则从第 1 章开始。</li>
+          <li>区间下载任务：优先定位到该任务的起始章节。</li>
+          <li>书籍已被移出书架：提示「该书已不在书架」，提供「重新加入」或忽略。</li>
+        </ul>
+      </dd>
+      <dt>结果与状态</dt>
+      <dd>
+        <ul>
+          <li>打开后下载队列照常运行，互不阻塞；返回下载页时任务状态与进度为最新。</li>
+        </ul>
+      </dd>
+      <dt>异常与边界</dt>
+      <dd>
+        <ul>
+          <li>任务下载中且该书章节未缓存：允许打开，未缓存章节按现有逻辑加载（失败则进入 FR-01 失败态）。</li>
+          <li>书籍只存在于下载记录但已被删除：行置灰并标注「书籍已删除」。</li>
+        </ul>
+      </dd>
+    </dl>
+  </div>
+</section>
+
+<!-- ================= 五 ================= -->
+<section id="s5">
+  <h2><span class="num">05</span>P1 候选（下一迭代）</h2>
+  <table>
+    <thead><tr><th>编号</th><th>能力</th><th>要解决的问题</th><th>关键决策点</th></tr></thead>
+    <tbody>
+      <tr><td class="id">FR-06</td><td>阅读统计</td><td>P-06：不知道自己读了多少</td><td>字数口径：已完成章节取章节字数，当前章按百分比折算；阅读时长按「阅读页停留」累计，切后台暂停。标注为估算</td></tr>
+      <tr><td class="id">FR-07</td><td>排版细节</td><td>P-07：宽屏行宽与段落观感</td><td>段间距、首行缩进、两端对齐、版心宽度、翻页动效开关；与现有字号/行距同属一套阅读设置</td></tr>
+      <tr><td class="id">FR-08</td><td>同步可观测性</td><td>P-08：失败原因不可见</td><td>同步日志（上传/下载条数、冲突处理结果）、手动重试、最近差异摘要</td></tr>
+      <tr><td class="id">FR-09</td><td>导出</td><td>P-09：内容带不走</td><td>单章 / 整本 TXT；编码与文件名规则；是否包含目录头</td></tr>
+      <tr><td class="id">FR-10</td><td>TTS 朗读</td><td>想听而不是看</td><td>系统语音优先；朗读高亮当前段；与翻页、进度保存的联动</td></tr>
+      <tr><td class="id">FR-11</td><td>书源优先级与分享</td><td>多源时结果质量不稳定</td><td>书源启用/禁用、按优先级排序搜索、单源导出 JSON 分享</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ================= 六 ================= -->
+<section id="s6">
+  <h2><span class="num">06</span>共享规则</h2>
+
+  <h3>6.1 阅读进度口径</h3>
+  <p>进度 = 章节序号 + 章内百分比（0–10000 的整数）。工具条切章、键盘切章、下载任务打开、换源跳转都必须复用同一口径；章内百分比只在分页完成后计算，避免不同排版下取整不一致。</p>
+
+  <h3>6.2 缓存与预取</h3>
+  <p>章节正文按「书 + 章」缓存；已缓存章节切章直出，未缓存章节预取下一章。新增的「读最新章」「下载任务打开」优先命中缓存，未缓存部分沿用现有加载与失败处理。</p>
+
+  <h3>6.3 错误提示分级</h3>
+  <table>
+    <thead><tr><th>类别</th><th>用户可见文案（示例）</th><th>默认动作</th><th>是否折叠技术详情</th></tr></thead>
+    <tbody>
+      <tr><td>网络</td><td>网络连接失败，请检查网络后重试</td><td>重试</td><td>是</td></tr>
+      <tr><td>书源规则</td><td>该书源解析不到正文，可能规则已失效</td><td>换来源 / 校验书源</td><td>是</td></tr>
+      <tr><td>内容缺失</td><td>这一章在源站不存在或地址已变更</td><td>更新目录 / 先下载</td><td>是</td></tr>
+      <tr><td>数据被删</td><td>书源或书籍已被删除</td><td>查看信息 / 重新添加</td><td>是</td></tr>
+    </tbody>
+  </table>
+
+  <h3>6.4 同步范围与冲突</h3>
+  <p>同步对象：阅读进度、书架条目、更新标记。合并键保持「书名 + 作者」；同一对象更新时间较新者生效，被覆盖一方保留为副本并在同步结果中计数，不静默丢弃。快捷键与沉浸偏好属于本机设置，不参与同步。</p>
+
+  <h3>6.5 请求克制</h3>
+  <p>任何自动行为（更新检查、预取、下载）都必须遵守设置中的并发数与请求间隔；自动行为失败不得弹出模态框打断阅读，只做状态栏提示。</p>
+
+  <h3>6.6 布局与入口一致性</h3>
+  <p>新增入口（工具条切章、沉浸按钮、下载阅读）一律沿用现有工具条样式与位置规则；不新增悬浮球、不做隐藏手势；所有图标按钮必须带悬停提示与键盘可达性。</p>
+</section>
+
+<!-- ================= 七 ================= -->
+<section id="s7">
+  <h2><span class="num">07</span>评审决策记录</h2>
+  <p>以下 5 项已在评审中确认，全部采纳建议方案，作为实现依据。</p>
+  <table>
+    <thead><tr><th>编号</th><th>问题</th><th>决策（已确认）</th></tr></thead>
+    <tbody>
+      <tr><td class="id">Q-1</td><td>更新检查的默认间隔与单轮上限</td><td>默认 60 分钟、单轮最多 20 本，可在设置中关闭</td></tr>
+      <tr><td class="id">Q-2</td><td>沉浸模式是否连系统标题栏一起隐藏</td><td>F11 真全屏；沉浸按钮只隐藏页面元素（侧栏 / 页眉页脚 / 工具条），两者相互独立</td></tr>
+      <tr><td class="id">Q-3</td><td>快捷键是否允许单键与组合键混用</td><td>允许；单键必须避开文本输入焦点，冲突时阻止保存并提示</td></tr>
+      <tr><td class="id">Q-4</td><td>「读最新章」是否自动抓正文</td><td>只更新目录并跳转最新章，正文由既有预取与加载逻辑处理</td></tr>
+      <tr><td class="id">Q-5</td><td>更新标记是否参与 WebDAV 同步</td><td>同步「新增章节数」；各设备也可独立检查，以较新者为准</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ================= 八 ================= -->
+<section id="s8">
+  <h2><span class="num">08</span>附录</h2>
+
+  <h3>8.1 能力缺口清单（按用户影响排序）</h3>
+  <ol>
+    <li>失败可恢复（P-01）：错误态无出路，最易导致弃用</li>
+    <li>新章提醒（P-02）：追更体验缺失</li>
+    <li>章节切换入口隐蔽（P-03）：最基础的导航变成三步操作</li>
+    <li>沉浸式与快捷键（P-04）：长时间阅读被打断</li>
+    <li>下载后直达阅读（P-05）：完成闭环断裂</li>
+    <li>阅读统计（P-06）：缺少长期反馈</li>
+    <li>排版细节（P-07）：宽屏与长段落观感</li>
+    <li>同步可观测（P-08）：失败不可解释</li>
+    <li>导出（P-09）：内容带不走</li>
+  </ol>
+
+  <h3>8.2 与现有能力的关系</h3>
+  <table>
+    <thead><tr><th>新需求</th><th>复用的现有能力</th><th>需要新增的数据</th></tr></thead>
+    <tbody>
+      <tr><td>FR-01 失败可恢复</td><td>现有书籍信息、下载、书源校验、多来源记录</td><td>来源列表（需 Q 确认）</td></tr>
+      <tr><td>FR-02 更新提醒</td><td>目录刷新、书架状态、设置项框架</td><td>更新标记、检查时间</td></tr>
+      <tr><td>FR-03 章节导航</td><td>阅读页工具条、目录高亮、翻章节奏</td><td>无</td></tr>
+      <tr><td>FR-04 沉浸与快捷键</td><td>阅读页布局、既有键盘翻页、设置持久化</td><td>快捷键映射、沉浸偏好</td></tr>
+      <tr><td>FR-05 下载直达阅读</td><td>下载任务、书架书籍、阅读进度</td><td>无</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.3 已剔除需求（评审结论）</h3>
+  <table>
+    <thead><tr><th>能力</th><th>原定优先级</th><th>结论</th></tr></thead>
+    <tbody>
+      <tr><td>正文内搜索与定位</td><td>P0</td><td>不纳入本次迭代，不在本次预留入口</td></tr>
+      <tr><td>书签与摘录笔记</td><td>P0</td><td>不纳入本次迭代，不在本次预留入口</td></tr>
+      <tr><td>书架分组、标签与批量操作</td><td>P0</td><td>不纳入本次迭代，书架筛选与排序保持现状</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.4 文档使用说明</h3>
+  <p class="note">本 PRD 只定义产品行为与业务规则，不包含技术方案、字段设计、接口与排期。P0 评审通过后，再进入技术设计与任务拆分；第 07 节问题在评审时逐条确认，确认结果回写本文件并升版本。</p>
+</section>
+
+</main>
+
+<footer class="end">
+  <span>阅微阅读器 · 桌面端迭代 PRD（v0.8.1 评审修订）</span>
+  <span>2026-11-28 · 待二次评审</span>
+</footer>
+
+</div>
+</body>
+</html>
