@@ -17,6 +17,10 @@ public class Book {
     public String lastReadAt;
     /** 删除墓碑：书架不显示，但保留给同步使用。 */
     public boolean deleted;
+    /** 上次检查目录发现的新增章节数，>0 表示书架显示「有更新」。 */
+    public int newChapters;
+    /** 上次检查目录的时间（ISO-8601），未检查过为 null。 */
+    public String tocCheckedAt;
 
     /** 展示用：书源名称，不落库。 */
     public String sourceName;

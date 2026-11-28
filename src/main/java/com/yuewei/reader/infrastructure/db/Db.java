@@ -122,6 +122,9 @@ public class Db {
                 s.execute(sql);
             }
             ensureColumn(c, "book", "deleted", "INTEGER NOT NULL DEFAULT 0");
+            // 更新提醒：上次检查发现的新增章节数与检查时间
+            ensureColumn(c, "book", "new_chapters", "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(c, "book", "toc_checked_at", "TEXT");
         } catch (SQLException e) {
             throw new IllegalStateException("初始化数据库失败: " + e.getMessage(), e);
         }

@@ -156,9 +156,20 @@ public class ShelfView implements AppView {
 
     private void refreshHero(List<Book> books) {
         heroHolder.getChildren().clear();
-        if (!books.isEmpty()) {
-            heroHolder.getChildren().add(heroCard(books.get(0)));
+        if (books.isEmpty()) {
+            return;
         }
+        // 没有在读进度的书优先展示有更新的书，方便直接读最新章
+        Book hero = books.get(0);
+        if (ctx.bookService.progress(hero.id) == null && hero.newChapters <= 0) {
+            for (Book book : books) {
+                if (book.newChapters > 0) {
+                    hero = book;
+                    break;
+                }
+            }
+        }
+        heroHolder.getChildren().add(heroCard(hero));
     }
 
     /** 继续阅读：最近一本书的书脊卡片。 */
@@ -170,18 +181,25 @@ public class ShelfView implements AppView {
         ReadingProgress progress = ctx.bookService.progress(book.id);
         int chapterIndex = progress == null ? 0 : progress.chapterIndex;
         int total = Math.max(1, book.chapterCount);
-        String chapter = "在读 · 第 " + (chapterIndex + 1) + " 章 · " + progressText(progress, total);
+        boolean hasUpdate = book.newChapters > 0;
+        String chapter = hasUpdate
+                ? "更新 " + book.newChapters + " 章 · 共 " + total + " 章"
+                : "在读 · 第 " + (chapterIndex + 1) + " 章 · " + progressText(progress, total);
 
         Label title = Ui.label(book.title, "hero-title");
         Label meta = Ui.label(chapter, "hero-meta");
-        Label action = Ui.label("继续阅读", "hero-continue");
+        Label action = Ui.label(hasUpdate ? "读最新章" : "继续阅读", "hero-continue");
         VBox info = new VBox(7, meta, title, action);
         HBox.setHgrow(info, Priority.ALWAYS);
 
         hero.getChildren().addAll(verticalSpine(book.title), info);
         hero.setOnMouseClicked(event -> {
             if (event.getClickCount() == 1) {
-                window.openBook(book);
+                if (hasUpdate) {
+                    readLatest(book);
+                } else {
+                    window.openBook(book);
+                }
             }
         });
         return hero;
@@ -331,7 +349,12 @@ public class ShelfView implements AppView {
         more.setOnAction(e -> contextMenu(book, more).show(more, Side.BOTTOM, 0, 4));
         more.addEventFilter(MouseEvent.MOUSE_CLICKED, MouseEvent::consume);
 
-        HBox row = new HBox(14, index, info, percent, more);
+        HBox row = new HBox(14, index, info);
+        if (book.newChapters > 0) {
+            Label badge = Ui.label("更新 " + book.newChapters + " 章", "shelf-update-badge");
+            row.getChildren().add(badge);
+        }
+        row.getChildren().addAll(percent, more);
         row.setAlignment(Pos.CENTER_LEFT);
         row.getStyleClass().add("shelf-row");
         row.setOnMouseEntered(event -> {
@@ -367,6 +390,10 @@ public class ShelfView implements AppView {
         MenuItem read = new MenuItem("阅读");
         read.setOnAction(e -> window.openBook(book));
 
+        MenuItem latest = new MenuItem("读最新章");
+        latest.setDisable(!book.isOnline());
+        latest.setOnAction(e -> readLatest(book));
+
         MenuItem download = new MenuItem("全部下载");
         download.setDisable(!book.isOnline());
         download.setOnAction(e -> downloadAll(book));
@@ -384,8 +411,32 @@ public class ShelfView implements AppView {
         MenuItem delete = new MenuItem("删除书籍");
         delete.setOnAction(e -> delete(book));
 
-        menu.getItems().addAll(read, download, updateToc, info, clearCache, delete);
+        menu.getItems().addAll(read, latest, download, updateToc, info, clearCache, delete);
         return menu;
+    }
+
+    /** 读最新章：先刷新目录，再打开最后一章；无更新时提示已是最新。 */
+    private void readLatest(Book book) {
+        window.status("正在检查《" + book.title + "》目录…");
+        Ui.async("read-latest", () -> ctx.onlineBookService.refreshToc(book),
+                added -> {
+                    ctx.bookService.markUpdate(book.id, 0);
+                    Book latest = ctx.bookService.find(book.id);
+                    window.refreshShelf();
+                    if (latest == null) {
+                        return;
+                    }
+                    int target = Math.max(0, latest.chapterCount - 1);
+                    window.openBookFrom(latest, target);
+                    window.status(added > 0
+                            ? "已更新目录，新增 " + added + " 章"
+                            : "已是最新，共 " + latest.chapterCount + " 章");
+                },
+                error -> {
+                    String message = ErrorKind.classify(error).message;
+                    window.status("更新失败：" + message);
+                    Ui.error("更新失败", message);
+                });
     }
 
     private void downloadAll(Book book) {

@@ -318,6 +318,7 @@ public class SyncService {
         item.put("bookUrl", book.bookUrl == null ? "" : book.bookUrl);
         item.put("fileHash", book.fileHash == null ? "" : book.fileHash);
         item.put("chapterCount", book.chapterCount);
+        item.put("newChapters", book.newChapters);
         item.put("addedAt", book.addedAt == null ? "" : book.addedAt);
         item.put("addedAtMs", millis(book.addedAt));
         item.put("lastReadAt", book.lastReadAt == null ? "" : book.lastReadAt);
@@ -562,11 +563,25 @@ public class SyncService {
             }
             boolean changed = mergeMeta(local, item);
             changed |= mergeShelfProgress(local, item);
+            changed |= mergeShelfUpdate(local, item, remoteActivity);
             if (changed) {
                 merged++;
             }
         }
         return merged;
+    }
+
+    /** 更新标记随书架条目合并：远端活动时间更新时采用远端的「新增章节数」；旧文件无该字段时忽略。 */
+    private boolean mergeShelfUpdate(Book local, JsonNode item, long remoteActivity) {
+        if (!item.hasNonNull("newChapters")) {
+            return false;
+        }
+        int remote = item.path("newChapters").asInt(0);
+        if (remoteActivity <= localActivity(local) || remote == local.newChapters) {
+            return false;
+        }
+        bookDao.updateNewChapters(local.id, remote);
+        return true;
     }
 
     /** 复活后写一条归零进度，避免下一次同步把删除前的旧进度拉回来。 */

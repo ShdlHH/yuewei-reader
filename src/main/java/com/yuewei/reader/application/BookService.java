@@ -135,6 +135,16 @@ public class BookService {
         bookDao.updateChapterCount(bookId, chapterDao.countByBook(bookId));
     }
 
+    /** 记录目录检查结果：新增章节数写入书架标记（0 清除「有更新」）。 */
+    public void markUpdate(long bookId, int newChapters) {
+        bookDao.updateNewChapters(bookId, newChapters);
+    }
+
+    /** 读到新章节后清除更新标记。 */
+    public void clearUpdate(long bookId) {
+        bookDao.updateNewChapters(bookId, 0);
+    }
+
     public BookDao books() {
         return bookDao;
     }

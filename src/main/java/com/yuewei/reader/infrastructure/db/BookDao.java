@@ -202,8 +202,21 @@ public class BookDao {
         }
     }
 
-    public void touchRead(long id) {
+    /** 记录一次目录检查结果：新增章节数 + 检查时间（0 表示无更新）。 */
+    public void updateNewChapters(long id, int newChapters) {
         try (Connection c = db.open();
+             PreparedStatement ps = c.prepareStatement(
+                     "UPDATE book SET new_chapters=?, toc_checked_at=? WHERE id=?")) {
+            ps.setInt(1, Math.max(0, newChapters));
+            ps.setString(2, LocalDateTime.now().toString());
+            ps.setLong(3, id);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    public void touchRead(long id) {        try (Connection c = db.open();
              PreparedStatement ps = c.prepareStatement("UPDATE book SET last_read_at=? WHERE id=?")) {
             ps.setString(1, LocalDateTime.now().toString());
             ps.setLong(2, id);
@@ -265,6 +278,8 @@ public class BookDao {
         b.addedAt = rs.getString("added_at");
         b.lastReadAt = rs.getString("last_read_at");
         b.deleted = rs.getInt("deleted") == 1;
+        b.newChapters = rs.getInt("new_chapters");
+        b.tocCheckedAt = rs.getString("toc_checked_at");
         b.sourceName = rs.getString("source_name");
         b.sourceMissing = rs.getInt("source_missing") == 1;
         return b;

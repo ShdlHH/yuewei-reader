@@ -55,6 +55,10 @@ public class SettingsService {
     /** 同步进行中标记：进程被关闭时来不及清除，下次启动据此补跑一次完整同步。 */
     public static final String SYNC_PENDING = "sync.pending";
 
+    public static final String UPDATE_CHECK_ENABLED = "update.check.enabled";
+    public static final String UPDATE_CHECK_INTERVAL = "update.check.intervalMin";
+    public static final String UPDATE_CHECK_LAST_AT = "update.check.lastAt";
+
     private final com.yuewei.reader.infrastructure.db.SettingDao dao;
     private final Map<String, String> cache;
 
@@ -272,5 +276,28 @@ public class SettingsService {
 
     public void applyTo(HttpGateway http) {
         http.configure(userAgent(), timeout(), 2);
+    }
+
+    /** 是否在启动与定时间隔自动检查追更。 */
+    public boolean updateCheckEnabled() {
+        return Boolean.parseBoolean(get(UPDATE_CHECK_ENABLED, "true"));
+    }
+
+    /** 更新检查间隔（分钟）：0 表示只手动检查。 */
+    public int updateCheckIntervalMin() {
+        return Math.max(0, Math.min(1440, getInt(UPDATE_CHECK_INTERVAL, 60)));
+    }
+
+    public void saveUpdateCheck(boolean enabled, int intervalMin) {
+        put(UPDATE_CHECK_ENABLED, String.valueOf(enabled));
+        put(UPDATE_CHECK_INTERVAL, String.valueOf(Math.max(0, Math.min(1440, intervalMin))));
+    }
+
+    public String lastUpdateCheckAt() {
+        return get(UPDATE_CHECK_LAST_AT, "");
+    }
+
+    public void markUpdateCheckAt() {
+        put(UPDATE_CHECK_LAST_AT, java.time.LocalDateTime.now().toString());
     }
 }

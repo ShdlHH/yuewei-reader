@@ -29,7 +29,10 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TextInputControl;
+import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
@@ -72,6 +75,10 @@ public class ReaderView implements AppView {
     private final Label tocCount = Ui.label("", "toc-count");
     private final Label tocFooter = Ui.label("", "toc-footer");
     private final Region resizeHandle = new Region();
+    private final Button prevChapterButton = Ui.button("‹ 上一章", "ghost-button");
+    private final Button nextChapterButton = Ui.button("下一章 ›", "ghost-button");
+    private final Tooltip prevChapterTip = new Tooltip("上一章");
+    private final Tooltip nextChapterTip = new Tooltip("下一章");
     private final ScrollPane scroll = new ScrollPane();
     private final VBox flow = new VBox();
     private final PauseTransition saveTimer = new PauseTransition(Duration.millis(700));
@@ -114,6 +121,12 @@ public class ReaderView implements AppView {
     private int prefetchToken;
     /** 章节加载令牌：快速连续切章时只让最后一次请求的结果上屏。 */
     private int loadToken;
+    /** 当前生效的快捷键（设置键 → 组合）。 */
+    private final Map<String, String> keymap = new HashMap<>();
+    /** 沉浸模式：隐藏工具条、目录与页眉页脚，仅留正文。 */
+    private boolean immersive;
+    private boolean tocVisibleBeforeImmersive;
+    private final PauseTransition immersiveTimer = new PauseTransition(Duration.seconds(3));
 
     public ReaderView(AppContext ctx, MainWindow window) {
         this.ctx = ctx;
@@ -131,14 +144,13 @@ public class ReaderView implements AppView {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
+        prevChapterButton.setOnAction(e -> previousChapter());
+        nextChapterButton.setOnAction(e -> nextChapter());
+        prevChapterButton.setTooltip(prevChapterTip);
+        nextChapterButton.setTooltip(nextChapterTip);
+
         Button tocToggle = Ui.button("目录", "ghost-button");
-        tocToggle.setOnAction(e -> {
-            boolean visible = !tocBox.isVisible();
-            tocBox.setVisible(visible);
-            tocBox.setManaged(visible);
-            resizeHandle.setVisible(visible);
-            resizeHandle.setManaged(visible);
-        });
+        tocToggle.setOnAction(e -> toggleToc());
 
         Button panel = Ui.button("Aa", "ghost-button");
         panel.setOnAction(e -> openReaderPanel());
@@ -146,7 +158,8 @@ public class ReaderView implements AppView {
         toolbar.getStyleClass().add("reader-toolbar");
         toolbar.setAlignment(Pos.CENTER_LEFT);
         toolbar.setPadding(new Insets(8, 14, 8, 14));
-        toolbar.getChildren().addAll(back, toolbarTitle, spacer, tocToggle, panel);
+        toolbar.getChildren().addAll(back, prevChapterButton, nextChapterButton,
+                toolbarTitle, spacer, tocToggle, panel);
 
         Label tocTitle = Ui.label("目录", "toc-title");
         Region tocSpacer = new Region();
@@ -171,7 +184,16 @@ public class ReaderView implements AppView {
             }
         });
 
-        HBox tocHeader = new HBox(8, tocTitle, tocCount, tocSpacer, tocSearchToggle);
+        Button tocLocate = Ui.button("定位", "toc-search-toggle");
+        Tooltip locateTip = new Tooltip("定位到当前章");
+        tocLocate.setTooltip(locateTip);
+        tocLocate.setOnAction(e -> {
+            tocSearch.clear();
+            refreshTocList(true);
+            window.status("已跳到第 " + (index + 1) + " 章位置");
+        });
+
+        HBox tocHeader = new HBox(8, tocTitle, tocCount, tocSpacer, tocLocate, tocSearchToggle);
         tocHeader.setAlignment(Pos.CENTER_LEFT);
         tocHeader.getStyleClass().add("toc-header");
 
@@ -294,6 +316,18 @@ public class ReaderView implements AppView {
         root.setFocusTraversable(true);
         root.getStyleClass().add("reader-root");
         root.addEventFilter(KeyEvent.KEY_PRESSED, this::handleKey);
+        root.addEventFilter(MouseEvent.MOUSE_MOVED, event -> {
+            // 沉浸模式下鼠标移到顶部热区，临时唤出工具条
+            if (immersive && event.getSceneY() <= 60) {
+                revealControls();
+            }
+        });
+        immersiveTimer.setOnFinished(event -> {
+            if (immersive) {
+                toolbar.setVisible(false);
+                toolbar.setManaged(false);
+            }
+        });
         root.setTop(toolbar);
         root.setLeft(main);
         root.setCenter(pageArea);
@@ -341,6 +375,8 @@ public class ReaderView implements AppView {
         currentChapter = chapter;
         chapterLabel.setText(chapter.title);
         refreshTocList(true);
+        updateChapterNav();
+        maybeClearUpdate();
         if (fraction >= 0) {
             pendingFraction = fraction;
         }
@@ -375,9 +411,8 @@ public class ReaderView implements AppView {
                         return;
                     }
                     loading = false;
-                    String message = Ui.message(error);
-                    setContent("本章加载失败：" + message + "\n\n可以在书源页校验规则，或先下载本书离线阅读。");
-                    window.status("章节加载失败：" + message);
+                    showFailure(chapter, error);
+                    window.status("章节加载失败：" + ErrorKind.classify(error).message);
                 });
     }
 
@@ -395,6 +430,86 @@ public class ReaderView implements AppView {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /** 失败态：按错误类别给出可执行动作，技术细节折叠。 */
+    private void showFailure(Chapter chapter, Throwable error) {
+        ErrorKind kind = ErrorKind.classify(error);
+        List<FailurePane.Action> actions = new ArrayList<>();
+        actions.add(new FailurePane.Action("重试", true, () -> loadChapter(index, -1)));
+        if (kind == ErrorKind.SOURCE_RULE) {
+            actions.add(new FailurePane.Action("去校验书源", false, () -> window.show("sources")));
+        }
+        if (kind == ErrorKind.CONTENT_MISSING) {
+            actions.add(new FailurePane.Action("更新目录", false, () -> window.refreshBookToc(book)));
+            actions.add(new FailurePane.Action("先下载本书", false, this::downloadCurrentBook));
+        }
+        if (kind == ErrorKind.DATA_DELETED) {
+            actions.add(new FailurePane.Action("回到书架", false, () -> window.backToShelf()));
+        }
+        blocks.clear();
+        pages.clear();
+        pageIndex = 0;
+        flow.getChildren().setAll(FailurePane.build(kind.message, Ui.message(error), actions));
+        flow.setOpacity(1);
+        pageLabel.setText("0 / 0");
+        currentChapter = chapter;
+    }
+
+    /** 失败态动作：把当前书加入「仅未缓存」下载队列。 */
+    private void downloadCurrentBook() {
+        if (book == null) {
+            return;
+        }
+        try {
+            ctx.downloadService.start(book, com.yuewei.reader.domain.DownloadRangeType.UNCACHED, null, null);
+            window.show("downloads");
+            window.status("《" + book.title + "》已加入下载队列");
+        } catch (RuntimeException e) {
+            Ui.error("无法开始下载", ErrorKind.classify(e).message);
+        }
+    }
+
+    /** 目录更新后重新载入章节列表（不重置阅读位置）。 */
+    public void reloadChapters() {
+        if (book == null) {
+            return;
+        }
+        chapters = ctx.bookService.chapters(book.id);
+        refreshTocList(true);
+        updateChapterNav();
+    }
+
+    /** 读到新增章节范围内时清除书架的「有更新」标记。 */
+    private void maybeClearUpdate() {
+        if (book == null || book.newChapters <= 0) {
+            return;
+        }
+        int start = Math.max(0, chapters.size() - book.newChapters);
+        if (index >= start) {
+            ctx.bookService.clearUpdate(book.id);
+            book.newChapters = 0;
+            window.refreshShelf();
+        }
+    }
+
+    /** 工具条切章按钮状态：首章 / 末章置灰并提示。 */
+    private void updateChapterNav() {
+        boolean empty = chapters.isEmpty();
+        boolean first = empty || index <= 0;
+        boolean last = empty || index >= chapters.size() - 1;
+        prevChapterButton.setDisable(first);
+        nextChapterButton.setDisable(last);
+        prevChapterTip.setText(first ? "已是第一章" : "上一章（" + chapterTitleAt(index - 1) + "）");
+        nextChapterTip.setText(last ? "已是最后一章" : "下一章（" + chapterTitleAt(index + 1) + "）");
+    }
+
+    private String chapterTitleAt(int target) {
+        if (target < 0 || target >= chapters.size()) {
+            return "";
+        }
+        String title = chapters.get(target).title;
+        return title == null || title.isBlank() ? "第 " + (target + 1) + " 章" : title;
     }
 
     /** 当前章上屏后预取下一章正文，使后续切章可以直接显示。 */
@@ -528,11 +643,8 @@ public class ReaderView implements AppView {
         turnPage(forward);
     }
 
-    /** 键盘翻页：空格/PageDown/→/↓ 下一页，PageUp/←/↑/退格 上一页。 */
+    /** 键盘操作：优先按用户配置的快捷键分发，方向键保留为翻页兼容。 */
     private void handleKey(KeyEvent event) {
-        if (event.isControlDown() || event.isAltDown() || event.isMetaDown()) {
-            return;
-        }
         if (root.getScene() == null || root.getParent() == null) {
             return;
         }
@@ -540,20 +652,55 @@ public class ReaderView implements AppView {
         if (owner instanceof TextInputControl || owner instanceof ComboBoxBase) {
             return;
         }
+        if (event.getCode() == KeyCode.ESCAPE && immersive) {
+            setImmersive(false);
+            event.consume();
+            return;
+        }
+        String action = Keymap.actionOf(keymap, event);
+        if (action != null) {
+            switch (action) {
+                case Keymap.NEXT_PAGE -> {
+                    event.consume();
+                    pageTurn(true);
+                }
+                case Keymap.PREV_PAGE -> {
+                    event.consume();
+                    pageTurn(false);
+                }
+                case Keymap.NEXT_CHAPTER -> {
+                    event.consume();
+                    jumpChapter(true);
+                }
+                case Keymap.PREV_CHAPTER -> {
+                    event.consume();
+                    jumpChapter(false);
+                }
+                default -> {
+                    // 目录 / 阅读设置 / 沉浸由主窗口统一处理
+                }
+            }
+            return;
+        }
         boolean forward;
         switch (event.getCode()) {
-            case SPACE, PAGE_DOWN, RIGHT, DOWN -> forward = true;
-            case PAGE_UP, LEFT, UP, BACK_SPACE -> forward = false;
+            case RIGHT, DOWN -> forward = true;
+            case LEFT, UP -> forward = false;
             default -> {
                 return;
             }
         }
+        event.consume();
+        pageTurn(forward);
+    }
+
+    /** 翻页带 150ms 节流，避免长按连发导致跳页。 */
+    private void pageTurn(boolean forward) {
         long now = System.currentTimeMillis();
         if (now - lastPageTurn < 150) {
             return;
         }
         lastPageTurn = now;
-        event.consume();
         turnPage(forward);
     }
 
@@ -882,9 +1029,71 @@ public class ReaderView implements AppView {
         progressDirty = false;
     }
 
+    /** 目录开关（工具条与快捷键共用）。 */
+    public void toggleToc() {
+        boolean visible = !tocBox.isVisible();
+        tocBox.setVisible(visible);
+        tocBox.setManaged(visible);
+        resizeHandle.setVisible(visible);
+        resizeHandle.setManaged(visible);
+        if (visible && !chapters.isEmpty()
+                && toc.getSelectionModel().getSelectedItem() != currentChapter) {
+            refreshTocList(true);
+            window.status("已跳到第 " + (index + 1) + " 章位置");
+        }
+    }
+
+    /** 阅读设置面板（快捷键入口）。 */
+    public void openPanel() {
+        openReaderPanel();
+    }
+
+    public boolean immersive() {
+        return immersive;
+    }
+
+    public void toggleImmersive() {
+        setImmersive(!immersive);
+    }
+
+    /** 沉浸模式：隐藏工具条、目录与页眉页脚；Esc 或顶部热区可恢复。 */
+    public void setImmersive(boolean on) {
+        if (immersive == on) {
+            return;
+        }
+        immersive = on;
+        if (on) {
+            tocVisibleBeforeImmersive = tocBox.isVisible();
+            setVisible(toolbar, false);
+            setVisible(tocBox, false);
+            setVisible(resizeHandle, false);
+            setVisible(runningHeader, false);
+            setVisible(runningFoot, false);
+            window.status("沉浸阅读：鼠标移到顶部可唤出工具条，Esc 退出");
+        } else {
+            immersiveTimer.stop();
+            setVisible(toolbar, true);
+            setVisible(tocBox, tocVisibleBeforeImmersive);
+            setVisible(resizeHandle, tocVisibleBeforeImmersive);
+            setVisible(runningHeader, true);
+            setVisible(runningFoot, true);
+            window.status("已退出沉浸阅读");
+        }
+    }
+
+    /** 沉浸中临时唤出工具条，3 秒后自动收起。 */
+    private void revealControls() {
+        setVisible(toolbar, true);
+        immersiveTimer.playFromStart();
+    }
+
+    private static void setVisible(Node node, boolean visible) {
+        node.setVisible(visible);
+        node.setManaged(visible);
+    }
+
     /** 阅读面板：字号、行距、字体、主题与着色，调整即时生效并持久化。 */
-    private void openReaderPanel() {
-        Dialog<ButtonType> dialog = new Dialog<>();
+    private void openReaderPanel() {        Dialog<ButtonType> dialog = new Dialog<>();
         dialog.initOwner(window.stage());
         dialog.setTitle("阅读设置");
         dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
@@ -997,6 +1206,7 @@ public class ReaderView implements AppView {
     }
 
     private void applyStyle() {
+        reloadKeymap();
         int size = ctx.settings.fontSize();
         String family = Fonts.resolve(ctx.settings.fontFamily());
         Ui.Theme theme = theme();
@@ -1018,6 +1228,12 @@ public class ReaderView implements AppView {
     /** 设置页保存后调用，让已打开的阅读界面立即套用新样式。 */
     public void refreshStyle() {
         applyStyle();
+    }
+
+    /** 重新读取快捷键配置（设置页保存或进入阅读时）。 */
+    private void reloadKeymap() {
+        keymap.clear();
+        keymap.putAll(Keymap.load(ctx.settings));
     }
 
     @Override

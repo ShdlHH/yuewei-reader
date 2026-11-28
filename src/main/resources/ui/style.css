@@ -316,6 +316,27 @@
     -fx-text-fill: -accent;
 }
 
+/* 书架「更新 N 章」标记 */
+.shelf-update-badge {
+    -fx-font-size: 11.5px;
+    -fx-text-fill: -accent;
+    -fx-background-color: derive(-accent, 88%);
+    -fx-border-color: derive(-accent, 60%);
+    -fx-border-radius: 999;
+    -fx-background-radius: 999;
+    -fx-padding: 1 8 1 8;
+}
+
+/* 阅读页失败态 */
+.failure-pane {
+    -fx-background-color: transparent;
+}
+
+.failure-title {
+    -fx-font-size: 15px;
+    -fx-text-fill: -ink;
+}
+
 /* 行内更多：hover 时才出现 */
 .shelf-more {
     -fx-background-color: transparent;

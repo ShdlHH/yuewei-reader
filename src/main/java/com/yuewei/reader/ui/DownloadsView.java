@@ -44,6 +44,7 @@ public class DownloadsView implements AppView {
     private final Button pauseButton = Ui.button("暂停", "ghost-button");
     private final Button resumeButton = Ui.button("继续", "ghost-button");
     private final Button cancelButton = Ui.button("取消", "danger-button");
+    private final Button readButton = Ui.button("阅读", "ghost-button");
 
     public DownloadsView(AppContext ctx, MainWindow window) {
         this.ctx = ctx;
@@ -81,10 +82,48 @@ public class DownloadsView implements AppView {
         pauseButton.setOnAction(e -> pause());
         resumeButton.setOnAction(e -> resume());
         cancelButton.setOnAction(e -> cancel());
+        readButton.setOnAction(e -> openTask(table.getSelectionModel().getSelectedItem(), false));
+
+        table.setRowFactory(view -> {
+            javafx.scene.control.TableRow<DownloadTask> row = new javafx.scene.control.TableRow<>();
+            row.setOnMouseClicked(event -> {
+                if (event.getClickCount() == 2 && !row.isEmpty()) {
+                    openTask(row.getItem(), false);
+                }
+            });
+            // 书籍已被移出书架的任务行置灰，并给出原因提示
+            row.itemProperty().addListener((observable, oldItem, item) -> {
+                if (item == null) {
+                    row.setOpacity(1);
+                    row.setTooltip(null);
+                    return;
+                }
+                boolean missing = ctx.bookService.find(item.bookId) == null;
+                row.setOpacity(missing ? 0.55 : 1);
+                row.setTooltip(missing ? new javafx.scene.control.Tooltip("书籍已删除，无法打开") : null);
+            });
+            return row;
+        });
+
+        // 右键菜单挂在表格上：选中行后右键即可看到「阅读 / 打开所在章节」
+        table.setOnContextMenuRequested(event -> {
+            DownloadTask task = table.getSelectionModel().getSelectedItem();
+            if (task == null) {
+                return;
+            }
+            javafx.scene.control.ContextMenu menu = new javafx.scene.control.ContextMenu();
+            menu.setStyle(Ui.themeTokens(Ui.theme(ctx.settings.theme())));
+            javafx.scene.control.MenuItem read = new javafx.scene.control.MenuItem("阅读");
+            read.setOnAction(e -> openTask(task, false));
+            javafx.scene.control.MenuItem fromStart = new javafx.scene.control.MenuItem("打开所在章节");
+            fromStart.setOnAction(e -> openTask(task, true));
+            menu.getItems().addAll(read, fromStart);
+            menu.show(table, event.getScreenX(), event.getScreenY());
+        });
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox toolbar = new HBox(8, create, pauseButton, resumeButton, cancelButton,
+        HBox toolbar = new HBox(8, create, readButton, pauseButton, resumeButton, cancelButton,
                 spacer, refresh);
         toolbar.setAlignment(Pos.CENTER_LEFT);
         toolbar.getStyleClass().add("page-toolbar");
@@ -202,6 +241,25 @@ public class DownloadsView implements AppView {
         resumeButton.setDisable(!canResume);
         resumeButton.setText(task != null && task.state == DownloadState.PARTIAL_FAILED ? "重试失败" : "继续");
         cancelButton.setDisable(!canCancel);
+        readButton.setDisable(task == null);
+    }
+
+    /** 从下载任务直达阅读：默认恢复上次进度，fromTaskStart 时定位到任务起始章。 */
+    private void openTask(DownloadTask task, boolean fromTaskStart) {
+        if (task == null) {
+            return;
+        }
+        Book book = ctx.bookService.find(task.bookId);
+        if (book == null) {
+            Ui.error("无法打开", "《" + (task.bookTitle == null ? "该书" : task.bookTitle)
+                    + "》已不在书架，无法打开阅读。");
+            return;
+        }
+        if (fromTaskStart && task.rangeType == DownloadRangeType.RANGE && task.fromIndex != null) {
+            window.openBookFrom(book, task.fromIndex);
+        } else {
+            window.openBook(book);
+        }
     }
 
     private void pause() {

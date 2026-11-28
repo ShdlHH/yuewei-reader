@@ -49,6 +49,7 @@ public class MainWindow {
     private final ReaderView readerView;
 
     private boolean switching;
+    private boolean checkingUpdates;
 
     public MainWindow(AppContext ctx, Stage stage) {
         this.ctx = ctx;
@@ -77,6 +78,7 @@ public class MainWindow {
         applyTheme();
         show("shelf");
         pullOnStartup();
+        scheduleUpdateCheck();
     }
 
     public Parent root() {
@@ -129,15 +131,80 @@ public class MainWindow {
     /** 打开阅读器：从上次阅读进度继续。 */
     public void openBook(Book book) {
         ReadingProgress progress = ctx.bookService.progress(book.id);
-        int chapterIndex = progress == null ? 0 : progress.chapterIndex;
-        int offset = progress == null ? 0 : progress.charOffset;
-        readerView.open(book, chapterIndex, offset);
+        openBookFrom(book, progress == null ? 0 : progress.chapterIndex,
+                progress == null ? 0 : progress.charOffset);
+    }
+
+    /** 打开阅读器并定位到指定章节（下载任务、读最新章等入口使用）。 */
+    public void openBookFrom(Book book, int chapterIndex) {
+        openBookFrom(book, chapterIndex, 0);
+    }
+
+    /** 打开阅读器并定位到章节内百分比位置。 */
+    public void openBookFrom(Book book, int chapterIndex, int charOffset) {
+        readerView.open(book, Math.max(0, chapterIndex), Math.max(0, charOffset));
         content.getChildren().setAll(readerView.node());
         switching = true;
         navButtons.values().forEach(button -> button.setSelected(false));
         switching = false;
         readerView.onShow();
         status("正在阅读《" + book.title + "》");
+    }
+
+    /** 启动 5 秒后检查一次追更，之后每分钟判断是否到间隔（关闭或 0 分钟时跳过）。 */
+    private void scheduleUpdateCheck() {
+        javafx.animation.PauseTransition initial = new javafx.animation.PauseTransition(
+                javafx.util.Duration.seconds(5));
+        initial.setOnFinished(e -> runUpdateCheck());
+        initial.play();
+        javafx.animation.Timeline timer = new javafx.animation.Timeline(
+                new javafx.animation.KeyFrame(javafx.util.Duration.minutes(1), e -> runUpdateCheck()));
+        timer.setCycleCount(javafx.animation.Timeline.INDEFINITE);
+        timer.play();
+    }
+
+    /** 静默执行一轮追更检查：有更新或失败才在状态栏提示，不打断阅读。 */
+    private void runUpdateCheck() {
+        if (checkingUpdates || !ctx.updateCheckService.due()) {
+            return;
+        }
+        checkingUpdates = true;
+        Ui.async("update-check",
+                () -> ctx.updateCheckService.runOnce(
+                        com.yuewei.reader.application.UpdateCheckService.DEFAULT_MAX_BOOKS),
+                result -> {
+                    checkingUpdates = false;
+                    refreshShelf();
+                    if (result.updated() > 0) {
+                        status(result.summary() + "，可在书架点「读最新章」");
+                    } else if (result.failed() > 0) {
+                        status(result.summary());
+                    }
+                },
+                error -> {
+                    checkingUpdates = false;
+                    status("更新检查失败：" + ErrorKind.classify(error).message);
+                });
+    }
+
+    /** 阅读页「更新目录」：抓最新目录并刷新书架与阅读页章节列表。 */
+    public void refreshBookToc(Book book) {
+        if (book == null || !book.isOnline()) {
+            return;
+        }
+        status("正在更新《" + book.title + "》目录…");
+        Ui.async("refresh-toc", () -> ctx.onlineBookService.refreshToc(book),
+                added -> {
+                    ctx.bookService.markUpdate(book.id, 0);
+                    readerView.reloadChapters();
+                    refreshShelf();
+                    status(added > 0 ? "目录已更新，新增 " + added + " 章" : "目录已是最新");
+                },
+                error -> {
+                    String message = ErrorKind.classify(error).message;
+                    status("目录更新失败：" + message);
+                    Ui.error("目录更新失败", message);
+                });
     }
 
     public void backToShelf() {
@@ -162,7 +229,7 @@ public class MainWindow {
                         status(result.message());
                     }
                 },
-                error -> status("同步拉取失败：" + Ui.message(error)));
+                error -> status("同步拉取失败：" + ErrorKind.classify(error).message));
     }
 
     /** 设置页“立即同步”：先拉远端进度，再把本地进度、书架与设置推上去。 */
@@ -186,10 +253,10 @@ public class MainWindow {
                     }
                 },
                 error -> {
-                    String message = Ui.message(error);
-                    status("同步失败：" + message);
+                    String message = ErrorKind.classify(error).message;
+                    status("同步失败：" + message + "，点击侧栏同步卡可重试");
                     if (verbose) {
-                        Ui.error("同步失败", message);
+                        Ui.error("同步失败：" + message, Ui.message(error));
                     }
                 });
     }
@@ -364,6 +431,38 @@ public class MainWindow {
     }
 
     private void handleShortcut(KeyEvent event) {
+        if (event.getCode() == KeyCode.F11) {
+            stage.setFullScreen(!stage.isFullScreen());
+            event.consume();
+            return;
+        }
+        boolean reading = content.getChildren().size() == 1
+                && content.getChildren().get(0) == readerView.node();
+        if (reading) {
+            String action = Keymap.actionOf(Keymap.load(ctx.settings), event);
+            if (action != null) {
+                switch (action) {
+                    case Keymap.TOC -> {
+                        readerView.toggleToc();
+                        event.consume();
+                        return;
+                    }
+                    case Keymap.READER_PANEL -> {
+                        event.consume();
+                        readerView.openPanel();
+                        return;
+                    }
+                    case Keymap.IMMERSIVE -> {
+                        readerView.toggleImmersive();
+                        event.consume();
+                        return;
+                    }
+                    default -> {
+                        // 翻页与切章由阅读页自己处理
+                    }
+                }
+            }
+        }
         if (!event.isControlDown()) {
             return;
         }

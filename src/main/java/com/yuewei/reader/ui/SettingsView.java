@@ -8,9 +8,11 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ColorPicker;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.PasswordField;
@@ -28,11 +30,14 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.TextFlow;
 import javafx.stage.FileChooser;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -55,6 +60,10 @@ public class SettingsView implements AppView {
     private final Spinner<Integer> cacheLimit = new Spinner<>(100, 10240, 1024, 100);
     private final Label cacheUsage = Ui.label("", "muted");
     private final CheckBox syncEnabled = new CheckBox("启用 WebDAV 同步");
+    private final CheckBox updateCheckEnabled = new CheckBox("自动检查追更");
+    private final ComboBox<String> updateInterval = new ComboBox<>();
+    private final Label updateHint = Ui.label("", "muted");
+    private final Map<String, Button> shortcutButtons = new LinkedHashMap<>();
     private final TextField syncUrl = new TextField();
     private final TextField syncAccount = new TextField();
     private final PasswordField syncPassword = new PasswordField();
@@ -246,10 +255,41 @@ public class SettingsView implements AppView {
         syncActions.setAlignment(Pos.CENTER_LEFT);
         syncActions.setMaxWidth(760);
 
+        updateInterval.getItems().setAll("关闭", "30 分钟", "60 分钟");
+        updateInterval.setPrefWidth(140);
+        GridPane updateGrid = grid();
+        row = 0;
+        updateGrid.add(new Label("自动检查"), 0, row);
+        updateGrid.add(updateCheckEnabled, 1, row++);
+        updateGrid.add(new Label("检查间隔"), 0, row);
+        updateGrid.add(updateInterval, 1, row++);
+        styleGrid(updateGrid);
+        Label updateNote = Ui.label("打开应用后与间隔到期时，静默检查书架中在线书的目录；"
+                + "发现新章会在书架标记「更新 N 章」，可一键读最新章。", "muted");
+        updateNote.setWrapText(true);
+        updateNote.setMaxWidth(560);
+
         Button save = Ui.button("保存设置", "primary-button");
         save.setOnAction(e -> save());
         Button resetAll = Ui.button("恢复默认", "ghost-button");
         resetAll.setOnAction(e -> resetDefaults());
+
+        GridPane shortcutGrid = grid();
+        row = 0;
+        for (Keymap.ActionDef def : Keymap.ACTIONS) {
+            Button bind = Ui.button("", "ghost-button");
+            bind.setMinWidth(180);
+            bind.setOnAction(e -> captureShortcut(def, bind));
+            shortcutButtons.put(def.key(), bind);
+            shortcutGrid.add(new Label(def.label()), 0, row);
+            shortcutGrid.add(bind, 1, row++);
+        }
+        styleGrid(shortcutGrid);
+        Button resetShortcut = Ui.button("恢复默认快捷键", "ghost-button");
+        resetShortcut.setOnAction(e -> resetShortcuts());
+        Label shortcutNote = Ui.label("点击按键后按下新组合即可重录；F11 固定为全屏开关，不占用快捷键表。", "muted");
+        shortcutNote.setWrapText(true);
+        shortcutNote.setMaxWidth(560);
 
         Label pageTitle = Ui.label("设置", "settings-page-title");
         Label pageSub = Ui.label("阅读、标点与网络偏好", "settings-page-sub");
@@ -280,6 +320,8 @@ public class SettingsView implements AppView {
                 card("标点着色", punctBox, punctHint),
                 card("网络", networkGrid, networkHint),
                 card("存储", storageGrid, storageActions),
+                card("追更检查", updateGrid, updateNote, updateHint),
+                card("快捷键", shortcutGrid, resetShortcut, shortcutNote),
                 card("同步（WebDAV）", syncGrid, syncActions, syncNote));
         content.setPadding(new Insets(Ui.SPACE_PAGE, Ui.SPACE_PAGE + 4,
                 Ui.SPACE_PAGE + 4, Ui.SPACE_PAGE + 4));
@@ -396,6 +438,11 @@ public class SettingsView implements AppView {
         syncAccount.setText(settings.syncAccount());
         syncPassword.setText(settings.syncPassword());
         syncDir.setText(settings.syncDir());
+        updateCheckEnabled.setSelected(settings.updateCheckEnabled());
+        int minutes = settings.updateCheckIntervalMin();
+        updateInterval.setValue(minutes >= 60 ? "60 分钟" : minutes > 0 ? "30 分钟" : "关闭");
+        refreshUpdateHint();
+        refreshShortcutButtons();
         refreshSyncHint();
         refreshCacheUsage();
         refreshFontHint();
@@ -558,6 +605,8 @@ public class SettingsView implements AppView {
         ctx.settings.saveNetwork(timeout.getValue(), searchConcurrency.getValue(),
                 downloadConcurrency.getValue(), requestInterval.getValue(), ua);
         ctx.settings.saveStorage(cacheLimit.getValue());
+        ctx.settings.saveUpdateCheck(updateCheckEnabled.isSelected(), updateIntervalMinutes());
+        refreshUpdateHint();
         ctx.settings.applyTo(ctx.http);
         saveSyncSettings();
         window.applyReaderStyle();
@@ -581,6 +630,78 @@ public class SettingsView implements AppView {
     /** 同步完成后由主窗口调用，刷新“上次同步”提示。 */
     public void refreshSyncHint() {
         syncHint.setText(ctx.settings.lastSyncText());
+    }
+
+    private int updateIntervalMinutes() {        String value = updateInterval.getValue();
+        if ("30 分钟".equals(value)) {
+            return 30;
+        }
+        if ("60 分钟".equals(value)) {
+            return 60;
+        }
+        return 0;
+    }
+
+    private void refreshUpdateHint() {
+        String last = ctx.settings.lastUpdateCheckAt();
+        updateHint.setText(last == null || last.isBlank()
+                ? "尚未检查过"
+                : "上次检查：" + last.replace('T', ' ').substring(0, Math.min(16, last.length())));
+    }
+
+    /** 重新录制一条快捷键：按下新组合即保存，冲突则提示。 */
+    private void captureShortcut(Keymap.ActionDef def, Button display) {
+        Map<String, String> map = Keymap.load(ctx.settings);
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.initOwner(window.stage());
+        dialog.setTitle("设置快捷键 · " + def.label());
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CANCEL);
+        Ui.styleDialog(dialog, window.stage());
+        Label hint = Ui.label("请按下新的快捷键（Esc 取消）", "muted");
+        VBox box = new VBox(8, hint);
+        box.setPadding(new Insets(16, 20, 8, 20));
+        box.setPrefWidth(320);
+        dialog.getDialogPane().setContent(box);
+        dialog.getDialogPane().addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == KeyCode.ESCAPE) {
+                return;
+            }
+            String combo = Keymap.comboOf(event);
+            if (combo.isEmpty()) {
+                event.consume();
+                return;
+            }
+            event.consume();
+            String conflict = Keymap.conflict(map, def.key(), combo);
+            if (conflict != null) {
+                hint.setText("该组合已用于「" + conflict + "」，请换一个");
+                return;
+            }
+            ctx.settings.put(def.key(), combo);
+            display.setText(Keymap.describe(combo));
+            window.applyReaderStyle();
+            dialog.close();
+        });
+        dialog.showAndWait();
+    }
+
+    private void resetShortcuts() {
+        for (Keymap.ActionDef def : Keymap.ACTIONS) {
+            ctx.settings.put(def.key(), def.defaultCombo());
+        }
+        refreshShortcutButtons();
+        window.applyReaderStyle();
+        window.status("快捷键已恢复默认");
+    }
+
+    private void refreshShortcutButtons() {
+        for (Keymap.ActionDef def : Keymap.ACTIONS) {
+            Button button = shortcutButtons.get(def.key());
+            if (button != null) {
+                button.setText(Keymap.describe(
+                        ctx.settings.get(def.key(), def.defaultCombo())));
+            }
+        }
     }
 
     @Override

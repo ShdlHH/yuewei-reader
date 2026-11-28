@@ -29,6 +29,7 @@ public class AppContext {
     public final ValidationService validationService;
     public final DownloadService downloadService;
     public final SyncService syncService;
+    public final UpdateCheckService updateCheckService;
 
     public AppContext(Path dataDir) {
         this.dataDir = dataDir;
@@ -62,6 +63,7 @@ public class AppContext {
                 onlineBookService, bookService, settings);
         downloadService.pauseUnfinishedOnStartup();
         syncService = new SyncService(settings, bookDao, chapterDao, progressDao, sourceDao, onlineBookService);
+        updateCheckService = new UpdateCheckService(settings, bookDao, onlineBookService);
     }
 
     /** 默认数据目录：%USERPROFILE%/.yuewei-reader，可用 -Dyuewei.dataDir 覆盖。 */

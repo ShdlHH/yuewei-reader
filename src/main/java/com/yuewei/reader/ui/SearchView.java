@@ -53,6 +53,11 @@ public class SearchView implements AppView {
     private final Label detailHint = Ui.label("选中一条结果后可加入书架", "muted");
     private final Label pageSub = Ui.label("", "page-sub");
     private final Label scopeHint = Ui.label("", "muted");
+    /** 失败书源重试：只重跑上次失败的书源，并把结果合并进当前列表。 */
+    private final Button retryButton = Ui.button("重试失败书源", "ghost-button");
+    private String lastKeyword = "";
+    private List<BookSource> lastSources = List.of();
+    private List<String> failedSourceNames = List.of();
 
     public SearchView(AppContext ctx, MainWindow window) {
         this.ctx = ctx;
@@ -69,6 +74,10 @@ public class SearchView implements AppView {
 
         searchButton.setPrefHeight(32);
         searchButton.setOnAction(e -> search());
+        retryButton.setPrefHeight(32);
+        retryButton.setVisible(false);
+        retryButton.setManaged(false);
+        retryButton.setOnAction(e -> retryFailedSources());
 
         scope.setPrefWidth(176);
         scope.setPrefHeight(32);
@@ -83,7 +92,7 @@ public class SearchView implements AppView {
         header.setAlignment(Pos.CENTER_LEFT);
         header.getStyleClass().add("page-header");
 
-        HBox toolbar = new HBox(8, keyword, searchButton);
+        HBox toolbar = new HBox(8, keyword, searchButton, retryButton);
         toolbar.setAlignment(Pos.CENTER_LEFT);
         toolbar.getStyleClass().add("page-toolbar");
 
@@ -200,6 +209,11 @@ public class SearchView implements AppView {
             return;
         }
         searchButton.setDisable(true);
+        retryButton.setVisible(false);
+        retryButton.setManaged(false);
+        failedSourceNames = List.of();
+        lastKeyword = text;
+        lastSources = chosen;
         progressList.getItems().clear();
         setProgressVisible(true);
         results.getItems().clear();
@@ -239,7 +253,80 @@ public class SearchView implements AppView {
         if (aggregated.isEmpty() && !outcome.failures.isEmpty()) {
             progressList.getItems().addAll(outcome.failures);
         }
+        failedSourceNames = outcome.progress.stream()
+                .filter(item -> "失败".equals(item.state))
+                .map(item -> item.sourceName)
+                .toList();
+        retryButton.setVisible(!failedSourceNames.isEmpty());
+        retryButton.setManaged(!failedSourceNames.isEmpty());
         setProgressVisible(!progressList.getItems().isEmpty());
+    }
+
+    /** 只重跑上次失败的书源，把新结果合并进现有列表，不丢已成功的结果。 */
+    private void retryFailedSources() {
+        if (lastKeyword.isBlank() || lastSources.isEmpty() || failedSourceNames.isEmpty()) {
+            return;
+        }
+        List<BookSource> retry = new ArrayList<>();
+        for (BookSource source : lastSources) {
+            if (failedSourceNames.contains(source.name)) {
+                retry.add(source);
+            }
+        }
+        if (retry.isEmpty()) {
+            return;
+        }
+        retryButton.setDisable(true);
+        window.status("正在重试 " + retry.size() + " 个失败书源…");
+        Ui.async("search-retry",
+                () -> ctx.searchService.search(lastKeyword, retry, 1, progress -> Platform.runLater(() -> {
+                    progressList.getItems().add("[重试] " + progress);
+                    progressList.scrollTo(progressList.getItems().size() - 1);
+                })),
+                outcome -> {
+                    retryButton.setDisable(false);
+                    List<AggregatedResult> merged = new ArrayList<>(results.getItems());
+                    for (AggregatedResult incoming : outcome.aggregate()) {
+                        AggregatedResult existing = findAggregated(merged, incoming);
+                        if (existing == null) {
+                            merged.add(incoming);
+                        } else {
+                            for (SearchResult source : incoming.sources) {
+                                boolean duplicated = existing.sources.stream()
+                                        .anyMatch(item -> item.sourceName.equals(source.sourceName));
+                                if (!duplicated) {
+                                    existing.sources.add(source);
+                                }
+                            }
+                        }
+                    }
+                    results.setItems(FXCollections.observableArrayList(merged));
+                    failedSourceNames = outcome.progress.stream()
+                            .filter(item -> "失败".equals(item.state))
+                            .map(item -> item.sourceName)
+                            .toList();
+                    retryButton.setVisible(!failedSourceNames.isEmpty());
+                    retryButton.setManaged(!failedSourceNames.isEmpty());
+                    progressLabel.setText(merged.size() + " 条结果 · 已重试 "
+                            + retry.size() + " 个书源");
+                    window.status("重试完成：新增 " + outcome.results.size() + " 条结果");
+                },
+                error -> {
+                    retryButton.setDisable(false);
+                    window.status("重试失败：" + ErrorKind.classify(error).message);
+                });
+    }
+
+    private AggregatedResult findAggregated(List<AggregatedResult> list, AggregatedResult target) {
+        for (AggregatedResult item : list) {
+            boolean sameTitle = item.title != null && item.title.equals(target.title);
+            boolean sameAuthor = (item.author == null ? "" : item.author)
+                    .equals(target.author == null ? "" : target.author);
+            if (sameTitle && sameAuthor) {
+                return item;
+            }
+        }
+        return null;
     }
 
     private void showSources(AggregatedResult aggregated) {
